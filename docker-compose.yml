@@ -1,0 +1,66 @@
+# Dindon: everything runs locally. Nothing leaves the machine.
+#
+#   cp .env.example .env     (then choose the passwords)
+#   docker compose up -d --build
+#
+# Every port is published on 127.0.0.1 only: nothing is reachable from the network.
+name: dindon
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dindon
+      POSTGRES_DB: dindon
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Choose a password in .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dindon -d dindon"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://dindon:${POSTGRES_PASSWORD}@db:5432/dindon
+      DINDON_PASSWORD: ${DINDON_PASSWORD:?Choose a password in .env}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:${DINDON_PORT:-8000}:8000"
+    volumes:
+      - ./inbox:/data/inbox
+      - ./archive:/data/archive
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  # Optional: local AI inside Docker. Meant for a Linux server (with an NVIDIA GPU, add the
+  # "deploy" section of the Ollama documentation). On a Mac, Docker cannot use the GPU:
+  # run Ollama natively instead and leave this service off.
+  #   docker compose --profile ollama up -d
+  ollama:
+    profiles: ["ollama"]
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+
+volumes:
+  pgdata:
+  ollama:

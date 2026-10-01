@@ -1,0 +1,11 @@
+.git
+.env
+.venv
+**/__pycache__
+inbox
+archive
+cards
+exporter/bin
+web/node_modules
+tests
+docs

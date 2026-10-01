@@ -1,0 +1,277 @@
+{
+  "users": [
+    {
+      "id": "000000000000000000",
+      "name": "text",
+      "discriminator": "0000",
+      "isBot": false,
+      "avatarUrl": "https://example.com/..."
+    },
+    {
+      "id": "000000000000000000",
+      "name": "text",
+      "discriminator": "0000",
+      "globalName": "text",
+      "nickname": "text",
+      "color": "#000000",
+      "isBot": false,
+      "roleIds": [
+        "000000000000000000"
+      ],
+      "avatarUrl": "https://example.com/..."
+    }
+  ],
+  "roles": [
+    {
+      "id": "000000000000000000",
+      "name": "text",
+      "color": "#000000",
+      "position": 0
+    }
+  ],
+  "emojis": [
+    {
+      "name": "text (the character itself)",
+      "code": "text",
+      "isAnimated": false,
+      "imageUrl": "https://example.com/..."
+    },
+    {
+      "id": "000000000000000000",
+      "name": "text",
+      "isAnimated": false,
+      "imageUrl": "https://example.com/..."
+    }
+  ],
+  "guild": {
+    "id": "000000000000000000",
+    "name": "text",
+    "iconUrl": "https://example.com/..."
+  },
+  "channel": {
+    "id": "000000000000000000",
+    "type": "GuildTextChat",
+    "categoryId": "000000000000000000",
+    "category": "text",
+    "name": "text",
+    "topic": "text",
+    "iconUrl": "https://example.com/..."
+  },
+  "dateRange": {
+    "after": "1970-01-01T00:00:00.000Z",
+    "before": "1970-01-01T00:00:00.000Z"
+  },
+  "exportedAt": "1970-01-01T00:00:00.000Z",
+  "schemaVersion": 2,
+  "messageCount": 2,
+  "messages": [
+    {
+      "id": "000000000000000000",
+      "type": "Default",
+      "timestamp": "1970-01-01T00:00:00.000Z",
+      "content": "text",
+      "authorId": "000000000000000000"
+    },
+    {
+      "id": "000000000000000000",
+      "type": "Reply",
+      "timestamp": "1970-01-01T00:00:00.000Z",
+      "timestampEdited": "1970-01-01T00:00:00.000Z",
+      "callEndedTimestamp": "1970-01-01T00:00:00.000Z",
+      "isPinned": true,
+      "content": "text",
+      "authorId": "000000000000000000",
+      "attachments": [
+        {
+          "id": "000000000000000000",
+          "url": "https://example.com/...",
+          "fileName": "text",
+          "fileSizeBytes": 0
+        }
+      ],
+      "embeds": [
+        {
+          "title": "text",
+          "url": "https://example.com/...",
+          "timestamp": "1970-01-01T00:00:00.000Z",
+          "description": "text",
+          "color": "#000000",
+          "author": {
+            "name": "text",
+            "url": "https://example.com/...",
+            "iconUrl": "https://example.com/...",
+            "iconCanonicalUrl": "https://example.com/..."
+          },
+          "thumbnail": {
+            "url": "https://example.com/...",
+            "canonicalUrl": "https://example.com/...",
+            "width": 0,
+            "height": 0
+          },
+          "image": {
+            "url": "https://example.com/...",
+            "canonicalUrl": "https://example.com/...",
+            "width": 0,
+            "height": 0
+          },
+          "video": {
+            "url": "https://example.com/...",
+            "canonicalUrl": "https://example.com/...",
+            "width": 0,
+            "height": 0
+          },
+          "footer": {
+            "text": "text",
+            "iconUrl": "https://example.com/...",
+            "iconCanonicalUrl": "https://example.com/..."
+          },
+          "images": [
+            {
+              "url": "https://example.com/...",
+              "canonicalUrl": "https://example.com/...",
+              "width": 0,
+              "height": 0
+            }
+          ],
+          "fields": [
+            {
+              "name": "text",
+              "value": "text",
+              "isInline": false
+            }
+          ],
+          "inlineEmojis": [
+            "000000000000000000"
+          ]
+        }
+      ],
+      "stickers": [
+        {
+          "id": "000000000000000000",
+          "name": "text",
+          "format": "text",
+          "sourceUrl": "https://example.com/..."
+        }
+      ],
+      "poll": {
+        "question": "text",
+        "answers": [
+          {
+            "id": 1,
+            "text": "text",
+            "emoji": "000000000000000000",
+            "votes": 0
+          }
+        ],
+        "expiresAt": "1970-01-01T00:00:00.000Z",
+        "allowsMultipleAnswers": true,
+        "isFinalized": true
+      },
+      "reactions": [
+        {
+          "emoji": "000000000000000000",
+          "count": 0,
+          "userIds": [
+            "000000000000000000"
+          ]
+        }
+      ],
+      "mentionedUserIds": [
+        "000000000000000000"
+      ],
+      "reference": {
+        "type": "Default",
+        "messageId": "000000000000000000",
+        "channelId": "000000000000000000",
+        "guildId": "000000000000000000",
+        "authorId": "000000000000000000",
+        "content": "text"
+      },
+      "forwardedMessage": {
+        "timestamp": "1970-01-01T00:00:00.000Z",
+        "timestampEdited": "1970-01-01T00:00:00.000Z",
+        "content": "text",
+        "attachments": [
+          {
+            "id": "000000000000000000",
+            "url": "https://example.com/...",
+            "fileName": "text",
+            "fileSizeBytes": 0
+          }
+        ],
+        "embeds": [
+          {
+            "title": "text",
+            "url": "https://example.com/...",
+            "timestamp": "1970-01-01T00:00:00.000Z",
+            "description": "text",
+            "color": "#000000",
+            "author": {
+              "name": "text",
+              "url": "https://example.com/...",
+              "iconUrl": "https://example.com/...",
+              "iconCanonicalUrl": "https://example.com/..."
+            },
+            "thumbnail": {
+              "url": "https://example.com/...",
+              "canonicalUrl": "https://example.com/...",
+              "width": 0,
+              "height": 0
+            },
+            "image": {
+              "url": "https://example.com/...",
+              "canonicalUrl": "https://example.com/...",
+              "width": 0,
+              "height": 0
+            },
+            "video": {
+              "url": "https://example.com/...",
+              "canonicalUrl": "https://example.com/...",
+              "width": 0,
+              "height": 0
+            },
+            "footer": {
+              "text": "text",
+              "iconUrl": "https://example.com/...",
+              "iconCanonicalUrl": "https://example.com/..."
+            },
+            "images": [
+              {
+                "url": "https://example.com/...",
+                "canonicalUrl": "https://example.com/...",
+                "width": 0,
+                "height": 0
+              }
+            ],
+            "fields": [
+              {
+                "name": "text",
+                "value": "text",
+                "isInline": false
+              }
+            ],
+            "inlineEmojis": [
+              "000000000000000000"
+            ]
+          }
+        ],
+        "stickers": [
+          {
+            "id": "000000000000000000",
+            "name": "text",
+            "format": "text",
+            "sourceUrl": "https://example.com/..."
+          }
+        ]
+      },
+      "interaction": {
+        "id": "000000000000000000",
+        "name": "text",
+        "userId": "000000000000000000"
+      },
+      "inlineEmojis": [
+        "000000000000000000"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,668 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DiscordChatExporter JSON export, schema version 2",
+  "description": "Properties that are null or empty are left out of the export, so everything that is not listed as required is optional.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "users",
+    "roles",
+    "emojis",
+    "guild",
+    "channel",
+    "exportedAt",
+    "schemaVersion",
+    "messageCount",
+    "messages"
+  ],
+  "properties": {
+    "users": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/user"
+      },
+      "description": "Everyone who appears in the export, in order of appearance."
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/role"
+      },
+      "description": "Roles of those users, from the most to the least important."
+    },
+    "emojis": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/emoji"
+      },
+      "description": "Emoji used by the messages."
+    },
+    "guild": {
+      "$ref": "#/$defs/guild"
+    },
+    "channel": {
+      "$ref": "#/$defs/channel"
+    },
+    "dateRange": {
+      "$ref": "#/$defs/dateRange"
+    },
+    "exportedAt": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "schemaVersion": {
+      "const": 2
+    },
+    "messageCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/message"
+      }
+    }
+  },
+  "$defs": {
+    "snowflake": {
+      "type": "string",
+      "pattern": "^[0-9]{1,20}$",
+      "description": "Discord ID. Always a string, because it is too large for some tools to handle as a number."
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+      "description": "UTC, always in this exact format, so that it can be compared and sorted as text."
+    },
+    "color": {
+      "type": "string",
+      "pattern": "^#[0-9A-F]{6}$",
+      "description": "Hexadecimal color."
+    },
+    "emojiKey": {
+      "type": "string",
+      "description": "Refers to an entry of 'emojis': by its 'id' if it has one (custom emoji), by its 'name' otherwise (standard emoji, where the name is the character itself)."
+    },
+    "user": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/snowflake"
+        },
+        "name": {
+          "type": "string",
+          "description": "Username, unique on Discord."
+        },
+        "discriminator": {
+          "type": "string",
+          "description": "Legacy discriminator, '0000' for accounts that don't have one."
+        },
+        "globalName": {
+          "type": "string",
+          "description": "Display name chosen by the user. Only present if it differs from 'name'."
+        },
+        "nickname": {
+          "type": "string",
+          "description": "Nickname that the user has in this server. Only present if they set one."
+        },
+        "color": {
+          "$ref": "#/$defs/color",
+          "description": "Color of the user in this server, from their roles."
+        },
+        "isBot": {
+          "type": "boolean"
+        },
+        "roleIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/snowflake"
+          },
+          "description": "From the most to the least important."
+        },
+        "avatarUrl": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "discriminator",
+        "isBot",
+        "avatarUrl"
+      ]
+    },
+    "role": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/snowflake"
+        },
+        "name": {
+          "type": "string"
+        },
+        "color": {
+          "$ref": "#/$defs/color"
+        },
+        "position": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The higher, the more important."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "position"
+      ]
+    },
+    "emoji": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/snowflake",
+          "description": "Custom emoji only."
+        },
+        "name": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string",
+          "description": "Left out for custom emoji, where it is the same as the name."
+        },
+        "isAnimated": {
+          "type": "boolean"
+        },
+        "imageUrl": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "isAnimated",
+        "imageUrl"
+      ]
+    },
+    "guild": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/snowflake"
+        },
+        "name": {
+          "type": "string"
+        },
+        "iconUrl": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "iconUrl"
+      ]
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/snowflake"
+        },
+        "type": {
+          "type": "string",
+          "description": "Kind of channel, e.g. GuildTextChat, GuildPublicThread."
+        },
+        "categoryId": {
+          "$ref": "#/$defs/snowflake"
+        },
+        "category": {
+          "type": "string",
+          "description": "Parent of the channel: its category or, for a thread or forum post, the channel it belongs to."
+        },
+        "name": {
+          "type": "string"
+        },
+        "topic": {
+          "type": "string"
+        },
+        "iconUrl": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "name"
+      ]
+    },
+    "dateRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "before": {
+          "$ref": "#/$defs/timestamp"
+        }
+      },
+      "description": "Only present if a date limit was set."
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/snowflake"
+        },
+        "url": {
+          "type": "string"
+        },
+        "fileName": {
+          "type": "string"
+        },
+        "fileSizeBytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "url",
+        "fileName",
+        "fileSizeBytes"
+      ]
+    },
+    "embedMedia": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "canonicalUrl": {
+          "type": "string"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "embed": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "timestamp": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "description": {
+          "type": "string"
+        },
+        "color": {
+          "$ref": "#/$defs/color"
+        },
+        "author": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "iconUrl": {
+              "type": "string"
+            },
+            "iconCanonicalUrl": {
+              "type": "string"
+            }
+          }
+        },
+        "thumbnail": {
+          "$ref": "#/$defs/embedMedia"
+        },
+        "image": {
+          "$ref": "#/$defs/embedMedia"
+        },
+        "video": {
+          "$ref": "#/$defs/embedMedia"
+        },
+        "footer": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "iconUrl": {
+              "type": "string"
+            },
+            "iconCanonicalUrl": {
+              "type": "string"
+            }
+          }
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/embedMedia"
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              },
+              "isInline": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "value",
+              "isInline"
+            ]
+          }
+        },
+        "inlineEmojis": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/emojiKey"
+          }
+        }
+      }
+    },
+    "sticker": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/snowflake"
+        },
+        "name": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "sourceUrl": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "format",
+        "sourceUrl"
+      ]
+    },
+    "poll": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "question": {
+          "type": "string"
+        },
+        "answers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "text": {
+                "type": "string"
+              },
+              "emoji": {
+                "$ref": "#/$defs/emojiKey"
+              },
+              "votes": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        "expiresAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "allowsMultipleAnswers": {
+          "const": true
+        },
+        "isFinalized": {
+          "const": true
+        }
+      },
+      "required": [
+        "question",
+        "answers"
+      ]
+    },
+    "reaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "emoji": {
+          "$ref": "#/$defs/emojiKey"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "userIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/snowflake"
+          }
+        }
+      },
+      "required": [
+        "emoji",
+        "count"
+      ]
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Default (reply) or Forward."
+        },
+        "messageId": {
+          "$ref": "#/$defs/snowflake"
+        },
+        "channelId": {
+          "$ref": "#/$defs/snowflake"
+        },
+        "guildId": {
+          "$ref": "#/$defs/snowflake"
+        },
+        "authorId": {
+          "$ref": "#/$defs/snowflake",
+          "description": "Replies only: author of the message that is replied to."
+        },
+        "content": {
+          "type": "string",
+          "description": "Replies only: content of the message that is replied to."
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "forwardedMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timestamp": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "timestampEdited": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "content": {
+          "type": "string"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/attachment"
+          }
+        },
+        "embeds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/embed"
+          }
+        },
+        "stickers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sticker"
+          }
+        }
+      },
+      "required": [
+        "timestamp",
+        "content"
+      ]
+    },
+    "interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/snowflake"
+        },
+        "name": {
+          "type": "string"
+        },
+        "userId": {
+          "$ref": "#/$defs/snowflake"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "userId"
+      ]
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/snowflake"
+        },
+        "type": {
+          "type": "string",
+          "description": "Kind of message: Default, Reply, ChannelPinnedMessage, ChatInputCommand, etc."
+        },
+        "timestamp": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "timestampEdited": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "callEndedTimestamp": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "isPinned": {
+          "const": true,
+          "description": "Only present if the message is pinned."
+        },
+        "content": {
+          "type": "string"
+        },
+        "authorId": {
+          "$ref": "#/$defs/snowflake"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/attachment"
+          }
+        },
+        "embeds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/embed"
+          }
+        },
+        "stickers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sticker"
+          }
+        },
+        "poll": {
+          "$ref": "#/$defs/poll"
+        },
+        "reactions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/reaction"
+          }
+        },
+        "mentionedUserIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/snowflake"
+          }
+        },
+        "reference": {
+          "$ref": "#/$defs/reference"
+        },
+        "forwardedMessage": {
+          "$ref": "#/$defs/forwardedMessage"
+        },
+        "interaction": {
+          "$ref": "#/$defs/interaction"
+        },
+        "inlineEmojis": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/emojiKey"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "timestamp",
+        "content",
+        "authorId"
+      ]
+    }
+  }
+}
