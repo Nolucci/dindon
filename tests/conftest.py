@@ -47,3 +47,31 @@ def conn(migrated_url):
     with psycopg.connect(migrated_url) as connection:
         yield connection
         connection.rollback()
+
+
+# The generators of invented servers live in tools/, next to the scripts that use them
+import sys  # noqa: E402
+
+sys.path.insert(0, str(ROOT / "tools"))
+
+
+@pytest.fixture
+def ingest_url(migrated_url):
+    """The URL of a database of its own (copy of the migrated one), for the tests that really commit, as an import does."""
+    import uuid
+
+    name = "dindon_t_" + uuid.uuid4().hex[:8]
+    base, _, _ = migrated_url.rpartition("/")
+    with psycopg.connect(migrated_url, autocommit=True) as admin:
+        admin.execute(f'CREATE DATABASE "{name}" TEMPLATE dindon')
+    try:
+        yield f"{base}/{name}"
+    finally:
+        with psycopg.connect(migrated_url, autocommit=True) as admin:
+            admin.execute(f'DROP DATABASE "{name}" WITH (FORCE)')
+
+
+@pytest.fixture
+def ingest_db(ingest_url):
+    with psycopg.connect(ingest_url, autocommit=True) as connection:
+        yield connection
