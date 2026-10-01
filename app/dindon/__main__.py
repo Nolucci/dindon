@@ -1,4 +1,4 @@
-"""Command line: dindon migrate | check | serve | ingest FILE... | rebuild-edges"""
+"""Command line: dindon migrate | check | serve | ingest FILE... | backfill | catchup | rebuild-edges"""
 import argparse
 import json
 import sys
@@ -40,6 +40,35 @@ def _ingest(settings, paths: list[Path], prune: bool) -> int:
     return 1 if failed else 0
 
 
+ACCOUNT_WARNING = (
+    "WARNING: this token belongs to a personal account. Automating a personal account is against Discord's terms of\n"
+    "service and can get it closed. A bot token is recommended (see README.md)."
+)
+
+
+def _collector(settings, guilds: list[int] | None):
+    from dataclasses import replace
+
+    from dindon.collector.watch import Collector
+
+    guild_ids = tuple(guilds or settings.guild_ids)
+    if not settings.discord_token or not guild_ids:
+        sys.exit("Set DISCORD_TOKEN and DINDON_GUILD_IDS in .env (or pass --guild).")
+    collector = Collector(replace(settings, guild_ids=guild_ids))
+    if collector.api.resolve_kind() == "account":
+        print(ACCOUNT_WARNING, file=sys.stderr)
+    return collector
+
+
+def _new_connection(settings):
+    def new():
+        conn = connect(settings.database_url, wait=5)
+        conn.autocommit = True
+        return conn
+
+    return new
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="dindon")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -47,6 +76,11 @@ def main() -> None:
     sub.add_parser("check", help="print what the database is made of")
     sub.add_parser("serve", help="migrate, then run the application (ingestion, collection, API, interface)")
     sub.add_parser("rebuild-edges", help="rebuild the links between people from the messages (after changing the half-life)")
+    backfill = sub.add_parser("backfill", help="first import of a whole server (can be stopped and started again)")
+    backfill.add_argument("--guild", type=int, action="append", help="server ID (default: DINDON_GUILD_IDS)")
+    backfill.add_argument("--parallel", type=int, default=2, help="channels exported at the same time (default 2)")
+    catchup = sub.add_parser("catchup", help="export the last days again now, to see what was edited or deleted")
+    catchup.add_argument("--guild", type=int, action="append")
     ingest = sub.add_parser("ingest", help="import JSON v2 exports (files or folders)")
     ingest.add_argument("paths", nargs="+", type=Path)
     ingest.add_argument("--prune", action="store_true", help="the files are complete re-exports of a window: remove what is gone from it")
@@ -69,12 +103,26 @@ def main() -> None:
     if args.command == "ingest":
         sys.exit(_ingest(settings, args.paths, args.prune))
 
+    if args.command == "backfill":
+        collector = _collector(settings, args.guild)
+        with connect(settings.database_url, wait=60) as conn:
+            migrate(conn, settings.db_dir)
+        for guild_id in collector.settings.guild_ids:
+            print(f"server {guild_id}: reactions cost one request each, so a big server takes a while")
+            print(collector.backfill(_new_connection(settings), guild_id, parallel=args.parallel))
+
+    if args.command == "catchup":
+        collector = _collector(settings, args.guild)
+        with _new_connection(settings)() as conn:
+            print(f"{collector.catchup(conn)} channels exported again")
+
     if args.command == "serve":
         import uvicorn
 
         from dindon.api.main import create_app
 
-        uvicorn.run(create_app(settings), host=settings.host, port=settings.port, log_level="info")
+        # Open pages (live events) must not keep the application from stopping: `docker stop` waits 10 seconds
+        uvicorn.run(create_app(settings), host=settings.host, port=settings.port, log_level="info", timeout_graceful_shutdown=3)
 
 
 if __name__ == "__main__":

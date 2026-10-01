@@ -27,6 +27,10 @@ INGEST_LOCK = 7_262_025  # one import at a time: they all touch the same people 
 NOTIFY_CHANNEL = "dindon"
 MAX_EDGE_EVENTS = 200  # beyond this, the interface is told to reload instead of one event per link
 MESSAGE_EXTRA_KEYS = ("embeds", "stickers", "poll", "forwardedMessage")
+# A re-export that seems to lack more than this share of a window (and at least this many messages) is more likely a
+# broken export than real deletions: nothing is removed then
+PRUNE_MAX_SHARE = 0.3
+PRUNE_MIN_COUNT = 50
 
 
 class InvalidExport(Exception):
@@ -43,6 +47,7 @@ class IngestResult:
     messages_new: int = 0
     messages_updated: int = 0
     messages_removed: int = 0
+    prune_skipped: int = 0  # messages that seemed deleted but were kept, see PRUNE_MAX_SHARE
     edges_changed: int = 0
     seconds: float = 0.0
 
@@ -308,6 +313,15 @@ def _apply(conn: psycopg.Connection, document: dict, run_id: int, params: dict, 
                          AND m.sent_at <= (SELECT max(sent_at) FROM stg_messages)
                          AND NOT EXISTS (SELECT 1 FROM stg_messages s WHERE s.id = m.id)""",
                     {**params, "after": _when(document["dateRange"]["after"])})
+        cur.execute("SELECT count(*) FROM pruned")
+        seems_deleted = cur.fetchone()[0]
+        if seems_deleted >= PRUNE_MIN_COUNT:
+            cur.execute("""SELECT count(*) FROM messages m WHERE m.channel_id = %(channel)s AND m.sent_at > %(after)s
+                             AND m.sent_at <= (SELECT max(sent_at) FROM stg_messages)""",
+                        {**params, "after": _when(document["dateRange"]["after"])})
+            if seems_deleted > PRUNE_MAX_SHARE * cur.fetchone()[0]:
+                cur.execute("DELETE FROM pruned")
+                result.prune_skipped = seems_deleted
     cur.execute("CREATE TEMP TABLE touched ON COMMIT DROP AS SELECT id FROM applied UNION ALL SELECT id FROM pruned")
     cur.execute("ANALYZE applied; ANALYZE touched")
 

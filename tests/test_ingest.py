@@ -374,3 +374,21 @@ def test_the_analysis_of_a_changed_channel_is_queued_once(ingest_db, world, file
         ingest_file(conn, path)
     jobs = conn.execute("SELECT kind, count(*) FROM jobs GROUP BY kind").fetchall()
     assert jobs == [("conversations", 3)]
+
+
+def test_a_catch_up_that_seems_to_lack_most_of_a_window_deletes_nothing(ingest_db, world, tmp_path):
+    """A broken export must not wipe what is known: more than 30% of a window missing is not believed."""
+    conn = ingest_db
+    channel = max(world.channels, key=lambda c: len(c.messages))
+    when = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    ingest_file(conn, write_doc(tmp_path / "all.json", _document_of(world, channel, when)))
+    ids = [int(m["id"]) for m in channel.messages]
+    document = json.loads(world.export_document(channel, after_id=ids[len(ids) // 4], exported_at=when + timedelta(days=1)))
+    keep = document["messages"][::4] + [document["messages"][-1]]  # three quarters are missing
+    missing = len(document["messages"]) - len(keep)
+    assert missing > 60
+    document["messages"], document["messageCount"] = keep, len(keep)
+    before = conn.execute("SELECT count(*) FROM messages").fetchone()[0]
+    result = ingest_file(conn, write_doc(tmp_path / "broken.json", document), prune=True)
+    assert result.messages_removed == 0 and result.prune_skipped >= 60
+    assert conn.execute("SELECT count(*) FROM messages").fetchone()[0] == before

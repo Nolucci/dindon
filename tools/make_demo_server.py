@@ -549,7 +549,7 @@ class World:
     def channel_listing(self) -> list[dict]:
         """What `GET /guilds/{id}/channels` returns (the parts that matter)."""
         return [{"id": str(c.id), "type": 0, "name": c.name, "parent_id": str(c.category_id), "last_message_id": c.last_message_id}
-                for c in self.channels]
+                for c in self.channels if c.parent_id is None]
 
 
 def write_exports(world: World, out: Path, partition: int = 0) -> list[Path]:
