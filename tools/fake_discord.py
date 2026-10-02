@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import threading
 import time
 import urllib.parse
@@ -21,6 +22,65 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from make_demo_server import World, iso
 
 API = "/api/v10"
+
+
+def _matches(expression: str, message: dict) -> bool:
+    """The part of the exporter's filter language that the importer writes: from:ID, mentions:ID, '|' (or), a space (and), groups."""
+    tokens = [t for t in re.findall(r"\(|\)|\||[^\s()|]+", expression)]
+    position = 0
+
+    def peek():
+        return tokens[position] if position < len(tokens) else None
+
+    def either() -> bool:
+        nonlocal position
+        result = both()
+        while peek() == "|":
+            position += 1
+            right = both()
+            result = result or right
+        return result
+
+    def both() -> bool:
+        nonlocal position
+        result = single()
+        while peek() not in (None, "|", ")"):
+            right = single()
+            result = result and right
+        return result
+
+    def single() -> bool:
+        nonlocal position
+        token = tokens[position]
+        position += 1
+        if token == "(":
+            inner = either()
+            assert peek() == ")", "unbalanced group in the filter"
+            position += 1
+            return inner
+        key, _, value = token.partition(":")
+        if key == "from":
+            return message["authorId"] == value
+        if key == "mentions":
+            return value in message.get("mentionedUserIds", [])
+        raise AssertionError(f"the fake exporter does not know the filter {token!r}")
+
+    result = either()
+    assert position == len(tokens), "the filter was not understood"
+    return result
+
+
+def apply_filter(text: str, expression: str) -> str:
+    """What the exporter would have written: only the messages that match, and only the people they involve."""
+    document = json.loads(text)
+    document["messages"] = [m for m in document["messages"] if _matches(expression, m)]
+    document["messageCount"] = len(document["messages"])
+    involved = set()
+    for m in document["messages"]:
+        involved |= {m["authorId"], *m.get("mentionedUserIds", []), *([m["reference"]["authorId"]] if "authorId" in m.get("reference", {}) else []),
+                     *[u for r in m.get("reactions", []) for u in r.get("userIds", [])], *([m["interaction"]["userId"]] if "interaction" in m else [])}
+    document["users"] = [u for u in document["users"] if u["id"] in involved]
+    return json.dumps(document, ensure_ascii=False, separators=(",", ":"))
 
 
 class FakeDiscord:
@@ -81,7 +141,10 @@ class FakeDiscord:
                 if channel is None:
                     return self._send(404, {"message": "Unknown Channel"})
                 after = int(query["after"][0]) if "after" in query else None
-                text = outer.world.export_document(channel, after_id=after, exported_at=datetime.now(timezone.utc))
+                before = int(query["before"][0]) if "before" in query else None
+                text = outer.world.export_document(channel, after_id=after, before_id=before, exported_at=datetime.now(timezone.utc))
+                if "filter" in query:
+                    text = apply_filter(text, query["filter"][0])
                 self._send(200, text, raw=True)
 
             def do_POST(self):

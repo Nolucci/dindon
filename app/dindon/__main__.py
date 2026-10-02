@@ -1,4 +1,4 @@
-"""Command line: dindon migrate | check | serve | bot | ingest FILE... | backfill | catchup | rebuild-edges"""
+"""Command line: dindon migrate | check | serve | bot | ingest FILE... | backfill [--channel … --from … --mentioning … --after … --before …] | catchup | rebuild-edges"""
 import argparse
 import json
 import sys
@@ -60,6 +60,16 @@ def _collector(settings, guilds: list[int] | None):
     return collector
 
 
+def selection_from(args):
+    """What the command line asks to import (a part of a server, or all of it), or an end of the program that says what is wrong."""
+    from dindon.collector.selection import ImportSelection, SelectionError
+
+    try:
+        return ImportSelection.parse(args.channels, args.authors, args.mentions, args.after, args.before)
+    except SelectionError as error:
+        sys.exit(str(error))
+
+
 def _new_connection(settings):
     def new():
         conn = connect(settings.database_url, wait=5)
@@ -80,6 +90,14 @@ def main() -> None:
     backfill = sub.add_parser("backfill", help="first import of a whole server (can be stopped and started again)")
     backfill.add_argument("--guild", type=int, action="append", help="server ID (default: DINDON_GUILD_IDS)")
     backfill.add_argument("--parallel", type=int, default=2, help="channels exported at the same time (default 2)")
+    backfill.add_argument("--channel", action="append", dest="channels", metavar="NAME_OR_ID",
+                          help="only this channel, by name or id (can be repeated). It is imported completely")
+    backfill.add_argument("--from", action="append", dest="authors", metavar="USER_ID",
+                          help="only the messages written by this person, by Discord id (can be repeated). A partial import")
+    backfill.add_argument("--mentioning", action="append", dest="mentions", metavar="USER_ID",
+                          help="only the messages that mention this person, by Discord id (can be repeated). A partial import")
+    backfill.add_argument("--after", metavar="YYYY-MM-DD", help="only from this day (included). A partial import")
+    backfill.add_argument("--before", metavar="YYYY-MM-DD", help="only up to this day (included). A partial import")
     catchup = sub.add_parser("catchup", help="export the last days again now, to see what was edited or deleted")
     catchup.add_argument("--guild", type=int, action="append")
     ingest = sub.add_parser("ingest", help="import JSON v2 exports (files or folders)")
@@ -110,12 +128,23 @@ def main() -> None:
         sys.exit(_ingest(settings, args.paths, args.prune))
 
     if args.command == "backfill":
+        selection = selection_from(args)
         collector = _collector(settings, args.guild)
+        if selection.channels and len(collector.settings.guild_ids) > 1:
+            sys.exit("Plusieurs serveurs sont suivis : précisez lequel avec --guild pour choisir des salons.")
         with connect(settings.database_url, wait=60) as conn:
             migrate(conn, settings.db_dir)
+        if selection.partial:
+            print("Narrowed import: it brings only a part of the channels, so it does not count as a first import, "
+                  "and a complete `dindon backfill` later still brings everything.")
+        from dindon.collector.selection import SelectionError
+
         for guild_id in collector.settings.guild_ids:
             print(f"server {guild_id}: reactions cost one request each, so a big server takes a while")
-            print(collector.backfill(_new_connection(settings), guild_id, parallel=args.parallel))
+            try:
+                print(collector.backfill(_new_connection(settings), guild_id, parallel=args.parallel, selection=selection))
+            except SelectionError as error:
+                sys.exit(str(error))
 
     if args.command == "catchup":
         collector = _collector(settings, args.guild)

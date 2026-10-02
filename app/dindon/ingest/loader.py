@@ -418,7 +418,7 @@ def _apply(conn: psycopg.Connection, document: dict, run_id: int, params: dict, 
 
 
 def ingest_document(conn: psycopg.Connection, document: dict, name: str, sha256: str, prune: bool = False,
-                    only_new: bool = False, consume: bool = False) -> IngestResult:
+                    only_new: bool = False, consume: bool = False, partial: bool = False) -> IngestResult:
     """Imports one JSON v2 document, whatever its origin (an export file, the live bot). `sha256` identifies it: a document
     that was already imported (same hash) is skipped.
 
@@ -428,6 +428,9 @@ def ingest_document(conn: psycopg.Connection, document: dict, name: str, sha256:
     `only_new` is for a source that only announces new messages (the bot, on MESSAGE_CREATE): a message that the database
     already has is left exactly as it is. Such a document knows nothing of reactions or edits that the database may have
     learned elsewhere, and importing it as a snapshot would erase them. It is what makes a duplicate event harmless.
+
+    `partial` records that this document brings only a part of what its channel contains (an import narrowed by people or by a
+    period): it is then never taken for a complete history (see collector/selection.py).
 
     `consume` lets the import take the messages out of `document` as they become rows, so that a very big file is not held
     twice in memory (ingest_file does). Without it the document is left intact: a failed attempt can be sent again."""
@@ -453,8 +456,8 @@ def ingest_document(conn: psycopg.Connection, document: dict, name: str, sha256:
             result.seconds = time.monotonic() - started
             return result
         cur.execute("""INSERT INTO ingest_runs (source_file, source_sha256, schema_version, exported_at, guild_id, channel_id,
-                           message_count, date_after, date_before) VALUES (%s, %s, 2, %s, %s, %s, %s, %s, %s) RETURNING id""",
-                    (name, sha256, exported_at, guild_id, channel_id, len(document["messages"]), date_after, date_before))
+                           message_count, date_after, date_before, is_partial) VALUES (%s, %s, 2, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+                    (name, sha256, exported_at, guild_id, channel_id, len(document["messages"]), date_after, date_before, partial))
         result.run_id = cur.fetchone()[0]
         try:
             _stage(cur, document, guild_id)
@@ -468,10 +471,10 @@ def ingest_document(conn: psycopg.Connection, document: dict, name: str, sha256:
     return result
 
 
-def ingest_file(conn: psycopg.Connection, path: Path, prune: bool = False) -> IngestResult:
-    """Imports one export file (see ingest_document for `prune`)."""
+def ingest_file(conn: psycopg.Connection, path: Path, prune: bool = False, partial: bool = False) -> IngestResult:
+    """Imports one export file (see ingest_document for `prune` and `partial`)."""
     raw = path.read_bytes()
     sha = hashlib.sha256(raw).hexdigest()
     document = parse_export(raw, path.name)
     del raw  # a big file is about ten times its size in memory: nothing else keeps it alive
-    return ingest_document(conn, document, path.name, sha, prune=prune, consume=True)
+    return ingest_document(conn, document, path.name, sha, prune=prune, consume=True, partial=partial)

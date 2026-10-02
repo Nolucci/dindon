@@ -205,13 +205,13 @@ def test_the_token_goes_to_the_exporter_by_the_environment_not_the_command_line(
     seen = {}
     import subprocess
 
-    real_run = subprocess.run
+    real_popen = subprocess.Popen
 
     def spy(args, **kwargs):
         seen["args"], seen["env_token"] = args, kwargs["env"].get("DISCORD_TOKEN")
-        return real_run(args, **kwargs)
+        return real_popen(args, **kwargs)
 
-    monkeypatch.setattr(subprocess, "run", spy)
+    monkeypatch.setattr(subprocess, "Popen", spy)
     exporter = Exporter(f"{shlex.quote(sys.executable)} {shlex.quote(str(TOOLS / 'fake_exporter.py'))}", TOKEN)
     out = tmp_path / "out"
     files = exporter.export(world.channels[0].id, out)

@@ -15,6 +15,7 @@ downloads only what is new, and the file is imported (and archived). Nothing is 
 import asyncio
 import logging
 import tempfile
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -25,7 +26,9 @@ from typing import Callable
 import psycopg
 
 from dindon.collector.discord_api import DiscordAPI, DiscordError, RateLimited, Watched
-from dindon.collector.exporter import Exporter, ExporterError
+from dindon.collector.exporter import Exporter, ExporterCancelled, ExporterError
+from dindon.collector.selection import ImportSelection, resolve_channels
+from dindon.collector.snowflake import DISCORD_EPOCH_MS, created_at, snowflake_at  # noqa: F401 (also read from here)
 from dindon.config import Settings
 from dindon.db import connect
 from dindon.ingest.inbox import archive_file
@@ -33,23 +36,14 @@ from dindon.ingest.loader import GATEWAY_SOURCE, InvalidExport, ingest_file
 
 log = logging.getLogger("dindon.collector")
 
-DISCORD_EPOCH_MS = 1_420_070_400_000
 BACKFILL_PARTITION = 50_000  # messages per file in a first import: each file is complete, so progress is kept
-
-
-def snowflake_at(when: datetime) -> int:
-    """The message id that corresponds to a date: everything sent after `when` has a larger id."""
-    return (int(when.timestamp() * 1000) - DISCORD_EPOCH_MS) << 22
-
-
-def created_at(snowflake: int) -> datetime:
-    return datetime.fromtimestamp(((snowflake >> 22) + DISCORD_EPOCH_MS) / 1000, tz=timezone.utc)
 
 
 @dataclass
 class ExportOutcome:
     ok: bool
     new_messages: int = 0
+    cancelled: bool = False
 
 
 class Collector:
@@ -75,12 +69,13 @@ class Collector:
     def _known(conn: psycopg.Connection, channels: list[Watched], exported_only: bool = False) -> dict[int, int]:
         """The newest message of each channel that the database has. A forum only has posts: it is its newest post's messages.
 
-        `exported_only` leaves out what only the live bot has written. A first import goes on "after the newest message it has", which
-        is right for what an export brought (it brings everything up to there), and wrong for a message that the bot announced: the
-        history before it is not here."""
+        `exported_only` leaves out what only the live bot has written, and what only a partial import (narrowed by people or by a period)
+        brought. A first import goes on "after the newest message it has", which is right for what a complete export brought (it
+        brings everything up to there), and wrong for a message that the bot announced or that a narrowed import picked: the history
+        before it is not here."""
         params = {"live": GATEWAY_SOURCE}
-        from_exports = ("AND EXISTS (SELECT 1 FROM ingest_runs r WHERE r.id = m.last_seen_run_id AND r.source_file IS DISTINCT FROM %(live)s)"
-                        if exported_only else "")
+        from_exports = ("AND EXISTS (SELECT 1 FROM ingest_runs r WHERE r.id = m.last_seen_run_id AND r.source_file IS DISTINCT FROM %(live)s "
+                        "AND NOT r.is_partial)" if exported_only else "")
         known: dict[int, int] = {}
         ids = [c.id for c in channels if c.kind != "forum"]
         for channel_id, last in conn.execute(
@@ -107,24 +102,29 @@ class Collector:
         log.warning("export of channel %s failed (%d in a row): %s", channel_id, count, self._state["last_error"])
 
     def _export(self, conn: psycopg.Connection, channel: Watched, after: int | None, threads: str = "none",
-                prune: bool = False, partition: int | None = None) -> ExportOutcome:
+                prune: bool = False, partition: int | None = None, before: int | None = None, message_filter: str | None = None,
+                partial: bool = False, cancel: threading.Event | None = None) -> ExportOutcome:
         root = self.settings.inbox_dir / ".collector"  # hidden: the inbox does not import from there by itself
         root.mkdir(parents=True, exist_ok=True)
         new = 0
         try:
             with tempfile.TemporaryDirectory(dir=root) as tmp:
-                for path in self.exporter.export(channel.id, Path(tmp), after=after, threads=threads, partition=partition):
+                for path in self.exporter.export(channel.id, Path(tmp), after=after, threads=threads, partition=partition, before=before,
+                                                 message_filter=message_filter, cancel=cancel):
                     if path.stat().st_size == 0:
                         continue  # an empty channel, or nothing new: the exporter leaves an empty file
-                    result = ingest_file(conn, path, prune=prune)
+                    result = ingest_file(conn, path, prune=prune, partial=partial)
                     if result.prune_skipped:
                         log.warning("channel %s: %d messages seem deleted but it is too many to be believed: kept", channel.id, result.prune_skipped)
                     archive_file(path, self.settings.archive_dir, result.sha256)
                     new += result.messages_new
+        except ExporterCancelled:
+            return ExportOutcome(False, cancelled=True)
         except (ExporterError, InvalidExport, psycopg.Error) as error:
             self._fail(channel.id, error)
             return ExportOutcome(False)
-        self._exported_up_to[channel.id] = channel.last_message_id or 0
+        if not partial:  # a narrowed import says nothing of what the channel contains up to its newest message
+            self._exported_up_to[channel.id] = channel.last_message_id or 0
         self._failures.pop(channel.id, None)
         self._state["exports"] += 1
         self._state["last_export_at"] = datetime.now(timezone.utc).isoformat()
@@ -142,9 +142,9 @@ class Collector:
         exports = 0
         for guild_id in self.settings.guild_ids:
             channels = self._channels_of(guild_id)
-            # The first import is an import of a history: what the live bot writes does not count
-            first_import = conn.execute("SELECT min(imported_at) FROM ingest_runs WHERE guild_id = %s AND source_file IS DISTINCT FROM %s",
-                                        (guild_id, GATEWAY_SOURCE)).fetchone()[0]
+            # The first import is an import of a complete history: what the live bot writes, or a narrowed import, does not count
+            first_import = conn.execute("SELECT min(imported_at) FROM ingest_runs WHERE guild_id = %s AND source_file IS DISTINCT FROM %s "
+                                        "AND NOT is_partial", (guild_id, GATEWAY_SOURCE)).fetchone()[0]
             if first_import is None:
                 self._needs_backfill.add(guild_id)
                 continue
@@ -220,33 +220,58 @@ class Collector:
     # --- first import -------------------------------------------------------------------------------
 
     def backfill(self, new_connection: Callable[[], psycopg.Connection], guild_id: int, parallel: int = 2,
-                 progress: Callable[[str], None] = print) -> dict:
+                 progress: Callable[[str], None] = print, selection: ImportSelection | None = None,
+                 cancel: threading.Event | None = None, report: Callable[[dict], None] | None = None) -> dict:
         """Imports a whole server, a channel after the other (`parallel` at a time). It can be stopped and started again:
         a channel that is already up to date is skipped, and one that is partly done goes on after its newest message.
-        Reactions cost one request each: this is the slow part on a big server."""
+        Reactions cost one request each: this is the slow part on a big server.
+
+        `selection` narrows it (see collector/selection.py): some channels only, which are still imported completely; and/or only some
+        people's messages, or a period, which brings a part of the channels and is recorded as partial (no resuming, and it never counts
+        as a complete history). `cancel`, once set, ends the exporter and starts no other channel. `report` receives what happens, as
+        dictionaries, for a screen that shows the progress."""
+        report = report or (lambda event: None)
+        selection = selection or ImportSelection()
         self.api.resolve_kind()
         mode = self.settings.exporter_threads
-        channels = self._channels_of(guild_id)
+        available = self._channels_of(guild_id)
+        chosen = resolve_channels(selection.channels, available) if selection.channels else available
+        explicit = {c.id for c in chosen} if selection.channels else set()
         with new_connection() as conn:
-            known = self._known(conn, channels, exported_only=True)
+            known = {} if selection.partial else self._known(conn, chosen, exported_only=True)
         todo = []
-        for channel in channels:
+        for channel in chosen:
             have = known.get(channel.id)
             if channel.last_message_id is None or (have is not None and have >= channel.last_message_id):
                 continue
-            if channel.kind == "thread" and mode != "none":
+            if channel.kind == "thread" and mode != "none" and channel.id not in explicit:
                 continue  # exported with its parent channel
             todo.append((channel, have))
-        progress(f"{len(todo)} channels to import out of {len(channels)} ({parallel} at a time)")
+        what = "narrowed import (partial): " if selection.partial else ""
+        progress(f"{what}{len(todo)} channels to import out of {len(available)} ({parallel} at a time)")
+        report({"event": "planned", "channels": len(todo), "of": len(available)})
         totals = {"channels": 0, "failed": 0, "messages": 0}
+        if cancel is not None:
+            totals["cancelled"] = 0
 
         def work(item: tuple[Watched, int | None], number: int) -> None:
             channel, have = item
+            if cancel is not None and cancel.is_set():
+                totals["cancelled"] += 1
+                return
             with new_connection() as conn:
-                outcome = self._export(conn, channel, after=have, threads=mode if channel.kind != "thread" else "none", partition=BACKFILL_PARTITION)
-            totals["channels" if outcome.ok else "failed"] += 1
-            totals["messages"] += outcome.new_messages
-            progress(f"[{number}/{len(todo)}] {channel.name or channel.id}: " + (f"{outcome.new_messages} messages" if outcome.ok else "failed"))
+                outcome = self._export(conn, channel, after=selection.after_id() if selection.partial else have, before=selection.before_id(),
+                                       message_filter=selection.message_filter(), partial=selection.partial, cancel=cancel,
+                                       threads=mode if channel.kind != "thread" else "none", partition=BACKFILL_PARTITION)
+            if outcome.cancelled:
+                totals["cancelled"] += 1
+            else:
+                totals["channels" if outcome.ok else "failed"] += 1
+                totals["messages"] += outcome.new_messages
+            progress(f"[{number}/{len(todo)}] {channel.name or channel.id}: " +
+                     ("cancelled" if outcome.cancelled else f"{outcome.new_messages} messages" if outcome.ok else "failed"))
+            report({"event": "channel", "name": channel.name or str(channel.id), "ok": outcome.ok, "cancelled": outcome.cancelled,
+                    "messages": outcome.new_messages})
 
         with ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
             futures = [pool.submit(work, item, number) for number, item in enumerate(todo, 1)]

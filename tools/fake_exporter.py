@@ -31,8 +31,9 @@ def main(argv: list[str]) -> int:
         print("Failed to export channel (simulated)", file=sys.stderr)
         return 1
     query = {"channel": channel}
-    if "--after" in options:
-        query["after"] = options["--after"]
+    for option in ("after", "before", "filter"):
+        if f"--{option}" in options:
+            query[option] = options[f"--{option}"]
     request = urllib.request.Request(f"{os.environ['FAKE_DISCORD_URL']}/_fake/export?{urllib.parse.urlencode(query)}", headers={"Authorization": token})
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
