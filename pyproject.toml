@@ -18,6 +18,8 @@ dev = [
     "pytest>=8",
     "httpx2",
 ]
+# Only for tools/check_ui.py (a real browser): pip install -e ".[e2e]" && playwright install chromium
+e2e = ["playwright"]
 
 [project.scripts]
 dindon = "dindon.__main__:main"

@@ -124,7 +124,8 @@ def _stage(cur: psycopg.Cursor, document: dict, guild_id: int) -> None:
         emojis[key] = (key, _int_or_none(e.get("id")), _text(e["name"]), e.get("code"), bool(e.get("isAnimated", False)), e["imageUrl"])
 
     messages, attachments, mentions, message_emojis, reactions, reaction_users = [], [], [], [], [], []
-    for m in document["messages"]:
+    source = document.pop("messages")  # taken out of the document: they are freed as soon as they are rows
+    for m in source:
         mid = int(m["id"])
         ref = m.get("reference") or {}
         inter = m.get("interaction")
@@ -146,24 +147,32 @@ def _stage(cur: psycopg.Cursor, document: dict, guild_id: int) -> None:
             reactions.append((mid, r["emoji"], r["count"]))
             for uid in r.get("userIds", ()):
                 reaction_users.append((mid, r["emoji"], int(uid)))
+    del source
 
-    for table, columns, rows in (
-        ("stg_users", "id, name, discriminator, global_name, is_bot, nickname, color, avatar_url, has_member", users.values()),
-        ("stg_user_roles", "user_id, role_id", user_roles),
-        ("stg_roles", "id, name, color, position", roles.values()),
-        ("stg_emojis", "key, id, name, code, is_animated, image_url", emojis.values()),
-        ("stg_messages", "id, author_id, type, sent_at, edited_at, call_ended_at, is_pinned, content, reference_type, "
-                         "reference_message_id, reference_channel_id, reference_guild_id, reference_author_id, reference_content, "
-                         "interaction_id, interaction_name, interaction_user_id, extra", messages),
-        ("stg_attachments", "id, message_id, url, file_name, size_bytes", attachments),
-        ("stg_mentions", "message_id, user_id", mentions),
-        ("stg_message_emojis", "message_id, emoji_key", message_emojis),
-        ("stg_reactions", "message_id, emoji_key, count", reactions),
-        ("stg_reaction_users", "message_id, emoji_key, user_id", reaction_users),
-    ):
-        with cur.copy(f"COPY {table} ({columns}) FROM STDIN") as copy:
+    columns = {
+        "stg_users": "id, name, discriminator, global_name, is_bot, nickname, color, avatar_url, has_member",
+        "stg_user_roles": "user_id, role_id",
+        "stg_roles": "id, name, color, position",
+        "stg_emojis": "key, id, name, code, is_animated, image_url",
+        "stg_messages": "id, author_id, type, sent_at, edited_at, call_ended_at, is_pinned, content, reference_type, reference_message_id, "
+                        "reference_channel_id, reference_guild_id, reference_author_id, reference_content, interaction_id, "
+                        "interaction_name, interaction_user_id, extra",
+        "stg_attachments": "id, message_id, url, file_name, size_bytes",
+        "stg_mentions": "message_id, user_id",
+        "stg_message_emojis": "message_id, emoji_key",
+        "stg_reactions": "message_id, emoji_key, count",
+        "stg_reaction_users": "message_id, emoji_key, user_id",
+    }
+    batches = {"stg_users": users.values(), "stg_user_roles": user_roles, "stg_roles": roles.values(), "stg_emojis": emojis.values(),
+               "stg_messages": messages, "stg_attachments": attachments, "stg_mentions": mentions,
+               "stg_message_emojis": message_emojis, "stg_reactions": reactions, "stg_reaction_users": reaction_users}
+    del messages, attachments, mentions, message_emojis, reactions, reaction_users
+    for table in list(batches):
+        rows = batches.pop(table)  # each batch is freed once it is written
+        with cur.copy(f"COPY {table} ({columns[table]}) FROM STDIN") as copy:
             for row in rows:
                 copy.write_row(row)
+        del rows
 
 
 # ---------------------------------------------------------------------------------------------
@@ -238,6 +247,7 @@ GROUP BY k.f, k.t, k.kind, k.tt, k.w0, k.n0, k.l0, hl.s
 
 
 def _apply(conn: psycopg.Connection, document: dict, run_id: int, params: dict, prune: bool, result: IngestResult) -> list[dict]:
+    # (the messages are in the staging tables by now: document["messages"] is gone)
     """Writes the staged data. Returns the notifications to send."""
     cur = conn.cursor()
     exported_at = params["exported_at"]
@@ -305,7 +315,7 @@ def _apply(conn: psycopg.Connection, document: dict, run_id: int, params: dict, 
                    WHERE m.id IS NULL OR r.id IS NULL OR r.exported_at <= %(exported_at)s
                    ORDER BY s.id""", params)
     cur.execute("CREATE TEMP TABLE pruned (id bigint) ON COMMIT DROP")
-    if prune and document["messages"] and "after" in document.get("dateRange", {}):
+    if prune and result.messages_in_file and "after" in document.get("dateRange", {}):
         # A complete re-export of a window: what the database has in it and the file has not was deleted.
         # Nothing newer than the newest message of the file is judged: it may have arrived since.
         cur.execute("""INSERT INTO pruned SELECT m.id FROM messages m

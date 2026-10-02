@@ -190,6 +190,7 @@ def test_a_failing_channel_is_left_alone_for_a_while_then_tried_again(collector,
     count, _ = collector._failures[channel.id]
     collector._failures[channel.id] = (count, 0.0)  # the waiting time is over
     assert collector.poll(ingest_db) == 1 and collector.status()["failing_channels"] == 0
+    assert collector.status()["last_error"] is None  # an error that is over does not stay on display
     assert ingest_db.execute("SELECT count(*) FROM messages WHERE content = 'bonjour' AND channel_id = %s", (channel.id,)).fetchone()[0] >= 1
 
 

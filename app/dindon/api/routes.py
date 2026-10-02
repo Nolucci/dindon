@@ -78,7 +78,8 @@ d AS (
 ), top AS (
     SELECT u FROM degree ORDER BY influence DESC LIMIT %(limit)s
 )
-SELECT p.a, p.b, p.weight, p.n, p.last_at, p.reply, p.mention, p.reaction, (SELECT count(*) FROM degree) AS nodes_total
+SELECT p.a, p.b, p.weight, p.n, p.last_at, p.reply, p.mention, p.reaction, (SELECT count(*) FROM degree) AS nodes_total,
+       count(*) OVER () AS edges_total
 FROM pairs p JOIN top ta ON ta.u = p.a JOIN top tb ON tb.u = p.b
 ORDER BY p.weight DESC LIMIT %(max_edges)s
 """
@@ -147,10 +148,11 @@ def graph(
               "community": None}  # filled in by the community detection (phase 5)
              for uid in sorted(node_ids, key=lambda u: -influence[u])]
     nodes_total = rows[0]["nodes_total"] if rows else 0
+    edges_total = rows[0]["edges_total"] if rows else 0
     return {"meta": {"guild": str(guild_id), "period": {"since": _iso(since), "until": _iso(until)} if period else None,
                      "half_life_days": float(half_life_days["value"]) if half_life_days else 90, "kind_factor": KIND_FACTOR,
                      "nodes_total": nodes_total, "nodes_shown": len(nodes), "nodes_hidden": nodes_total - len(nodes),
-                     "edges_shown": len(edges), "generated_at": _iso(datetime.now(timezone.utc))},
+                     "edges_shown": len(edges), "edges_hidden": edges_total - len(edges), "generated_at": _iso(datetime.now(timezone.utc))},
             "nodes": nodes, "edges": edges}
 
 

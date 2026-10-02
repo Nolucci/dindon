@@ -155,6 +155,8 @@ class Collector:
                 threads = self.settings.exporter_threads if channel.kind != "thread" and self.api.token_kind == "account" else "none"
                 if self._export(conn, channel, after=have, threads=threads).ok:
                     exports += 1
+        if not self._failures:  # the last error is over (a failing channel keeps it on display until it works again)
+            self._state["last_error"] = None
         return exports
 
     def catchup_due(self, now: datetime) -> bool:

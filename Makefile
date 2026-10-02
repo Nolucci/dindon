@@ -3,10 +3,13 @@ PYTHON ?= python3.13
 VENV   := .venv
 BIN    := $(VENV)/bin
 
-.PHONY: help setup up down db migrate check test axes backup
+.PHONY: help setup web up down db migrate check test axes backup demo check-ui
 
 help:
 	@echo "make setup    create the Python environment (.venv) and install Dindon with its test tools"
+	@echo "make web      build the interface (needs Node.js), for running outside Docker"
+	@echo "make demo     a complete demo without Discord: invented server, first import, live exchanges (http://127.0.0.1:8011)"
+	@echo "make check-ui check the page in a real browser, against the demo (needs Playwright, see tools/check_ui.py)"
 	@echo "make up       start everything with Docker (database, application)"
 	@echo "make down     stop everything (data is kept)"
 	@echo "make db       start the database only, to work on the code outside Docker"
@@ -22,6 +25,15 @@ $(BIN)/dindon: pyproject.toml
 	@touch $(BIN)/dindon
 
 setup: $(BIN)/dindon
+
+web:
+	cd web && npm ci --no-audit --no-fund && npm run build
+
+demo: setup
+	./tools/demo.sh
+
+check-ui: setup
+	$(BIN)/python tools/check_ui.py
 
 up:
 	docker compose up -d --build

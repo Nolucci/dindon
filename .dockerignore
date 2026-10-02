@@ -4,8 +4,10 @@
 **/__pycache__
 inbox
 archive
+backups
 cards
 exporter/bin
 web/node_modules
+web/dist
 tests
 docs

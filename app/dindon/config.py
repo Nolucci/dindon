@@ -63,7 +63,7 @@ def load_settings() -> Settings:
         discord_api_url=env.get("DINDON_DISCORD_API", "https://discord.com/api/v10").rstrip("/"),
         exporter_path=env.get("DINDON_EXPORTER", str(REPO_ROOT / "exporter" / "bin" / "DiscordChatExporter.Cli")),
         exporter_threads=env.get("DINDON_THREADS", "active"),
-        poll_seconds=float(env.get("DINDON_POLL_SECONDS", "45")),
+        poll_seconds=float(env.get("DINDON_POLL_SECONDS", "30")),
         catchup_hour_utc=int(env.get("DINDON_CATCHUP_HOUR", "3")),
         catchup_days=int(env.get("DINDON_CATCHUP_DAYS", "7")),
         web_dir=Path(env.get("DINDON_WEB_DIR", REPO_ROOT / "web" / "dist")),

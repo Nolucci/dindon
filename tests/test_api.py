@@ -220,3 +220,13 @@ def test_the_interface_is_warned_when_a_personal_account_is_being_automated(me):
     assert me.get("/api/status").json()["warnings"] == ["account_token"]
     me.app.state.collector = SimpleNamespace(status=lambda: {"enabled": True, "token_kind": "bot"})
     assert me.get("/api/status").json()["warnings"] == []
+
+
+def test_the_cap_on_links_keeps_the_strongest_and_says_how_many_are_hidden(me):
+    full = me.get("/api/graph").json()
+    capped = me.get("/api/graph?max_edges=40").json()
+    assert capped["meta"]["edges_shown"] == len(capped["edges"]) == 40
+    assert capped["meta"]["edges_hidden"] == full["meta"]["edges_shown"] - 40 > 0
+    weakest_kept = min(e["weight"] for e in capped["edges"])
+    assert all(e["weight"] <= weakest_kept + 1e-9 for e in full["edges"][40:])  # what is left out is weaker than what is shown
+    assert full["meta"]["edges_hidden"] == 0
