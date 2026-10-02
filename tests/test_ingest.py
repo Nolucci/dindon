@@ -2,6 +2,7 @@
 
 Everything is invented (tools/make_demo_server.py). The database is a copy of the migrated one, with real commits.
 """
+import hashlib
 import json
 import random
 from datetime import datetime, timedelta, timezone
@@ -10,7 +11,7 @@ from pathlib import Path
 import psycopg
 import pytest
 
-from dindon.ingest.loader import InvalidExport, ingest_file
+from dindon.ingest.loader import InvalidExport, ingest_document, ingest_file
 from make_demo_server import World, parse_iso, write_exports
 
 TABLES = ["guilds", "channels", "users", "members", "roles", "member_roles", "identity_history", "emojis", "messages",
@@ -392,3 +393,122 @@ def test_a_catch_up_that_seems_to_lack_most_of_a_window_deletes_nothing(ingest_d
     result = ingest_file(conn, write_doc(tmp_path / "broken.json", document), prune=True)
     assert result.messages_removed == 0 and result.prune_skipped >= 60
     assert conn.execute("SELECT count(*) FROM messages").fetchone()[0] == before
+
+
+# ---------------------------------------------------------------------------------------------
+# A document built in memory (the live bot) goes through the very same ingestion
+# ---------------------------------------------------------------------------------------------
+
+
+def _digest(document: dict) -> str:
+    return hashlib.sha256(json.dumps(document, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
+@pytest.fixture
+def small_world():
+    """Its own world: these tests add messages to it."""
+    w = World(seed=11, people=12)
+    w.generate(300, days=10)
+    return w
+
+
+def test_a_document_in_memory_and_the_same_file_share_one_ledger(ingest_db, small_world, tmp_path):
+    conn = ingest_db
+    channel = max(small_world.channels, key=lambda c: len(c.messages))
+    text = small_world.export_document(channel, exported_at=datetime(2026, 10, 1, tzinfo=timezone.utc))
+    sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    first = ingest_document(conn, json.loads(text), "from memory", sha)
+    assert first.status == "imported" and first.messages_new == len(channel.messages)
+    after = counts(conn)
+    # the file with the same bytes is the same document: skipped
+    path = tmp_path / "same.json"
+    path.write_text(text, encoding="utf-8")
+    assert ingest_file(conn, path).status == "duplicate"
+    assert counts(conn) == after
+    assert_edges_equal_rebuild(conn)
+
+
+def test_a_document_that_is_not_an_export_is_refused_whatever_its_origin(ingest_db):
+    with pytest.raises(InvalidExport, match="schemaVersion"):
+        ingest_document(ingest_db, {"schemaVersion": 3}, "memory", "0" * 64)
+    with pytest.raises(InvalidExport, match="not a JSON v2 export"):
+        ingest_document(ingest_db, ["not", "an", "object"], "memory", "1" * 64)  # type: ignore[arg-type]
+    assert ingest_db.execute("SELECT count(*) FROM ingest_runs").fetchone()[0] == 0
+
+
+def _announcement(world, channel, when):
+    """What a source that only announces new messages sends: everything it knows, minus the reactions it knows nothing about,
+    and with a content that differs from the database's (proving that an existing message is not rewritten)."""
+    document = json.loads(world.export_document(channel, exported_at=when))
+    for m in document["messages"]:
+        m.pop("reactions", None)
+        m["content"] = "REWRITTEN BY THE ANNOUNCEMENT"
+    return document
+
+
+def test_only_new_adds_the_new_message_and_leaves_every_other_one_untouched(ingest_db, small_world):
+    conn = ingest_db
+    world, channel = small_world, max(small_world.channels, key=lambda c: len(c.messages))
+    alice, bob = world.people[0], world.people[1]
+    t0 = datetime(2026, 10, 1, 9, tzinfo=timezone.utc)
+    first = world.post(channel, alice, "bonjour tout le monde", t0 - timedelta(hours=1))
+    ingest_document(conn, json.loads(world.export_document(channel, exported_at=t0)), "export", "a" * 64)
+    reactions_before = conn.execute("SELECT count(*) FROM reaction_users").fetchone()[0]
+    assert reactions_before > 0,"the invented world should have reactions, or this test proves nothing"
+    contents_before = dict(conn.execute("SELECT id, content FROM messages").fetchall())
+    counts_before, edges_before = counts(conn), edges_snapshot(conn)
+
+    world.post(channel, bob, "salut Alice", t0 + timedelta(minutes=5), reply_to=first)
+    document = _announcement(world, channel, t0 + timedelta(minutes=5))
+    result = ingest_document(conn, document, "live", _digest(document), only_new=True)
+
+    assert (result.messages_new, result.messages_updated, result.messages_removed) == (1, 0, 0)
+    assert dict(conn.execute("SELECT id, content FROM messages").fetchall()) == {
+        **contents_before, int(document["messages"][-1]["id"]): "REWRITTEN BY THE ANNOUNCEMENT"}  # only the new one has the new text
+    after = counts(conn)
+    assert after["messages"] == counts_before["messages"] + 1
+    assert {t: n for t, n in after.items() if t not in ("messages", "edges")} == {t: n for t, n in counts_before.items() if t not in ("messages", "edges")}
+    assert conn.execute("SELECT count(*) FROM reaction_users").fetchone()[0] == reactions_before  # nobody's reaction was erased
+    edges_after = edges_snapshot(conn)
+    changed = {k for k in edges_before.keys() | edges_after.keys() if edges_before.get(k) != edges_after.get(k)}
+    assert changed == {(world.guild_id, bob.id, alice.id, "reply")}  # no other link moved
+    assert_edges_equal_rebuild(conn)
+
+
+def test_the_same_new_message_announced_twice_counts_once(ingest_db, small_world):
+    """A replayed event (after a reconnection, say) must not count a second time, nor erase anything."""
+    conn = ingest_db
+    world, channel = small_world, max(small_world.channels, key=lambda c: len(c.messages))
+    alice, bob = world.people[0], world.people[1]
+    t0 = datetime(2026, 10, 1, 9, tzinfo=timezone.utc)
+    first = world.post(channel, alice, "bonjour", t0 - timedelta(hours=1))
+    ingest_document(conn, json.loads(world.export_document(channel, exported_at=t0)), "export", "b" * 64)
+    world.post(channel, bob, "salut", t0 + timedelta(minutes=1), reply_to=first)
+
+    def announce(when):
+        document = _announcement(world, channel, when)
+        return ingest_document(conn, document, "live", _digest(document), only_new=True), document
+
+    one, document = announce(t0 + timedelta(minutes=1))
+    assert one.messages_new == 1
+    state = (counts(conn), edges_snapshot(conn))
+    # delivered again: the same document is skipped, and the same message in a document of another moment changes nothing
+    assert ingest_document(conn, document, "live", _digest(document), only_new=True).status == "duplicate"
+    two, _ = announce(t0 + timedelta(minutes=2))
+    assert two.status == "imported" and two.messages_new == 0 and two.messages_updated == 0
+    assert counts(conn) == state[0] and edges_snapshot(conn) == state[1]
+    assert_edges_equal_rebuild(conn)
+
+
+def test_a_failed_attempt_leaves_the_document_intact_so_that_it_can_be_sent_again(ingest_db, small_world):
+    """The bot retries the very same document after a database error: it must still have its messages."""
+    conn = ingest_db
+    channel = max(small_world.channels, key=lambda c: len(c.messages))
+    document = json.loads(small_world.export_document(channel, exported_at=datetime(2026, 10, 1, tzinfo=timezone.utc)))
+    expected = len(document["messages"])
+    broken = {**document, "messages": [*document["messages"], {"id": "9" * 15}]}  # one message lacks its fields: the file fails
+    with pytest.raises(InvalidExport):
+        ingest_document(conn, broken, "live", "c" * 64)
+    assert len(broken["messages"]) == expected + 1 and conn.execute("SELECT count(*) FROM messages").fetchone()[0] == 0
+    ok = ingest_document(conn, document, "live", "d" * 64)
+    assert ok.messages_new == expected and len(document["messages"]) == expected

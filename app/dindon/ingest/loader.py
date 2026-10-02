@@ -11,6 +11,8 @@ tables. Everything happens in one transaction, so an interrupted import leaves n
   of these messages and what the file says: exact, even when a message is edited or an export arrives
   late. rebuild_edges() (db/migrations/0001_edges.sql) computes the same thing from zero.
 * Analysis jobs are queued, and NOTIFY tells the interface what changed.
+* The same pipeline takes a file (ingest_file) or a document built in memory (ingest_document), which is how the
+  live bot feeds it: there is one ingestion, whatever the source.
 """
 from __future__ import annotations
 
@@ -67,6 +69,11 @@ def parse_export(raw: bytes, name: str) -> dict:
         document = json.loads(raw)
     except ValueError as error:
         raise InvalidExport(f"{name}: not valid JSON ({error})") from None
+    return check_document(document, name)
+
+
+def check_document(document: object, name: str) -> dict:
+    """The top-level shape of a JSON v2 document (a file that was read, or one that the bot built)."""
     if not isinstance(document, dict):
         raise InvalidExport(f"{name}: not a JSON v2 export")
     if document.get("schemaVersion") != 2:
@@ -246,7 +253,8 @@ GROUP BY k.f, k.t, k.kind, k.tt, k.w0, k.n0, k.l0, hl.s
 """
 
 
-def _apply(conn: psycopg.Connection, document: dict, run_id: int, params: dict, prune: bool, result: IngestResult) -> list[dict]:
+def _apply(conn: psycopg.Connection, document: dict, run_id: int, params: dict, prune: bool, only_new: bool,
+           result: IngestResult) -> list[dict]:
     # (the messages are in the staging tables by now: document["messages"] is gone)
     """Writes the staged data. Returns the notifications to send."""
     cur = conn.cursor()
@@ -254,7 +262,7 @@ def _apply(conn: psycopg.Connection, document: dict, run_id: int, params: dict, 
     guild_id, channel_id = params["guild"], params["channel"]
     cur.execute("SELECT NOT EXISTS (SELECT 1 FROM ingest_runs WHERE guild_id = %s AND exported_at > %s)", (guild_id, exported_at))
     newest = cur.fetchone()[0]
-    params = {**params, "newest": newest, "run": run_id}
+    params = {**params, "newest": newest, "run": run_id, "only_new": only_new}
 
     # Where the messages come from. An export older than what is known only adds what is missing.
     g = document["guild"]
@@ -307,12 +315,13 @@ def _apply(conn: psycopg.Connection, document: dict, run_id: int, params: dict, 
                        last_seen_at = greatest(identity_history.last_seen_at, excluded.last_seen_at)""", params)
 
     # Which messages does this file really change? Not the ones of an older export than what is known.
+    # (`only_new`: messages that the database already has are not touched at all, see ingest_document)
     cur.execute("""CREATE TEMP TABLE applied ON COMMIT DROP AS
                    SELECT DISTINCT ON (s.id) s.id, (m.id IS NOT NULL) AS existing
                    FROM stg_messages s
                    LEFT JOIN messages m ON m.id = s.id
                    LEFT JOIN ingest_runs r ON r.id = m.last_seen_run_id
-                   WHERE m.id IS NULL OR r.id IS NULL OR r.exported_at <= %(exported_at)s
+                   WHERE m.id IS NULL OR (NOT %(only_new)s AND (r.id IS NULL OR r.exported_at <= %(exported_at)s))
                    ORDER BY s.id""", params)
     cur.execute("CREATE TEMP TABLE pruned (id bigint) ON COMMIT DROP")
     if prune and result.messages_in_file and "after" in document.get("dateRange", {}):
@@ -407,15 +416,25 @@ def _apply(conn: psycopg.Connection, document: dict, run_id: int, params: dict, 
     return events
 
 
-def ingest_file(conn: psycopg.Connection, path: Path, prune: bool = False) -> IngestResult:
-    """Imports one export file. `prune` is for a complete re-export of a window of time (the nightly catch-up):
-    the messages that the database has in that window and the file has not were deleted on Discord."""
+def ingest_document(conn: psycopg.Connection, document: dict, name: str, sha256: str, prune: bool = False,
+                    only_new: bool = False, consume: bool = False) -> IngestResult:
+    """Imports one JSON v2 document, whatever its origin (an export file, the live bot). `sha256` identifies it: a document
+    that was already imported (same hash) is skipped.
+
+    `prune` is for a complete re-export of a window of time (the nightly catch-up): the messages that the database has
+    in that window and the document has not were deleted on Discord.
+
+    `only_new` is for a source that only announces new messages (the bot, on MESSAGE_CREATE): a message that the database
+    already has is left exactly as it is. Such a document knows nothing of reactions or edits that the database may have
+    learned elsewhere, and importing it as a snapshot would erase them. It is what makes a duplicate event harmless.
+
+    `consume` lets the import take the messages out of `document` as they become rows, so that a very big file is not held
+    twice in memory (ingest_file does). Without it the document is left intact: a failed attempt can be sent again."""
     started = time.monotonic()
-    raw = path.read_bytes()
-    sha = hashlib.sha256(raw).hexdigest()
-    document = parse_export(raw, path.name)
-    del raw
-    result = IngestResult(name=path.name, status="imported", sha256=sha, messages_in_file=len(document["messages"]))
+    check_document(document, name)
+    if not consume:
+        document = {**document}  # _stage takes "messages" out of the dict it is given
+    result = IngestResult(name=name, status="imported", sha256=sha256, messages_in_file=len(document["messages"]))
     try:
         guild_id = int(document["guild"]["id"])
         channel_id = int(document["channel"]["id"])
@@ -423,26 +442,35 @@ def ingest_file(conn: psycopg.Connection, path: Path, prune: bool = False) -> In
         date_range = document.get("dateRange", {})
         date_after, date_before = _when(date_range.get("after")), _when(date_range.get("before"))
     except (KeyError, ValueError, TypeError, AttributeError) as error:
-        raise InvalidExport(f"{path.name}: unexpected content ({type(error).__name__}: {error})") from None
+        raise InvalidExport(f"{name}: unexpected content ({type(error).__name__}: {error})") from None
     with conn.transaction():
         cur = conn.cursor()
         cur.execute("SELECT pg_advisory_xact_lock(%s)", (INGEST_LOCK,))
-        cur.execute("SELECT id FROM ingest_runs WHERE source_sha256 = %s", (sha,))
+        cur.execute("SELECT id FROM ingest_runs WHERE source_sha256 = %s", (sha256,))
         if cur.fetchone():
             result.status = "duplicate"
             result.seconds = time.monotonic() - started
             return result
         cur.execute("""INSERT INTO ingest_runs (source_file, source_sha256, schema_version, exported_at, guild_id, channel_id,
                            message_count, date_after, date_before) VALUES (%s, %s, 2, %s, %s, %s, %s, %s, %s) RETURNING id""",
-                    (path.name, sha, exported_at, guild_id, channel_id, len(document["messages"]), date_after, date_before))
+                    (name, sha256, exported_at, guild_id, channel_id, len(document["messages"]), date_after, date_before))
         result.run_id = cur.fetchone()[0]
         try:
             _stage(cur, document, guild_id)
         except (KeyError, ValueError, TypeError, AttributeError) as error:  # a field that is missing or has the wrong shape
-            raise InvalidExport(f"{path.name}: unexpected content ({type(error).__name__}: {error})") from None
+            raise InvalidExport(f"{name}: unexpected content ({type(error).__name__}: {error})") from None
         params = {"guild": guild_id, "channel": channel_id, "exported_at": exported_at}
-        events = _apply(conn, document, result.run_id, params, prune, result)
+        events = _apply(conn, document, result.run_id, params, prune, only_new, result)
         for event in events:
             cur.execute("SELECT pg_notify(%s, %s)", (NOTIFY_CHANNEL, json.dumps(event)))
     result.seconds = time.monotonic() - started
     return result
+
+
+def ingest_file(conn: psycopg.Connection, path: Path, prune: bool = False) -> IngestResult:
+    """Imports one export file (see ingest_document for `prune`)."""
+    raw = path.read_bytes()
+    sha = hashlib.sha256(raw).hexdigest()
+    document = parse_export(raw, path.name)
+    del raw  # a big file is about ten times its size in memory: nothing else keeps it alive
+    return ingest_document(conn, document, path.name, sha, prune=prune, consume=True)
