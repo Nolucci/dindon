@@ -6,7 +6,7 @@ Dindon ne lit jamais Discord lui-même : il s'appuie sur l'**exportateur** (Disc
 | --- | --- | --- |
 | **A. Export à la main** : déposer des fichiers JSON dans `inbox/` | à la demande | rien (l'application graphique de l'exportateur suffit) |
 | **B. Surveillance** : l'application regarde ce qui a bougé et lance l'exportateur | environ la moitié de l'intervalle de relevé (15 s par défaut) | un jeton, l'identifiant du serveur, l'exportateur |
-| **C. Bot en direct** | moins d'une seconde | pas encore fait (phase 5) : l'ingestion est prête à le recevoir |
+| **C. Bot en direct** | moins d'une seconde | un jeton de **bot**, l'identifiant du serveur, l'option « Message Content Intent » du bot. **Écrit et testé avec un faux Gateway ; jamais essayé sur le vrai Discord** |
 
 ## Avertissement : compte personnel ou bot
 
@@ -62,6 +62,32 @@ Il se **reprend** là où il s'est arrêté : un salon à jour est sauté, un sa
 - **Fils archivés** : ils ne sont pris que par un `backfill` avec `DINDON_THREADS=all`.
 - **Un message supprimé en dernier** reste en base jusqu'à ce qu'un message plus récent arrive dans le salon (le rattrapage ne juge rien de plus récent que le dernier message de l'export).
 - **Reproduction réelle** : tout ceci est testé contre un faux Discord et un faux exportateur. **Rien n'a encore tourné contre le vrai Discord** (pas de jeton). Les arguments passés à l'exportateur ont été vérifiés contre le vrai programme (il les accepte), pas son comportement sur un vrai serveur.
+
+## C. Le bot en direct
+
+Un processus à part (`dindon bot`, service `bot` de Docker Compose, même image que l'application) reste connecté au Gateway de Discord et reçoit chaque **nouveau message** au moment où il est écrit. Il ne contient aucune logique d'analyse : il transforme l'événement en document JSON version 2 et le confie à **la même ingestion** que les deux autres modes (voir [DECISIONS.md](DECISIONS.md)). L'application affiche le lien de la même façon (NOTIFY puis SSE).
+
+**Ce qu'il demande à Discord** : les serveurs (rôles, salons, fils) et les messages avec leur contenu. Ni la liste des membres, ni les présences, ni les réactions. Il ne suit **que** les serveurs de `DINDON_GUILD_IDS` (liste obligatoire) et ignore le reste sans le regarder. Ses journaux disent combien de messages, jamais lesquels.
+
+**Ce qu'il fait (étape M1)** : les nouveaux messages, avec leurs réponses et mentions. **Ce qu'il ne fait pas encore** : les modifications, les suppressions et les réactions arrivent sur la même connexion, sont comptées, **mais ne sont pas appliquées**. Le rattrapage nocturne (et la surveillance, si elle tourne) les apportent, comme avant.
+
+Pour l'essayer seul, couper la surveillance (`DINDON_COLLECTOR=off`), puis :
+
+```console
+docker compose up -d --build
+docker compose --profile bot up -d --build
+docker compose logs -f bot
+```
+
+**Limites connues**
+
+- **Un message supprimé reste en base** jusqu'au rattrapage nocturne (3 h UTC par défaut), et une modification n'est pas vue avant.
+- **Ce que le bot ne sait pas décrire** (le rattrapage le complète) : aperçus de liens (Discord les ajoute après coup), sondages, messages transférés, émojis Unicode du texte (l'exportateur les repère avec sa table complète).
+- **Reconnexion** : une coupure courte est reprise sans rien perdre. Si Discord invalide la session, une **nouvelle session** démarre et ce qui s'est écrit entre-temps n'est pas reçu : le bot le signale (« reconnected with a new session ») ; la surveillance et le rattrapage nocturne comblent le trou. Il n'y a pas encore de rattrapage automatique déclenché par le bot.
+- **Un événement reçu pendant que la base est indisponible** attend et est réessayé ; au-delà de 5 000 messages en attente, les plus récents sont abandonnés (et comptés) ; le rattrapage les rapporte.
+- **Texte des messages** : le bot reproduit la mise en forme de l'exportateur (mentions en noms, émojis personnalisés, dates), d'après la lecture de son code. La comparaison avec la sortie réelle de l'exportateur se fait sur un vrai serveur avec `tools/compare_with_export.py`. Les dates écrites dans un message (`<t:…>`) sont mises en forme en UTC, culture invariante.
+- **Rien n'est archivé** : le bot n'écrit aucun fichier dans `archive/` ; la base est sa seule trace.
+- **Jamais essayé sur le vrai Discord.** Tout ce qui précède est testé avec un faux Gateway.
 
 ## Essayer sans Discord
 

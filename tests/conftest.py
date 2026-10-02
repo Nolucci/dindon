@@ -75,3 +75,14 @@ def ingest_url(migrated_url):
 def ingest_db(ingest_url):
     with psycopg.connect(ingest_url, autocommit=True) as connection:
         yield connection
+
+
+@pytest.fixture(autouse=True)
+def discord_is_never_reached(monkeypatch):
+    """discord.py starts from its built-in Discord addresses. Whatever a test does, they point to a closed local port, so that
+    no test can ever reach the real Discord (a test that talks to the fake one sets its own addresses)."""
+    import discord
+    import yarl
+
+    monkeypatch.setattr(discord.http.Route, "BASE", "http://127.0.0.1:9/api/v10")
+    monkeypatch.setattr(discord.gateway.DiscordWebSocket, "DEFAULT_GATEWAY", yarl.URL("ws://127.0.0.1:9/"))

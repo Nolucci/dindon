@@ -40,7 +40,7 @@ Ouvrez ensuite **http://127.0.0.1:8000** et entrez le mot de passe `DINDON_PASSW
 
 ### Collecter les messages
 
-Voir **[docs/COLLECTE.md](docs/COLLECTE.md)** : exports à la main, surveillance automatique (jeton, serveur, premier import avec `dindon backfill`), rattrapage nocturne, limites.
+Voir **[docs/COLLECTE.md](docs/COLLECTE.md)** : exports à la main, surveillance automatique (jeton, serveur, premier import avec `dindon backfill`), rattrapage nocturne, **bot en direct** (`docker compose --profile bot up -d --build`, pas encore essayé sur le vrai Discord), limites.
 
 **Compte personnel ou bot ?** Un bot est recommandé : automatiser un compte personnel est interdit par Discord. L'interface affiche un bandeau d'avertissement tant qu'un compte personnel est utilisé.
 
@@ -56,6 +56,7 @@ Pas nécessaire avant la phase 2. Sur un Mac, installez Ollama directement (`bre
 | `make test` | tous les tests (voir plus bas) |
 | `make web` / `make demo` / `make check-ui` | construire l'interface, la démonstration sans Discord, la vérification dans un navigateur |
 | `dindon ingest dossier/` | importer des exports sans passer par `inbox/` |
+| `dindon bot` | le bot en direct (jeton de bot, `DINDON_GUILD_IDS`) : normalement lancé par le service `bot` de Compose |
 | `dindon backfill` / `dindon catchup` | premier import d'un serveur / rattrapage des derniers jours maintenant |
 | `make check` | ce que contient la base (tables, vues, axes) |
 | `make axes` | réécrit [docs/AXES.md](docs/AXES.md) depuis la base : la page où relire les axes et idéologies |

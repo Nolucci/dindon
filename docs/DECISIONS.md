@@ -97,6 +97,49 @@ Pas d'ORM, pas de framework de migrations : psycopg et du SQL.
 | Un compteur `data-flashes` sur la carte | permet de tester depuis l'extérieur (`tools/check_ui.py`) que le lien s'illumine ; ne contient aucune donnée |
 | Les rôles d'âge et de genre ne sortent **nulle part** de l'API (seuls les rôles d'idéologie, présentés comme « non vérifiés ») | exigence du prompt ; un test le vérifie sur toutes les fiches |
 
+# Bot en direct (mode C, étapes 1 à 3 du plan de reprise)
+
+Rien de ce qui suit n'a tourné contre le vrai Discord : tout est testé avec un faux Gateway (`tools/fake_gateway.py`).
+
+## Ingestion partagée
+
+| Choix | Pourquoi |
+| --- | --- |
+| `ingest_document(conn, document, nom, sha256)` extrait de `ingest_file` : **une seule ingestion** pour un fichier et pour un document construit en mémoire | le bot n'a pas sa propre écriture en base ; les imports à la main, la surveillance et le bot convergent |
+| Option `only_new` : un message que la base a déjà n'est **pas touché** | une annonce « nouveau message » ne sait rien des réactions ou modifications que la base a apprises par ailleurs (rattrapage, exportateur). Importée comme un instantané, elle les effacerait : un événement rejoué après une reconnexion détruirait les réactions et les liens qui vont avec. Testé : sans l'option, le test « annonce tardive » échoue |
+| `consume` : l'import vide `messages` du document au fur et à mesure (gros fichiers) ; sans lui, le document reste intact | un nouvel essai après une panne de base doit pouvoir renvoyer **le même document**. Le comportement économe en mémoire de `ingest_file` est conservé |
+| Le bot s'inscrit dans le registre des imports sous le nom `gateway`, avec l'empreinte du document | le même lot reçu deux fois est reconnu et ignoré, sans même une ligne de plus dans le registre |
+
+## Adaptateur (`app/dindon/bot/adapter.py`)
+
+| Choix | Pourquoi |
+| --- | --- |
+| Fonction pure : des dictionnaires en entrée, un document JSON v2 en sortie ; ni discord.py, ni base, ni horloge | testable avec des charges utiles enregistrées ; le cœur de Dindon reste indépendant de la bibliothèque |
+| Reproduit le formatage de l'exportateur (noms de types, texte brut avec mentions en noms, émojis personnalisés, dates, phrases des messages système, couleur et rôles des membres, avatars) | un message doit être identique qu'il vienne du bot ou d'un export, sinon le rattrapage nocturne réécrirait ce que le bot a écrit et l'analyse lirait deux « dialectes ». **Écart au principe « Dindon ne réécrit pas la lecture de Discord »** : voir RESUME.md. Les valeurs attendues des tests viennent de la **lecture** du code C#, pas de son exécution ; la preuve est `tools/compare_with_export.py` sur un vrai serveur |
+| `exportedAt` du document = heure du message le plus récent (pas l'heure de l'appel) | le même lot donne toujours le même document et la même empreinte ; une annonce tardive ne peut jamais paraître plus récente qu'un export ultérieur |
+| Un salon, un serveur ou un rôle inconnu : **rien n'est inventé**, le message est sauté et compté | un nom fabriqué écraserait le vrai (`ON CONFLICT … DO UPDATE` du salon) ; le rattrapage rapporte le message |
+| Dates écrites dans le texte (`<t:…>`) : UTC, culture invariante | l'exportateur utilise la culture et le fuseau de la machine ; dans un conteneur c'est l'invariant et UTC. Parité exacte impossible sur une autre machine |
+| Pas couverts : aperçus de liens, sondages, messages transférés, émojis Unicode du texte, résultat d'un sondage détaillé | le rattrapage les ajoute ; les omettre est sans danger, les inventer ne l'est pas |
+
+## Connexion (`gateway.py`, `runner.py`)
+
+| Choix | Pourquoi |
+| --- | --- |
+| **discord.py**, isolé dans un seul fichier, utilisé pour la connexion seulement (battement de cœur, reprise, reconnexion, débit) ; les trames brutes arrivent par `on_socket_raw_receive` et sortent en dictionnaires | décision validée ; ses modèles et ses caches ne sortent pas du fichier ; une autre bibliothèque pourrait le remplacer |
+| Intents : serveurs, messages, **contenu des messages**. Pas de membres, présences, réactions | le minimum ; « Message Content » est « privilégié » : le propriétaire du bot l'active dans le portail. Vérifié par un test : l'IDENTIFY envoyé demande exactement ces trois |
+| Aucun cache de messages ni de membres | mémoire constante ; le contenu n'est conservé nulle part ailleurs qu'en base |
+| Les trames de débogage de discord.py (qui contiennent les messages) sont **filtrées de force** | même en DEBUG, ni le jeton ni un texte de message ne sort dans un journal (testé avec tous les journaux à DEBUG) |
+| Le bot ne suit **que** `DINDON_GUILD_IDS` (liste obligatoire, jamais « tous ») ; messages privés ignorés | moindre privilège ; le bot refuse de démarrer sans liste |
+| Lots de 300 ms par salon (100 messages au plus par document) | un document coûte environ 80 ms sous un verrou global (mesuré, voir MESURES.md) : une rafale ne doit pas devenir une rafale de documents |
+| Base indisponible : le lot attend et est réessayé (1, 2, 5, 15, 60 s) ; au-delà de 5 000 messages, les nouveaux sont abandonnés et comptés | réessayer est sans danger (voir `only_new`) ; la mémoire reste bornée ; le rattrapage rapporte ce qui manque |
+| Un message que l'adaptateur ou l'ingestion refuse est **isolé**, abandonné et compté | un message étrange ne doit pas bloquer son salon pour toujours |
+| Modifications, suppressions, réactions : reçues, **comptées, non appliquées** | décision du plan : étape P3. Tant que ce n'est pas fait, un message supprimé reste en base jusqu'au rattrapage nocturne |
+| Erreur qui ne se règle pas en attendant (jeton refusé, intent absent) : message clair, puis **une heure de silence** avant que le conteneur ne redémarre | redémarrer toutes les secondes serait refusé à chaque fois et compté contre le bot |
+| Autre échec de la bibliothèque : nouvelle session, délais jusqu'à 5 minutes | reste très en dessous des 1 000 sessions par jour de Discord, même si l'échec revient à chaque démarrage |
+| Processus et service `bot` séparés, même image, profil Compose `bot`, dépend de l'application saine | décision validée : redémarrer l'interface ne coupe pas la session Discord ; l'application applique les migrations, le bot jamais |
+| `DINDON_COLLECTOR=off` coupe la surveillance | pour essayer le bot seul : les deux apportent les mêmes messages (sans danger) mais la surveillance masquerait le bot |
+| Tests : `conftest.py` redirige discord.py vers un port local fermé | un `discord.Client` ordinaire démarre toujours sur l'adresse réelle de Discord ; aucun test ne doit pouvoir l'atteindre |
+
 ## Ce qui n'est pas fait, et pourquoi
 
 | Reste à faire | Où |

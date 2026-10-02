@@ -62,7 +62,7 @@ def create_app(settings: Settings | None = None, background: bool = True) -> Fas
         tasks = [asyncio.create_task(hub.run())]
         if background:
             tasks.append(asyncio.create_task(inbox_loop(settings)))
-            if settings.discord_token and settings.guild_ids:
+            if settings.discord_token and settings.guild_ids and settings.collector_enabled:
                 from dindon.collector.watch import Collector
 
                 app.state.collector = Collector(settings)

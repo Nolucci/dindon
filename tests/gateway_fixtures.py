@@ -20,7 +20,18 @@ def role(id: str, name: str, position: int, color: int = 0) -> dict:
 
 
 def channel(id: str, name: str, type: int = 0, parent_id: str | None = None, topic: str | None = None, guild_id: str = GUILD) -> dict:
-    return {"id": id, "type": type, "guild_id": guild_id, "name": name, "parent_id": parent_id, "topic": topic, "position": 1}
+    """A channel as the Gateway describes it, with what discord.py insists on for each kind (the adapter only reads a few fields)."""
+    data = {"id": id, "type": type, "guild_id": guild_id, "name": name, "parent_id": parent_id, "position": 1, "permission_overwrites": [],
+            "flags": 0}
+    if type in (0, 5):                                 # text, announcement
+        data.update(topic=topic, nsfw=False, last_message_id=None, rate_limit_per_user=0)
+    elif type in (2, 13):                              # voice, stage
+        data.update(bitrate=64000, user_limit=0, rtc_region=None, nsfw=False, last_message_id=None, rate_limit_per_user=0)
+    elif type in (10, 11, 12):                         # threads
+        data.update(owner_id="1000000000000000001", message_count=0, member_count=1, rate_limit_per_user=0, last_message_id=None,
+                    thread_metadata={"archived": False, "auto_archive_duration": 1440, "archive_timestamp": "2026-10-01T00:00:00.000000+00:00",
+                                     "locked": False})
+    return data
 
 
 def guild_create(guild_id: str = GUILD, name: str = "Serveur test", icon: str | None = None, threads: list | None = None) -> dict:

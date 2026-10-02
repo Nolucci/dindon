@@ -38,6 +38,8 @@ class Settings:
     catchup_hour_utc: int
     catchup_days: int
     web_dir: Path
+    # The watcher (mode B) can be switched off, to run the live bot (mode C) alone: DINDON_COLLECTOR=off
+    collector_enabled: bool = True
 
 
 def load_settings() -> Settings:
@@ -67,4 +69,5 @@ def load_settings() -> Settings:
         catchup_hour_utc=int(env.get("DINDON_CATCHUP_HOUR", "3")),
         catchup_days=int(env.get("DINDON_CATCHUP_DAYS", "7")),
         web_dir=Path(env.get("DINDON_WEB_DIR", REPO_ROOT / "web" / "dist")),
+        collector_enabled=env.get("DINDON_COLLECTOR", "on").strip().lower() not in ("off", "false", "no", "0"),
     )

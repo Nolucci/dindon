@@ -42,13 +42,13 @@ Il est fait pour une seule personne (francophone), sur un serveur dont on est me
 
 ## 4. Le « bot » : comment les messages arrivent
 
-**Il n'y a pas encore de bot qui écoute Discord en direct.** Aujourd'hui, les messages arrivent par trois portes qui mènent à la **même ingestion** :
+**Le bot en direct existe mais n'a jamais tourné sur le vrai Discord.** Les messages arrivent par trois portes qui mènent à la **même ingestion** :
 
 | Mode | Fonctionnement | Délai | État |
 | --- | --- | --- | --- |
 | **A. À la main** | on dépose des exports JSON dans `inbox/` (par exemple faits avec l'application graphique de l'exportateur) | à la demande | fait |
 | **B. Surveillance** | l'application regarde ce qui a bougé et lance l'exportateur pour ces seuls salons | environ la moitié de l'intervalle de relevé (15 s par défaut) | fait, testé contre un faux Discord |
-| **C. Bot en direct** | un bot reçoit chaque message au moment où il est écrit (accès « Gateway »), avec modifications et suppressions | moins d'une seconde | **pas fait** (phase 5) |
+| **C. Bot en direct** | un bot reçoit chaque nouveau message au moment où il est écrit (accès « Gateway »). Modifications, suppressions et réactions : **pas encore appliquées** | moins d'une seconde | écrit, **testé avec un faux Gateway seulement** ; jamais essayé sur le vrai Discord ([COLLECTE.md](COLLECTE.md)) |
 
 ### La surveillance (mode B)
 
@@ -87,7 +87,7 @@ L'ingestion est faite pour le recevoir : elle prend des messages décrits dans l
 
 **Cinq principes**
 
-1. **Un seul contrat avec Discord** : le JSON version 2 de l'exportateur. Dindon ne réécrit ni la lecture de Discord ni la mise en forme des messages.
+1. **Un seul contrat avec Discord** : le JSON version 2 de l'exportateur. Le bot en direct doit en reproduire la mise en forme du texte (adaptateur `app/dindon/bot/adapter.py`, d'après le code de l'exportateur) : c'est la seule partie de la lecture de Discord que Dindon réécrit, et elle se vérifie avec `tools/compare_with_export.py`.
 2. **Une seule base** : PostgreSQL sert à la fois de stockage, de file de tâches, de bus d'événements (`LISTEN/NOTIFY`), de recherche en français, de base de vecteurs et de graphe. Ni Redis, ni Kafka, ni Neo4j, ni Elasticsearch, ni microservices.
 3. **Pas de classement sans preuve** : une position n'existe que si elle cite des messages, et s'affiche avec son nombre de preuves et son incertitude.
 4. **Deux vitesses** : les liens entre personnes (réponses, mentions, réactions) se mettent à jour tout de suite, sans IA ; les idées passent par l'IA et arrivent en quelques minutes.

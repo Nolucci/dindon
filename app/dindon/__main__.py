@@ -1,4 +1,4 @@
-"""Command line: dindon migrate | check | serve | ingest FILE... | backfill | catchup | rebuild-edges"""
+"""Command line: dindon migrate | check | serve | bot | ingest FILE... | backfill | catchup | rebuild-edges"""
 import argparse
 import json
 import sys
@@ -75,6 +75,7 @@ def main() -> None:
     sub.add_parser("migrate", help="apply the SQL files")
     sub.add_parser("check", help="print what the database is made of")
     sub.add_parser("serve", help="migrate, then run the application (ingestion, collection, API, interface)")
+    sub.add_parser("bot", help="the live bot: receives the new messages of the followed servers from Discord's Gateway (needs a bot token)")
     sub.add_parser("rebuild-edges", help="rebuild the links between people from the messages (after changing the half-life)")
     backfill = sub.add_parser("backfill", help="first import of a whole server (can be stopped and started again)")
     backfill.add_argument("--guild", type=int, action="append", help="server ID (default: DINDON_GUILD_IDS)")
@@ -99,6 +100,11 @@ def main() -> None:
     if args.command == "rebuild-edges":
         with connect(settings.database_url) as conn:
             print(f"{conn.execute('SELECT rebuild_edges()').fetchone()[0]} links rebuilt")
+
+    if args.command == "bot":
+        from dindon.bot.runner import main as run_bot
+
+        sys.exit(run_bot(settings))
 
     if args.command == "ingest":
         sys.exit(_ingest(settings, args.paths, args.prune))

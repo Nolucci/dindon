@@ -40,6 +40,8 @@ services:
       DINDON_POLL_SECONDS: ${DINDON_POLL_SECONDS:-30}
       DINDON_THREADS: ${DINDON_THREADS:-active}
       DINDON_EXPORTER: /opt/exporter/DiscordChatExporter.Cli
+      # "off" switches the watcher off (to run the live bot alone, see COLLECTE.md)
+      DINDON_COLLECTOR: ${DINDON_COLLECTOR:-on}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -55,6 +57,23 @@ services:
       timeout: 5s
       retries: 6
       start_period: 15s
+
+  # Optional: the live bot (mode C of docs/COLLECTE.md). It receives the new messages of the followed servers from Discord's
+  # Gateway the moment they are written, and hands them to the same ingestion as everything else. Same image as the application.
+  # It needs the token of a BOT and the server IDs in .env, and the "Message Content Intent" switched on for the bot.
+  #   docker compose --profile bot up -d --build
+  bot:
+    profiles: ["bot"]
+    build: .
+    command: ["dindon", "bot"]
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy   # the application applies the migrations; the bot never does
+    environment:
+      DATABASE_URL: postgresql://dindon:${POSTGRES_PASSWORD}@db:5432/dindon
+      DISCORD_TOKEN: ${DISCORD_TOKEN:-}
+      DINDON_GUILD_IDS: ${DINDON_GUILD_IDS:-}
 
   # Optional: local AI inside Docker. Meant for a Linux server (with an NVIDIA GPU, add the
   # "deploy" section of the Ollama documentation). On a Mac, Docker cannot use the GPU:
