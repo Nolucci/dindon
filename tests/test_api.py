@@ -10,7 +10,9 @@ from fastapi.testclient import TestClient
 
 from dindon.api.auth import COOKIE, Auth
 from dindon.api.main import create_app
-from dindon.ingest.loader import ingest_file
+from dindon.bot.adapter import Directory, build_document, digest
+from dindon.ingest.loader import GATEWAY_SOURCE, ingest_document, ingest_file
+from gateway_fixtures import ALICE, BOB, BOT, CAROL, GENERAL, GUILD, OLD_DAVE, guild_create, member, message_create
 from make_demo_server import AGE_ROLES, GENDER_ROLES, World, write_exports
 from synthetic import settings_for
 
@@ -230,3 +232,119 @@ def test_the_cap_on_links_keeps_the_strongest_and_says_how_many_are_hidden(me):
     weakest_kept = min(e["weight"] for e in capped["edges"])
     assert all(e["weight"] <= weakest_kept + 1e-9 for e in full["edges"][40:])  # what is left out is weaker than what is shown
     assert full["meta"]["edges_hidden"] == 0
+
+
+# ---------------------------------------------------------------------------------------------
+# People without a link
+# ---------------------------------------------------------------------------------------------
+
+ERIN = {"id": "1000000000000000006", "username": "erin", "discriminator": "0", "global_name": "Erin", "avatar": None}
+FRANK = {"id": "1000000000000000007", "username": "frank", "discriminator": "0", "global_name": "Frank", "avatar": None}
+
+
+def _ago(**delta) -> str:
+    return (datetime.now(timezone.utc) - timedelta(**delta)).isoformat()
+
+
+@pytest.fixture
+def small_server(ingest_db):
+    """One small server of its own, next to the big invented one:
+    Alice writes alone (twice); Bob answers Carol, now; Erin and Frank talked 100 days ago; Dave wrote alone 200 days ago; a bot wrote."""
+    directory = Directory([GUILD])
+    directory.apply("GUILD_CREATE", guild_create())
+    counter = iter(range(9_000_000_000_000_000_000 - 100, 9_000_000_000_000_000_000))
+    def msg(text, author, when, **kw):
+        return message_create(next(counter), text, author, timestamp=when, **kw)
+    carol_says = msg("on y va ?", CAROL, _ago(hours=2))
+    erin_says = msg("salut", ERIN, _ago(days=100, minutes=1))
+    messages = [
+        msg("je parle seule", ALICE, _ago(days=2), member_data=member("Ali")), msg("encore moi", ALICE, _ago(days=1), member_data=member("Ali")),
+        carol_says, msg("oui", BOB, _ago(hours=1), reply_to=carol_says),
+        erin_says, msg("salut Erin", FRANK, _ago(days=100), reply_to=erin_says),
+        msg("il y a longtemps", OLD_DAVE, _ago(days=200)),
+        msg("annonce automatique", {**BOT, "bot": True}, _ago(minutes=5), member_data=None),
+    ]
+    document = build_document(directory, GUILD, GENERAL, messages)
+    ingest_document(ingest_db, document, GATEWAY_SOURCE, digest(document), only_new=True)
+    return {name: person["id"] for name, person in dict(alice=ALICE, bob=BOB, carol=CAROL, dave=OLD_DAVE, erin=ERIN, frank=FRANK, bot=BOT).items()}
+
+
+def _graph(client, **params) -> dict:
+    return client.get("/api/graph", params={"guild": GUILD, **params}).json()
+
+
+def test_people_without_a_link_are_only_added_when_asked(me, small_server):
+    ids = small_server
+    plain = _graph(me)
+    assert {n["id"] for n in plain["nodes"]} == {ids["bob"], ids["carol"], ids["erin"], ids["frank"]}  # as before: only the linked ones
+    assert plain["meta"]["isolated_shown"] == 0 and plain["meta"]["isolated_hidden"] == 0
+    asked = _graph(me, isolated="true")
+    nodes = {n["id"]: n for n in asked["nodes"]}
+    assert set(nodes) == {ids["bob"], ids["carol"], ids["erin"], ids["frank"], ids["alice"], ids["dave"]}  # nobody else, no bot
+    assert asked["edges"] == plain["edges"]                                                                # the links do not change
+    assert [n["id"] for n in asked["nodes"][:4]] == [n["id"] for n in plain["nodes"]]                      # the linked ones come first, in the same order
+    assert not any(nodes[i].get("isolated") for i in (ids["bob"], ids["carol"], ids["erin"], ids["frank"]))
+    alice = nodes[ids["alice"]]
+    assert alice["isolated"] is True and alice["influence"] == 0 and alice["messages"] == 2 and alice["label"] == "Ali"
+    assert alice["last_message_at"] is not None and nodes[ids["dave"]]["messages"] == 1
+    assert [n["id"] for n in asked["nodes"][4:]] == [ids["alice"], ids["dave"]]                            # the most talkative first
+    meta = asked["meta"]
+    assert (meta["nodes_shown"], meta["isolated_shown"], meta["isolated_hidden"], meta["nodes_hidden"]) == (6, 2, 0, 0)
+
+
+def test_whoever_ever_wrote_stays_on_the_map_whatever_the_period(me, small_server):
+    """In the last 7 days only Bob and Carol exchanged; Erin and Frank, and the others, are still there, without a link."""
+    ids = small_server
+    week = _graph(me, isolated="true", since=_ago(days=7))
+    nodes = {n["id"]: n for n in week["nodes"]}
+    assert {n["id"] for n in week["nodes"] if not n.get("isolated")} == {ids["bob"], ids["carol"]}
+    assert {i for i, n in nodes.items() if n.get("isolated")} == {ids["alice"], ids["dave"], ids["erin"], ids["frank"]}
+    assert nodes[ids["dave"]]["messages"] == 1 and nodes[ids["erin"]]["messages"] == 1  # their whole activity, not the period's
+    assert len(week["edges"]) == 1
+
+
+def test_kinds_that_are_switched_off_leave_their_people_as_points_without_a_link(me, small_server):
+    ids = small_server
+    only_mentions = _graph(me, isolated="true", kinds="mention")
+    assert only_mentions["edges"] == [] and {n["id"] for n in only_mentions["nodes"]} == {ids["bob"], ids["carol"], ids["erin"], ids["frank"], ids["alice"], ids["dave"]}
+    assert all(n["isolated"] for n in only_mentions["nodes"])
+
+
+def test_bots_are_left_out_of_the_points_without_a_link_unless_asked(me, small_server):
+    ids = small_server
+    assert ids["bot"] not in {n["id"] for n in _graph(me, isolated="true")["nodes"]}
+    shown = {n["id"]: n for n in _graph(me, isolated="true", bots="true")["nodes"]}
+    assert shown[ids["bot"]]["isolated"] is True
+
+
+def test_the_limit_counts_the_points_without_a_link_and_the_linked_ones_come_first(me, small_server, ingest_db):
+    ids = small_server
+    directory = Directory([GUILD])
+    directory.apply("GUILD_CREATE", guild_create())
+    extra = [{"id": str(2_000_000_000_000_000_000 + i), "username": f"extra{i}", "discriminator": "0", "global_name": None, "avatar": None}
+             for i in range(1, 9)]
+    document = build_document(directory, GUILD, GENERAL, [message_create(8_000_000_000_000_000_000 + i, "bonjour", person, timestamp=_ago(minutes=i))
+                                                          for i, person in enumerate(extra, 1)])
+    ingest_document(ingest_db, document, GATEWAY_SOURCE, digest(document), only_new=True)
+    everyone = _graph(me, isolated="true", limit=100)
+    assert everyone["meta"]["isolated_shown"] == 10 and everyone["meta"]["nodes_shown"] == 14   # 4 linked + Alice, Dave + 8 more
+    tight = _graph(me, isolated="true", limit=10)
+    linked = [n for n in tight["nodes"] if not n["isolated"]]
+    isolated = [n for n in tight["nodes"] if n["isolated"]]
+    assert tight["meta"]["nodes_shown"] == 10 and len(linked) == 4                                    # the linked ones are never pushed out
+    assert [n["id"] for n in isolated[:2]] == [ids["alice"], ids["dave"]]                              # then the most talkative, then by id
+    assert tight["meta"]["isolated_shown"] == 6 and tight["meta"]["isolated_hidden"] == 4
+
+
+def test_the_card_of_a_person_without_a_link_opens(me, small_server):
+    card = me.get(f"/api/person/{small_server['alice']}?guild={GUILD}")
+    assert card.status_code == 200 and card.json()["activity"]["messages"] == 2 and card.json()["top_links"] == []
+
+
+def test_without_the_option_the_big_server_is_unchanged_and_with_it_only_points_are_added(me, world):
+    plain = me.get("/api/graph").json()
+    asked = me.get("/api/graph?isolated=true").json()
+    assert asked["edges"] == plain["edges"]
+    linked = [n for n in asked["nodes"] if not n.get("isolated")]
+    assert linked == plain["nodes"]
+    assert asked["meta"]["nodes_shown"] == len(asked["nodes"]) == len(plain["nodes"]) + asked["meta"]["isolated_shown"]

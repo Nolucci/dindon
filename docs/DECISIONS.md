@@ -95,6 +95,7 @@ Pas d'ORM, pas de framework de migrations : psycopg et du SQL.
 | L'interface demande par défaut les **2 500 liens les plus forts** | 20 000 traits superposés donnent une masse blanche ; l'API dit combien sont masqués |
 | Les événements en direct n'ajoutent un lien que visuellement ; la carte est rechargée au plus toutes les 8 s | éviter de recharger des milliers de liens à chaque message |
 | Un compteur `data-flashes` sur la carte | permet de tester depuis l'extérieur (`tools/check_ui.py`) que le lien s'illumine ; ne contient aucune donnée |
+| **Personnes sans lien** (`/api/graph?isolated=true`, case cochée par défaut dans l'interface) : toutes celles qui ont **déjà** écrit dans le serveur et ne sont pas sur la carte, **quelle que soit la période** ; taille minimale ; les robots restent exclus (`bots=true` les ajoute) | demande de l'utilisateur : voir son propre compte sur la carte avec un seul compte. Les personnes reliées passent avant et gardent leurs places ; ces points ne prennent que ce qui reste de `limit` (les plus bavards d'abord), et `isolated_hidden` dit combien manquent. Leurs chiffres (messages, dernier message) sont ceux de toute leur activité, pas de la période. Par défaut l'API ne change pas |
 | Les rôles d'âge et de genre ne sortent **nulle part** de l'API (seuls les rôles d'idéologie, présentés comme « non vérifiés ») | exigence du prompt ; un test le vérifie sur toutes les fiches |
 
 # Bot en direct (mode C, étapes 1 à 3 du plan de reprise)

@@ -29,6 +29,7 @@
   let until = $state('');
   let kinds = $state({ reply: true, mention: true, reaction: true });
   let density = $state('2500'); // how many links to draw at most: the strongest ones first
+  let showIsolated = $state(true); // also the people who wrote and have no link on the map (points on their own)
   let lastExchange = $state(null);
   let exchangeTimer;
   let meta = $state(null);
@@ -66,7 +67,7 @@
   let showsPresent = $derived(preset !== 'custom' || !until);
 
   function graphParams() {
-    const params = { guild, kinds: KINDS.filter((k) => kinds[k.id]).map((k) => k.id).join(','), max_edges: density };
+    const params = { guild, kinds: KINDS.filter((k) => kinds[k.id]).map((k) => k.id).join(','), max_edges: density, isolated: showIsolated };
     const days = PRESETS.find((p) => p.id === preset)?.days;
     if (days) params.since = new Date(Date.now() - days * 86400000).toISOString();
     if (preset === 'custom') {
@@ -126,6 +127,7 @@
       }
     } else if (event.type === 'messages') {
       newMessages += event.count;
+      if (showIsolated && showsPresent) scheduleReload(); // someone may have written for the first time, without a link yet
     } else if (event.type === 'graph') {
       scheduleReload(500);
     }
@@ -212,6 +214,13 @@
     card = null;
     scheduleReload(0);
   }
+
+  // The box of the people without a link answers at once (the other filters wait for the next reload)
+  function isolatedChanged() {
+    selectedId = null;
+    card = null;
+    reload();
+  }
 </script>
 
 <div class="app">
@@ -247,6 +256,9 @@
       <option value="8000">Liens : détaillés</option>
       <option value="20000">Liens : tous (lent)</option>
     </select>
+    <label class="check" title="Les personnes qui ont déjà écrit mais n’ont aucun lien affiché, quelle que soit la période">
+      <input type="checkbox" bind:checked={showIsolated} onchange={isolatedChanged} /> Personnes sans lien
+    </label>
     <button onclick={() => map?.resetView()} title="Revenir à la vue d’ensemble">Tout voir</button>
 
     <div class="search">
@@ -294,7 +306,7 @@
     {/if}
 
     <div class="legend" aria-hidden="true">
-      <div><span class="dot big"></span> Taille : poids des échanges · couleur : activité récente (clair) ou ancienne (sombre)</div>
+      <div><span class="dot big"></span> Taille : poids des échanges (les plus petits points n’ont aucun lien affiché) · couleur : activité récente (clair) ou ancienne (sombre)</div>
       <div><span class="bar"></span> Les liens se révèlent en <strong>survolant</strong> ou en <strong>cliquant</strong> une personne ; leur épaisseur est le poids de l’échange{#if meta && !meta.period}&nbsp;(les échanges récents comptent plus, demi-vie {meta.half_life_days} j){/if}</div>
     </div>
   </main>
@@ -302,7 +314,7 @@
   <footer>
     <span class="live" class:on={live}><i></i>{live ? 'En direct' : 'Hors ligne'}</span>
     {#if meta}
-      <span>{fmt.format(meta.nodes_shown)} personnes{#if meta.nodes_hidden > 0}&nbsp;(+ {fmt.format(meta.nodes_hidden)} moins connectées, masquées){/if}</span>
+      <span>{fmt.format(meta.nodes_shown)} personnes{#if meta.isolated_shown > 0}&nbsp;(dont {fmt.format(meta.isolated_shown)} sans lien{#if meta.isolated_hidden > 0}, + {fmt.format(meta.isolated_hidden)} masquées{/if}){/if}{#if meta.nodes_hidden > 0}&nbsp;(+ {fmt.format(meta.nodes_hidden)} moins connectées, masquées){/if}</span>
       <span>{fmt.format(meta.edges_shown)} liens{#if meta.edges_hidden > 0}&nbsp;(+ {fmt.format(meta.edges_hidden)} plus faibles, masqués){/if}</span>
     {/if}
     {#if newMessages}<span>{fmt.format(newMessages)} nouveaux messages depuis l’ouverture</span>{/if}
@@ -328,6 +340,8 @@
   .group button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
   .group button:last-child { border-radius: 0 6px 6px 0; }
   .quiet { background: none; margin-left: auto; color: var(--muted); }
+  .check { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; cursor: pointer; user-select: none; }
+  .check input { accent-color: #4f8fd1; margin: 0; cursor: pointer; }
   .search { position: relative; }
   .search input { width: 168px; }
   .search ul { position: absolute; top: 100%; left: 0; right: 0; margin: 4px 0 0; padding: 4px; list-style: none; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; z-index: 20; }

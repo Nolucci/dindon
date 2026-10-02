@@ -22,7 +22,7 @@ Un faux Discord (60 personnes inventées) répond comme le vrai, le premier impo
 
 ## Lire la carte
 
-Un point par personne, une ligne par paire de personnes qui se parlent. Les **noms** sont affichés avec un halo sombre, en nombre adapté à la taille du serveur (pour un grand serveur, seuls les noms qui tiennent ; zoomer ou chercher en révèle d'autres). Les **liens** forment une toile discrète : ils ne se révèlent qu'en **survolant** ou en **cliquant** une personne, dont les liens deviennent nets (épaisseur = poids de l'échange), avec le nom de ses interlocuteurs principaux. La fiche s'ouvre à côté de la carte. « Tout voir » revient à la vue d'ensemble.
+Un point par personne, une ligne par paire de personnes qui se parlent. La case **Personnes sans lien** (cochée au départ) ajoute aussi, comme de petits points sans trait, toutes celles qui ont déjà écrit mais n'ont aucun lien affiché, quelle que soit la période choisie ; cliquer un tel point ouvre sa fiche. Les **noms** sont affichés avec un halo sombre, en nombre adapté à la taille du serveur (pour un grand serveur, seuls les noms qui tiennent ; zoomer ou chercher en révèle d'autres). Les **liens** forment une toile discrète : ils ne se révèlent qu'en **survolant** ou en **cliquant** une personne, dont les liens deviennent nets (épaisseur = poids de l'échange), avec le nom de ses interlocuteurs principaux. La fiche s'ouvre à côté de la carte. « Tout voir » revient à la vue d'ensemble.
 
 ## Installer
 

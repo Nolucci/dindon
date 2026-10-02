@@ -25,7 +25,7 @@ Il est fait pour une seule personne (francophone), sur un serveur dont on est me
 
 ### Ce qu'on voit
 
-- **La carte** : un point par personne (taille : poids de ses échanges ; couleur : activité récente), une ligne par paire de personnes qui se parlent. Les noms sont lisibles ; les liens forment une toile discrète qui devient nette, avec le nom des interlocuteurs principaux, quand on **survole ou clique** une personne. Quand un nouvel échange arrive, **son lien s'illumine**.
+- **La carte** : un point par personne (taille : poids de ses échanges ; couleur : activité récente), une ligne par paire de personnes qui se parlent. Une case **« Personnes sans lien »** (cochée au départ) ajoute toutes celles qui ont déjà écrit mais n'ont aucun lien affiché, en petits points, quelle que soit la période. Les noms sont lisibles ; les liens forment une toile discrète qui devient nette, avec le nom des interlocuteurs principaux, quand on **survole ou clique** une personne. Quand un nouvel échange arrive, **son lien s'illumine**.
 - **La fiche d'une personne** (au clic) : activité, échanges envoyés et reçus, liens principaux, salons les plus fréquentés, et les rôles d'idéologie qu'elle s'est donnés (présentés comme **non vérifiés**). Les positions sur les idées et leur vérification arrivent avec les phases 3 et 4.
 - **Filtres** : période (tout, 90 / 30 / 7 jours, dates), types d'échanges (réponses, mentions, réactions), nombre de liens affichés, recherche d'une personne.
 - **Bandeau et bas de page** : un **bandeau d'avertissement** en haut si un compte personnel est automatisé ; en bas, l'état du direct, le nombre de personnes et de liens, le dernier échange et l'état de la surveillance.

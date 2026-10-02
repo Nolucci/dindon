@@ -107,6 +107,7 @@ def graph(
     limit: int = Query(3000, ge=10, le=20000, description="most people shown (the most connected ones)"),
     max_edges: int = Query(20000, ge=10, le=100000),
     bots: bool = False,
+    isolated: bool = Query(False, description="also the people who ever wrote and are not on the map: points without a link"),
 ) -> dict:
     kind_list = [k for k in kinds.split(",") if k in KIND_FACTOR]
     if not kind_list:
@@ -121,12 +122,26 @@ def graph(
                   "since": since or datetime(1970, 1, 1, tzinfo=timezone.utc), "until": until or datetime(2200, 1, 1, tzinfo=timezone.utc)}
         rows = conn.execute(_GRAPH.replace("{source}", _PERIOD if period else _ALL_TIME), params).fetchall()
         node_ids = sorted({r["a"] for r in rows} | {r["b"] for r in rows})
+        # Points without a link: whoever ever wrote in this server (not only during the period) and is not on the map. Linked
+        # people come first and keep their places; these only take what is left of `limit`, the most talkative first.
+        loners, loners_total = [], 0
+        if isolated:
+            on_map = set(node_ids)
+            candidates = [r for r in conn.execute(
+                """SELECT m.author_id AS id, count(*) AS messages, max(m.sent_at) AS last_at
+                   FROM messages m JOIN channels c ON c.id = m.channel_id JOIN users u ON u.id = m.author_id
+                   WHERE c.guild_id = %(guild)s AND (%(bots)s OR NOT u.is_bot)
+                   GROUP BY m.author_id ORDER BY count(*) DESC, m.author_id""", params) if r["id"] not in on_map]
+            loners_total = len(candidates)
+            loners = candidates[:max(limit - len(node_ids), 0)]
         labels, stats = {}, {}
-        if node_ids:
+        label_ids = node_ids + [r["id"] for r in loners]
+        if label_ids:
             for r in conn.execute(
                 f"""SELECT u.id, {LABEL} AS label FROM users u LEFT JOIN members m ON m.guild_id = %s AND m.user_id = u.id
-                    WHERE u.id = ANY(%s)""", (guild_id, node_ids)):
+                    WHERE u.id = ANY(%s)""", (guild_id, label_ids)):
                 labels[r["id"]] = r["label"]
+        if node_ids:
             for r in conn.execute(
                 """SELECT m.author_id, count(*) AS messages, max(m.sent_at) AS last_at
                    FROM messages m JOIN channels c ON c.id = m.channel_id
@@ -145,13 +160,17 @@ def graph(
     nodes = [{"id": str(uid), "label": labels.get(uid, str(uid)), "influence": round(influence[uid], 4),
               "messages": stats[uid]["messages"] if uid in stats else 0,
               "last_message_at": _iso(stats[uid]["last_at"]) if uid in stats else None,
-              "community": None}  # filled in by the community detection (phase 5)
+              "community": None,  # filled in by the community detection (phase 5)
+              "isolated": False}
              for uid in sorted(node_ids, key=lambda u: -influence[u])]
+    nodes += [{"id": str(r["id"]), "label": labels.get(r["id"], str(r["id"])), "influence": 0, "messages": r["messages"],
+               "last_message_at": _iso(r["last_at"]), "community": None, "isolated": True} for r in loners]
     nodes_total = rows[0]["nodes_total"] if rows else 0
     edges_total = rows[0]["edges_total"] if rows else 0
     return {"meta": {"guild": str(guild_id), "period": {"since": _iso(since), "until": _iso(until)} if period else None,
                      "half_life_days": float(half_life_days["value"]) if half_life_days else 90, "kind_factor": KIND_FACTOR,
-                     "nodes_total": nodes_total, "nodes_shown": len(nodes), "nodes_hidden": nodes_total - len(nodes),
+                     "nodes_total": nodes_total, "nodes_shown": len(nodes), "nodes_hidden": nodes_total - len(node_ids),
+                     "isolated_shown": len(loners), "isolated_hidden": loners_total - len(loners),
                      "edges_shown": len(edges), "edges_hidden": edges_total - len(edges), "generated_at": _iso(datetime.now(timezone.utc))},
             "nodes": nodes, "edges": edges}
 
