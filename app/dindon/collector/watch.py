@@ -29,7 +29,7 @@ from dindon.collector.exporter import Exporter, ExporterError
 from dindon.config import Settings
 from dindon.db import connect
 from dindon.ingest.inbox import archive_file
-from dindon.ingest.loader import InvalidExport, ingest_file
+from dindon.ingest.loader import GATEWAY_SOURCE, InvalidExport, ingest_file
 
 log = logging.getLogger("dindon.collector")
 
@@ -72,20 +72,27 @@ class Collector:
     # --- what is known ------------------------------------------------------------------------------
 
     @staticmethod
-    def _known(conn: psycopg.Connection, channels: list[Watched]) -> dict[int, int]:
-        """The newest message of each channel that the database has. A forum only has posts: it is its newest post's messages."""
+    def _known(conn: psycopg.Connection, channels: list[Watched], exported_only: bool = False) -> dict[int, int]:
+        """The newest message of each channel that the database has. A forum only has posts: it is its newest post's messages.
+
+        `exported_only` leaves out what only the live bot has written. A first import goes on "after the newest message it has", which
+        is right for what an export brought (it brings everything up to there), and wrong for a message that the bot announced: the
+        history before it is not here."""
+        params = {"live": GATEWAY_SOURCE}
+        from_exports = ("AND EXISTS (SELECT 1 FROM ingest_runs r WHERE r.id = m.last_seen_run_id AND r.source_file IS DISTINCT FROM %(live)s)"
+                        if exported_only else "")
         known: dict[int, int] = {}
         ids = [c.id for c in channels if c.kind != "forum"]
         for channel_id, last in conn.execute(
-            """SELECT t.id, (SELECT m.id FROM messages m WHERE m.channel_id = t.id ORDER BY m.sent_at DESC LIMIT 1)
-               FROM unnest(%s::bigint[]) AS t(id)""", (ids,)):
+            f"""SELECT t.id, (SELECT m.id FROM messages m WHERE m.channel_id = t.id {from_exports} ORDER BY m.sent_at DESC LIMIT 1)
+                FROM unnest(%(ids)s::bigint[]) AS t(id)""", {**params, "ids": ids}):
             if last:
                 known[channel_id] = last
         forums = [c.id for c in channels if c.kind == "forum"]
         if forums:
             known.update(dict(conn.execute(
-                """SELECT ch.parent_id, max(m.id) FROM channels ch JOIN messages m ON m.channel_id = ch.id
-                   WHERE ch.parent_id = ANY(%s) GROUP BY ch.parent_id""", (forums,)).fetchall()))
+                f"""SELECT ch.parent_id, max(m.id) FROM channels ch JOIN messages m ON m.channel_id = ch.id
+                    WHERE ch.parent_id = ANY(%(forums)s) {from_exports} GROUP BY ch.parent_id""", {**params, "forums": forums}).fetchall()))
         return known
 
     # --- one export ---------------------------------------------------------------------------------
@@ -135,7 +142,9 @@ class Collector:
         exports = 0
         for guild_id in self.settings.guild_ids:
             channels = self._channels_of(guild_id)
-            first_import = conn.execute("SELECT min(imported_at) FROM ingest_runs WHERE guild_id = %s", (guild_id,)).fetchone()[0]
+            # The first import is an import of a history: what the live bot writes does not count
+            first_import = conn.execute("SELECT min(imported_at) FROM ingest_runs WHERE guild_id = %s AND source_file IS DISTINCT FROM %s",
+                                        (guild_id, GATEWAY_SOURCE)).fetchone()[0]
             if first_import is None:
                 self._needs_backfill.add(guild_id)
                 continue
@@ -219,7 +228,7 @@ class Collector:
         mode = self.settings.exporter_threads
         channels = self._channels_of(guild_id)
         with new_connection() as conn:
-            known = self._known(conn, channels)
+            known = self._known(conn, channels, exported_only=True)
         todo = []
         for channel in channels:
             have = known.get(channel.id)

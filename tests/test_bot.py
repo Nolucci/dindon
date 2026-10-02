@@ -450,3 +450,58 @@ def test_a_message_written_on_the_fake_discord_lights_up_the_link_on_the_page(in
     print(f"\nmessage dispatched by the fake Gateway -> 'edge' event received by the page: {latency:.2f}s")
     assert latency < 3 and edge["weight"] > 0.9 and edge["guild"] == GUILD
     assert len(messages(ingest_db)) == 2
+
+
+# ---------------------------------------------------------------------------------------------
+# Review: what is a passing problem, and what is a message that cannot be digested
+# ---------------------------------------------------------------------------------------------
+
+
+def test_a_database_that_is_not_ready_makes_the_messages_wait_instead_of_dropping_them(migrated_url, tmp_path):
+    """The bot can start before the application has applied the migrations: 'relation does not exist' is not the fault of the messages."""
+    import uuid
+
+    from dindon.migrate import migrate
+
+    name = "dindon_empty_" + uuid.uuid4().hex[:8]
+    base = migrated_url.rpartition("/")[0]
+    with psycopg.connect(migrated_url, autocommit=True) as admin:
+        admin.execute(f'CREATE DATABASE "{name}"')
+    try:
+        url = f"{base}/{name}"
+        runner = BotRunner([GUILD], Writer(url), batch_seconds=0, retry_seconds=(0,))
+        runner.handle(event("GUILD_CREATE", guild_create()))
+        for number in (1, 2, 3):
+            runner.handle(create(message_create(number, f"m{number}")))
+        assert flush(runner) is False                                          # nothing to write them into yet
+        assert runner.status()["rejected"] == 0 and runner.status()["waiting"] == 3
+        with psycopg.connect(url) as conn:                                      # the application applies the migrations
+            migrate(conn, __import__("pathlib").Path(__file__).resolve().parents[1] / "db")
+        assert flush(runner) is True
+        with psycopg.connect(url) as conn:
+            assert {r[0] for r in conn.execute("SELECT id FROM messages")} == {1, 2, 3}
+        assert runner.status()["rejected"] == 0
+    finally:
+        with psycopg.connect(migrated_url, autocommit=True) as admin:
+            admin.execute(f'DROP DATABASE "{name}" WITH (FORCE)')
+
+
+def test_an_error_in_the_middle_of_a_transaction_costs_one_message_and_leaves_the_connection_usable(ingest_db, ingest_url):
+    """The database itself refuses one message (a person that is in no table): that message is dropped, the others are written, and the
+    connection that went through the failed transaction goes on working."""
+    writer = Writer(ingest_url)
+
+    def refused_by_the_database(document, sha):
+        for m in document["messages"]:
+            if m["id"] == "2":
+                m["reference"] = {"type": "Default", "messageId": "1", "authorId": "999999999999"}
+        return writer(document, sha)
+
+    runner = BotRunner([GUILD], refused_by_the_database, batch_seconds=0)
+    runner.handle(event("GUILD_CREATE", guild_create()))
+    for number in (1, 2, 3):
+        runner.handle(create(message_create(number, f"m{number}")))
+    assert flush(runner)
+    assert set(messages(ingest_db)) == {1, 3} and runner.status()["rejected"] == 1 and runner.status()["waiting"] == 0
+    runner.handle(create(message_create(4, "après")))
+    assert flush(runner) and set(messages(ingest_db)) == {1, 3, 4}             # the same connection, still good

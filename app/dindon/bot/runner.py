@@ -23,10 +23,10 @@ from typing import Callable
 import psycopg
 
 from dindon.bot.adapter import DIRECTORY_EVENTS, Directory, build_document, digest
-from dindon.bot.gateway import FatalGatewayError, GatewayEvent, GatewaySource
+from dindon.bot.events import FatalGatewayError, GatewayEvent
 from dindon.config import Settings
 from dindon.db import connect
-from dindon.ingest.loader import IngestResult, ingest_document
+from dindon.ingest.loader import GATEWAY_SOURCE, IngestResult, InvalidExport, ingest_document
 
 log = logging.getLogger("dindon.bot")
 
@@ -39,6 +39,10 @@ FATAL_WAIT_SECONDS = 3600     # after an error that waiting does not fix: stay q
 NOT_APPLIED = ("MESSAGE_UPDATE", "MESSAGE_DELETE", "MESSAGE_DELETE_BULK")  # arrive, are counted, are not applied yet
 
 Ingest = Callable[[dict, str], IngestResult]
+
+# What is the fault of a message: a shape that was not expected, or data that the database refuses. Anything else (the database away,
+# not ready, locked, out of room...) is not, and the messages wait: dropping them would lose what nothing is wrong with.
+UNDIGESTIBLE = (InvalidExport, KeyError, TypeError, ValueError, AttributeError, IndexError, psycopg.DataError, psycopg.IntegrityError)
 
 
 class Writer:
@@ -53,8 +57,8 @@ class Writer:
             self._conn = connect(self._url)
             self._conn.autocommit = True
         try:
-            # 'gateway' is the name in the ledger of imports; only_new: see the module description
-            return ingest_document(self._conn, document, "gateway", sha256, only_new=True)
+            # GATEWAY_SOURCE is the name in the ledger of imports; only_new: see the module description
+            return ingest_document(self._conn, document, GATEWAY_SOURCE, sha256, only_new=True)
         except (psycopg.OperationalError, psycopg.InterfaceError):
             self._conn.close()
             self._conn = None
@@ -86,8 +90,8 @@ class BotRunner:
             self.connected = True
             if self.stats["sessions"] > 1:  # a new session after a first one: what happened in between is lost to the Gateway
                 self.stats["gaps"] += 1
-                log.warning("reconnected with a new session: messages written meanwhile were not received here; "
-                            "the watcher (if it runs) and the nightly catch-up bring them back")
+                log.warning("reconnected with a new session: messages written meanwhile were not received here; the nightly catch-up "
+                            "(or `dindon catchup`, now) brings them back: the watcher does not see them")
             else:
                 log.info("connected to Discord")
         elif event.kind == "resumed":
@@ -176,15 +180,15 @@ class BotRunner:
             return []
         try:
             result = await asyncio.to_thread(self._ingest, document, digest(document))
-        except (psycopg.OperationalError, psycopg.InterfaceError) as error:
+        except UNDIGESTIBLE as error:  # a document that the ingestion refuses
+            return await self._isolate(channel_id, chunk, error)
+        except Exception as error:  # not the fault of the messages: the database is away, or not ready
             self._failures += 1
             self.stats["database_retries"] += 1
             delay = self._retry_seconds[min(self._failures - 1, len(self._retry_seconds) - 1)]
             self._retry_at = self._clock() + delay
             log.warning("database unavailable (%s): %d messages wait, next try in %ss", type(error).__name__, len(chunk) + self._pending_count, delay)
             return chunk
-        except Exception as error:  # a document that the ingestion refuses
-            return await self._isolate(channel_id, chunk, error)
         self._failures = 0
         self._retry_at = 0.0
         self.stats["batches"] += 1
@@ -250,6 +254,8 @@ class BotRunner:
 
 
 async def serve(settings: Settings, fatal_wait: float = FATAL_WAIT_SECONDS) -> int:
+    from dindon.bot.gateway import GatewaySource  # the only place where the library comes in
+
     source = GatewaySource(settings.discord_token, settings.discord_api_url)
     runner = BotRunner(settings.guild_ids, Writer(settings.database_url))
     stop = asyncio.Event()        # the engine must write what waits and finish

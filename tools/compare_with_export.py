@@ -21,6 +21,8 @@ from pathlib import Path
 
 import psycopg
 
+from dindon.ingest.loader import GATEWAY_SOURCE
+
 FIELDS = ("type", "content", "author", "sent_at", "pinned", "reply_to", "reply_author", "reply_content", "mentions")
 
 
@@ -38,15 +40,23 @@ def _expected(message: dict) -> dict:
 
 
 def compare(conn: psycopg.Connection, document: dict) -> dict:
-    """{'compared', 'same', 'edited_since', 'not_in_database', 'differences': [(message id, field, in the database, in the export)]}"""
-    result = {"compared": 0, "same": 0, "edited_since": 0, "not_in_database": 0, "differences": []}
+    """{'compared', 'same', 'edited_since', 'rewritten_by_export', 'not_in_database', 'differences': [(id, field, database, export)]}
+
+    Only what the bot wrote and nobody has rewritten is compared: a row that an export has written since (the catch-up, say) is the
+    exporter's, and comparing it with an export would say "identical" whatever the bot had written."""
+    result = {"compared": 0, "same": 0, "edited_since": 0, "rewritten_by_export": 0, "not_in_database": 0, "differences": []}
     for message in document["messages"]:
         mid = int(message["id"])
         row = conn.execute(
-            """SELECT type, content, author_id, sent_at, is_pinned, reference_message_id, reference_author_id, reference_content
-               FROM messages WHERE id = %s""", (mid,)).fetchone()
+            """SELECT m.type, m.content, m.author_id, m.sent_at, m.is_pinned, m.reference_message_id, m.reference_author_id,
+                      m.reference_content, r.source_file
+               FROM messages m LEFT JOIN ingest_runs r ON r.id = m.last_seen_run_id WHERE m.id = %s""", (mid,)).fetchone()
         if row is None:
             result["not_in_database"] += 1
+            continue
+        *row, written_by = row
+        if written_by != GATEWAY_SOURCE:
+            result["rewritten_by_export"] += 1
             continue
         if "timestampEdited" in message:
             result["edited_since"] += 1
@@ -70,7 +80,7 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
     from dindon.config import load_settings
 
-    totals = {"compared": 0, "same": 0, "edited_since": 0, "not_in_database": 0}
+    totals = {"compared": 0, "same": 0, "edited_since": 0, "rewritten_by_export": 0, "not_in_database": 0}
     differences: list = []
     with psycopg.connect(load_settings().database_url) as conn:
         for path in args.exports:
@@ -79,7 +89,8 @@ def main(argv: list[str]) -> int:
                 totals[key] += result[key]
             differences.extend(result["differences"])
     print(f"compared {totals['compared']} messages: {totals['same']} identical, {len({d[0] for d in differences})} different; "
-          f"{totals['edited_since']} edited since (not applied yet), {totals['not_in_database']} not in the database")
+          f"{totals['edited_since']} edited since (not applied yet), {totals['rewritten_by_export']} already rewritten by an export "
+          f"(proves nothing: not compared), {totals['not_in_database']} not in the database")
     for mid, field, have, want in differences:
         print(f"  message {mid}: {field}" + (f"\n      database: {str(have)[:80]!r}\n      export:   {str(want)[:80]!r}" if args.show else ""))
     return 1 if differences else 0

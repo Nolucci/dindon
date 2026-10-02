@@ -23,7 +23,7 @@ def written(ingest_db):
 
 def test_identical_messages_give_no_difference(written):
     conn, export = written
-    assert compare(conn, export) == {"compared": 2, "same": 2, "edited_since": 0, "not_in_database": 0, "differences": []}
+    assert compare(conn, export) == {"compared": 2, "same": 2, "edited_since": 0, "rewritten_by_export": 0, "not_in_database": 0, "differences": []}
 
 
 def test_a_difference_in_the_text_a_mention_or_the_reply_is_named(written):
@@ -45,3 +45,16 @@ def test_an_edited_message_and_an_unknown_one_are_counted_apart(written):
     export["messages"].append({**export["messages"][1], "id": "999"})
     result = compare(conn, export)
     assert (result["compared"], result["same"], result["edited_since"], result["not_in_database"], result["differences"]) == (1, 1, 1, 1, [])
+
+
+def test_a_message_that_an_export_has_rewritten_since_proves_nothing_about_the_bot_and_is_counted_apart(written):
+    """After a catch-up (or any export), the row is the exporter's: comparing it with an export would say 'identical' whatever the bot
+    had written. Only what the bot wrote and nobody has rewritten is compared."""
+    conn, document = written
+    rewritten = copy.deepcopy(document)
+    rewritten["exportedAt"] = "2026-10-04T03:00:00.000Z"
+    rewritten["messages"] = [m for m in rewritten["messages"] if m["id"] == "100"]
+    rewritten["messageCount"] = 1
+    ingest_document(conn, rewritten, "export.json", "f" * 64)                    # a real export of message 100, later
+    result = compare(conn, document)
+    assert result["rewritten_by_export"] == 1 and result["compared"] == 1 and result["same"] == 1

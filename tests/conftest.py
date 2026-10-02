@@ -3,7 +3,9 @@
 Set DINDON_TEST_DATABASE_URL to use an existing database instead (it must be disposable).
 Tests only ever use synthetic data.
 """
+import ipaddress
 import os
+import socket
 import subprocess
 from pathlib import Path
 
@@ -86,3 +88,63 @@ def discord_is_never_reached(monkeypatch):
 
     monkeypatch.setattr(discord.http.Route, "BASE", "http://127.0.0.1:9/api/v10")
     monkeypatch.setattr(discord.gateway.DiscordWebSocket, "DEFAULT_GATEWAY", yarl.URL("ws://127.0.0.1:9/"))
+
+
+# --- the tests never leave this machine ---------------------------------------------------------------------------------
+# Not even to say hello to Discord: any connection to, or name resolution of, anything but this machine is refused and recorded, and
+# a test during which something was refused fails (even if the code under test swallowed the error, as a retry loop would).
+BLOCKED: list[str] = []
+
+
+def _is_this_machine(host) -> bool:
+    if host in (None, "", "localhost", "0.0.0.0", "::"):
+        return True
+    if isinstance(host, bytes):
+        host = host.decode(errors="replace")
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return str(host).endswith(".localhost")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def tests_never_leave_this_machine():
+    real_connect, real_connect_ex, real_getaddrinfo = socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo
+
+    def refuse(host) -> None:
+        BLOCKED.append(str(host))
+        raise OSError(f"blocked: the tests may only talk to this machine, not to {host}")
+
+    def connect(self, address):
+        if isinstance(address, tuple) and not _is_this_machine(address[0]):
+            refuse(address[0])
+        return real_connect(self, address)
+
+    def connect_ex(self, address):
+        if isinstance(address, tuple) and not _is_this_machine(address[0]):
+            refuse(address[0])
+        return real_connect_ex(self, address)
+
+    def getaddrinfo(host, *args, **kwargs):
+        if not _is_this_machine(host):
+            refuse(host)
+        return real_getaddrinfo(host, *args, **kwargs)
+
+    patch = pytest.MonkeyPatch()
+    patch.setattr(socket.socket, "connect", connect)
+    patch.setattr(socket.socket, "connect_ex", connect_ex)
+    patch.setattr(socket, "getaddrinfo", getaddrinfo)
+    yield
+    patch.undo()
+
+
+@pytest.fixture
+def blocked_attempts() -> list[str]:
+    return BLOCKED
+
+
+@pytest.fixture(autouse=True)
+def no_test_tried_to_leave_this_machine():
+    BLOCKED.clear()
+    yield
+    assert not BLOCKED, f"this test tried to reach: {sorted(set(BLOCKED))}"

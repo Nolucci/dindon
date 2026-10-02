@@ -14,11 +14,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from dataclasses import dataclass
 
 import aiohttp
 import discord
 import yarl
+
+from dindon.bot.events import FatalGatewayError, GatewayEvent  # noqa: F401 (re-exported: the engine reads them from here too)
 
 log = logging.getLogger("dindon.bot")
 
@@ -31,17 +32,6 @@ INTENTS.message_content = True
 # When Discord cannot be reached at all (once connected, discord.py handles it). At most 5 minutes apart, so that even a failure
 # that comes back at every start stays far under Discord's 1000 sessions a day.
 CONNECT_RETRY_SECONDS = (5, 10, 30, 60, 120, 300)
-
-
-@dataclass(frozen=True)
-class GatewayEvent:
-    kind: str                 # 'dispatch', 'connected' (a new session), 'resumed' (same session, nothing missed), 'disconnected'
-    type: str = ""            # for a dispatch: MESSAGE_CREATE, GUILD_CREATE, ...
-    data: dict | None = None
-
-
-class FatalGatewayError(Exception):
-    """Something that trying again will not fix (a refused token, an intent that is not allowed): the message says what to do."""
 
 
 class _NoFrames(logging.Filter):

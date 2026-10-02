@@ -268,3 +268,62 @@ def test_the_catch_up_applies_edits_and_deletions_of_the_last_days(collector, fa
     incremental = ingest_db.execute("SELECT guild_id, from_user_id, to_user_id, kind, n FROM edges ORDER BY 1, 2, 3, 4").fetchall()
     ingest_db.execute("SELECT rebuild_edges()")
     assert incremental == ingest_db.execute("SELECT guild_id, from_user_id, to_user_id, kind, n FROM edges ORDER BY 1, 2, 3, 4").fetchall()
+
+
+# ---------------------------------------------------------------------------------------------
+# The live bot as another source: it must not be taken for a first import
+# ---------------------------------------------------------------------------------------------
+
+
+def _bot_writes_the_newest_message(conn, world, channel):
+    """What the bot does on a MESSAGE_CREATE: one new message, recorded under the name 'gateway'."""
+    import hashlib
+
+    from dindon.ingest.loader import ingest_document
+
+    newest = int(channel.messages[-1]["id"])
+    document = json.loads(world.export_document(channel, after_id=newest - 1))
+    assert [m["id"] for m in document["messages"]] == [str(newest)]
+    sha = hashlib.sha256(json.dumps(document, sort_keys=True).encode()).hexdigest()
+    ingest_document(conn, document, "gateway", sha, only_new=True)
+    return newest
+
+
+def test_a_server_that_the_bot_saw_first_is_still_imported_in_full_by_backfill(collector, ingest_db, ingest_url, world):
+    """If the bot writes the newest message of a channel before any import, 'the newest message is known' must not be read as
+    'the history is here': the first import has to bring everything that came before."""
+    channel = max(world.channels, key=lambda c: len(c.messages))
+    _bot_writes_the_newest_message(ingest_db, world, channel)
+    assert message_count(ingest_db) == 1
+    collector.backfill(lambda: connection(ingest_url), world.guild_id, parallel=2, progress=lambda _: None)
+    assert message_count(ingest_db) == sum(len(c.messages) for c in world.channels)
+
+
+def test_a_message_written_by_the_bot_is_not_a_first_import_for_the_watcher(collector, fake, ingest_db, world):
+    channel = max(world.channels, key=lambda c: len(c.messages))
+    _bot_writes_the_newest_message(ingest_db, world, channel)
+    assert collector.poll(ingest_db) == 0 and exports_asked(fake) == []
+    assert collector.status()["needs_backfill"] == [str(world.guild_id)]  # the interface still says that the first import is to do
+
+
+def test_the_watcher_does_not_see_a_gap_left_by_the_bot_only_the_nightly_catch_up_does(collector, fake, imported, ingest_db, world):
+    """After a new Gateway session, messages written meanwhile are missing. The watcher only looks for what is newer than the newest
+    message it knows, so it does not see them; the catch-up, which exports the last days again, brings them back. (The documentation
+    says so: it must be true.)"""
+    channel = max(world.channels, key=lambda c: len(c.messages))
+    alice = world.people[0]
+    missed = [fake.post(channel, alice, f"manqué {n}") for n in range(2)]
+    seen = fake.post(channel, alice, "vu par le bot")
+    import hashlib
+
+    from dindon.ingest.loader import ingest_document
+
+    document = json.loads(world.export_document(channel, after_id=int(seen["id"]) - 1))
+    ingest_document(ingest_db, document, "gateway", hashlib.sha256(json.dumps(document).encode()).hexdigest(), only_new=True)
+    ids = {r[0] for r in ingest_db.execute("SELECT id FROM messages WHERE channel_id = %s", (channel.id,))}
+    assert int(seen["id"]) in ids and not {int(m["id"]) for m in missed} & ids
+    fake.requests.clear()
+    assert collector.poll(ingest_db) == 0 and exports_asked(fake) == []          # the watcher sees nothing to do
+    collector.catchup(ingest_db)
+    ids = {r[0] for r in ingest_db.execute("SELECT id FROM messages WHERE channel_id = %s", (channel.id,))}
+    assert {int(m["id"]) for m in missed} <= ids                                  # the catch-up does

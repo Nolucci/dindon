@@ -26,6 +26,7 @@ from pathlib import Path
 import psycopg
 
 INGEST_LOCK = 7_262_025  # one import at a time: they all touch the same people and the same links
+GATEWAY_SOURCE = "gateway"  # the name, in the ledger of imports, of what the live bot writes: it is not an import of a history
 NOTIFY_CHANNEL = "dindon"
 MAX_EDGE_EVENTS = 200  # beyond this, the interface is told to reload instead of one event per link
 MESSAGE_EXTRA_KEYS = ("embeds", "stickers", "poll", "forwardedMessage")
