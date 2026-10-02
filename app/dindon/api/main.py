@@ -13,7 +13,9 @@ from pydantic import BaseModel
 from dindon import __version__
 from dindon.api.auth import COOKIE, LIFETIME, Auth, require_session
 from dindon.api.hub import Hub
+from dindon.api.imports import router as imports_router
 from dindon.api.routes import router
+from dindon.collector.job import ImportJobs
 from dindon.config import Settings, load_settings
 from dindon.db import connect
 from dindon.health import database_report, ollama_report
@@ -77,6 +79,7 @@ def create_app(settings: Settings | None = None, background: bool = True) -> Fas
 
     app = FastAPI(title="Dindon", version=__version__, docs_url=None, redoc_url=None, lifespan=lifespan)
     app.state.settings, app.state.auth, app.state.pool, app.state.hub, app.state.collector = settings, auth, pool, hub, None
+    app.state.imports = ImportJobs(settings)
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
@@ -133,6 +136,7 @@ def create_app(settings: Settings | None = None, background: bool = True) -> Fas
         return StreamingResponse(stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     app.include_router(router)
+    app.include_router(imports_router)
 
     if settings.web_dir.is_dir():
         app.mount("/", StaticFiles(directory=settings.web_dir, html=True), name="web")

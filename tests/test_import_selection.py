@@ -244,6 +244,8 @@ def test_stopping_before_the_start_exports_nothing(collector, fake, world, inges
                                 cancel=cancel, report=events.append)
     assert totals["channels"] == 0 and totals["cancelled"] == events[0]["channels"] > 0
     assert exports_asked(fake) == [] and events[0]["event"] == "planned"
+    # every channel that was not done is reported as cancelled, so that a screen counts them all
+    assert [e["cancelled"] for e in events[1:]] == [True] * events[0]["channels"]
 
 
 def test_what_is_reported_while_it_runs(collector, fake, world, ingest_url):

@@ -256,8 +256,10 @@ class Collector:
 
         def work(item: tuple[Watched, int | None], number: int) -> None:
             channel, have = item
-            if cancel is not None and cancel.is_set():
+            if cancel is not None and cancel.is_set():  # asked to stop before this channel started: it is reported like the others
                 totals["cancelled"] += 1
+                progress(f"[{number}/{len(todo)}] {channel.name or channel.id}: cancelled")
+                report({"event": "channel", "name": channel.name or str(channel.id), "ok": False, "cancelled": True, "messages": 0})
                 return
             with new_connection() as conn:
                 outcome = self._export(conn, channel, after=selection.after_id() if selection.partial else have, before=selection.before_id(),
