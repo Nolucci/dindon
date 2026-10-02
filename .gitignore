@@ -24,3 +24,6 @@ web/dist/
 
 .DS_Store
 backups/
+
+# Real exports kept to compare with the bot (tools/compare_with_export.py)
+parity/
