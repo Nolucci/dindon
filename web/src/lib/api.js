@@ -8,7 +8,8 @@ async function request(path, options = {}) {
   if (response.status === 401) throw new AuthError('not authenticated');
   if (!response.ok) {
     const detail = await response.json().catch(() => ({}));
-    const error = new Error(detail.detail || `Erreur ${response.status}`);
+    // A refusal that the application wrote is a sentence; a form that was not filled in properly is a list of fields
+    const error = new Error(typeof detail.detail === 'string' && detail.detail ? detail.detail : `Erreur ${response.status}`);
     error.status = response.status;
     throw error;
   }
@@ -32,6 +33,10 @@ export const api = {
   people: (q, guild) => request(`/api/people${query({ q, guild })}`),
   person: (id, guild) => request(`/api/person/${id}${query({ guild })}`),
   status: () => request('/api/status'),
+  importOptions: () => request('/api/import/options'),
+  importStatus: () => request('/api/import'),
+  importStart: (body) => request('/api/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  importCancel: () => request('/api/import/cancel', { method: 'POST' }),
 };
 
 // Live events. The browser reconnects by itself; `onState` says whether the line is open.

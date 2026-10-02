@@ -3,6 +3,7 @@
   import { api, AuthError, openEvents } from '../lib/api.js';
   import { MapGraph } from '../lib/mapgraph.js';
   import PersonCard from './PersonCard.svelte';
+  import ImportPanel from './ImportPanel.svelte';
 
   let { onLogout } = $props();
 
@@ -29,6 +30,7 @@
   let until = $state('');
   let kinds = $state({ reply: true, mention: true, reaction: true });
   let density = $state('2500'); // how many links to draw at most: the strongest ones first
+  let showImport = $state(false); // the window to import a part of the server
   let showIsolated = $state(true); // also the people who wrote and have no link on the map (points on their own)
   let lastExchange = $state(null);
   let exchangeTimer;
@@ -215,6 +217,17 @@
     scheduleReload(0);
   }
 
+  // Once the window of the import is closed, the map shows what it brought (also when no server was there before)
+  async function importClosed() {
+    showImport = false;
+    const list = await guard(() => api.guilds());
+    if (list) {
+      guilds = list;
+      if (!guild && list.length) guild = list.reduce((a, b) => ((b.last_message_at ?? '') > (a.last_message_at ?? '') ? b : a)).id;
+    }
+    reload();
+  }
+
   // The box of the people without a link answers at once (the other filters wait for the next reload)
   function isolatedChanged() {
     selectedId = null;
@@ -272,6 +285,7 @@
       {/if}
     </div>
 
+    <button onclick={() => (showImport = true)} title="Importer l’historique de certains salons, de certaines personnes, d’une période">Importer…</button>
     <button class="quiet" onclick={logout}>Quitter</button>
   </header>
 
@@ -310,6 +324,10 @@
       <div><span class="bar"></span> Les liens se révèlent en <strong>survolant</strong> ou en <strong>cliquant</strong> une personne ; leur épaisseur est le poids de l’échange{#if meta && !meta.period}&nbsp;(les échanges récents comptent plus, demi-vie {meta.half_life_days} j){/if}</div>
     </div>
   </main>
+
+  {#if showImport}
+    <ImportPanel onClose={importClosed} onAuthLost={onLogout} />
+  {/if}
 
   <footer>
     <span class="live" class:on={live}><i></i>{live ? 'En direct' : 'Hors ligne'}</span>

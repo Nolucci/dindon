@@ -37,6 +37,7 @@ Il est fait pour une seule personne (francophone), sur un serveur dont on est me
 | Essayer tout de suite, sans Discord | `make setup && make web && make demo`, puis http://127.0.0.1:8011 (mot de passe : `demo`) |
 | Lancer pour de bon | `cp .env.example .env` (choisir les deux mots de passe), `docker compose up -d --build`, puis http://127.0.0.1:8000 |
 | Importer des exports à la main | les déposer dans `inbox/` (importés, puis rangés dans `archive/`) |
+| Importer seulement une partie de l'historique | bouton **Importer…** de la page, ou `dindon backfill --channel … --from … --mentioning … --after … --before …` ([COLLECTE.md](COLLECTE.md)) : salons, personnes (par identifiant), période. Un import restreint par personnes ou par période est **partiel** : il ne compte pas comme un premier import. Testé avec un faux Discord |
 | Lancer les tests | `make test` |
 | Vérifier la page dans un vrai navigateur | `make check-ui` (facultatif, demande Playwright) |
 

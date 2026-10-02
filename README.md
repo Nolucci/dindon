@@ -57,6 +57,7 @@ Pas nécessaire avant la phase 2. Sur un Mac, installez Ollama directement (`bre
 | `make web` / `make demo` / `make check-ui` | construire l'interface, la démonstration sans Discord, la vérification dans un navigateur |
 | `dindon ingest dossier/` | importer des exports sans passer par `inbox/` |
 | `dindon bot` | le bot en direct (jeton de bot, `DINDON_GUILD_IDS`) : normalement lancé par le service `bot` de Compose |
+| `dindon backfill --channel … --from … --mentioning … --after … --before …` | importer seulement certains salons, certaines personnes, une période (voir [COLLECTE.md](docs/COLLECTE.md)). Aussi dans l'interface : **Importer…** |
 | `dindon backfill` / `dindon catchup` | premier import d'un serveur / rattrapage des derniers jours maintenant |
 | `make check` | ce que contient la base (tables, vues, axes) |
 | `make axes` | réécrit [docs/AXES.md](docs/AXES.md) depuis la base : la page où relire les axes et idéologies |

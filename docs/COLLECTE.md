@@ -63,6 +63,34 @@ Il se **reprend** là où il s'est arrêté : un salon à jour est sauté, un sa
 - **Un message supprimé en dernier** reste en base jusqu'à ce qu'un message plus récent arrive dans le salon (le rattrapage ne juge rien de plus récent que le dernier message de l'export).
 - **Reproduction réelle** : tout ceci est testé contre un faux Discord et un faux exportateur. **Rien n'a encore tourné contre le vrai Discord** (pas de jeton). Les arguments passés à l'exportateur ont été vérifiés contre le vrai programme (il les accepte), pas son comportement sur un vrai serveur.
 
+## Importer une partie de l'historique
+
+`dindon backfill` seul importe **tout** l'historique de tous les salons. On peut le restreindre, en ligne de commande ou depuis l'interface (bouton **Importer…**, en haut de la page) :
+
+```console
+docker compose exec app dindon backfill --channel général --channel sql            # ces salons, en entier
+docker compose exec app dindon backfill --channel général --from 123456789012345678 # seulement les messages de cette personne
+docker compose exec app dindon backfill --mentioning 123456789012345678 --after 2025-09-01 --before 2025-09-30
+```
+
+| Option | Effet |
+| --- | --- |
+| `--channel NOM_OU_ID` (répétable) | seulement ces salons, par nom (casse et accents sans importance) ou par identifiant. **Ils sont importés en entier** |
+| `--from ID` (répétable) | seulement les messages **écrits par** ces personnes (identifiant Discord : clic droit sur la personne, mode développeur, « Copier l'identifiant ») |
+| `--mentioning ID` (répétable) | seulement les messages qui **mentionnent** ces personnes. Avec `--from`, il faut les deux (les personnes d'un même groupe sont un « ou ») |
+| `--after JJ`, `--before JJ` | seulement cette période, **premier et dernier jour inclus** (UTC) |
+
+**Un import restreint par personnes ou par période est « partiel ».** Il ne ramène qu'une partie de ce que contient un salon, donc :
+- il **ne compte pas comme un premier import** (la surveillance attend toujours un `dindon backfill` complet) ;
+- il ne marque pas le salon « à jour » : un import complet fait plus tard rapporte tout, y compris ce que l'import partiel avait déjà pris (rien n'est dupliqué) ;
+- le graphe qu'il produit est incomplet (seuls les messages choisis, donc seulement les liens qu'ils portent).
+
+Choisir seulement des salons n'est **pas** partiel : ils sont importés complètement.
+
+C'est l'exportateur qui filtre (`--filter`, `--after`, `--before`) : ce qui ne correspond pas n'est même pas téléchargé. L'expression de filtre produite a été vérifiée contre l'analyseur du **vrai** exportateur, sans connexion. Une copie JSON de chaque export est gardée dans `archive/` comme pour les autres imports.
+
+**Depuis l'interface**, la fenêtre liste les salons tels que Discord les montre maintenant (même ceux jamais importés), demande les filtres, lance l'import en arrière-plan avec sa progression, et permet de l'**annuler** (l'exportateur est arrêté ; ce qu'il n'avait pas fini n'est pas importé). On peut la fermer : l'import continue. Un seul import à la fois ; seuls les serveurs de `DINDON_GUILD_IDS` peuvent être importés. **Testé avec un faux Discord seulement, jamais sur le vrai.**
+
 ## C. Le bot en direct
 
 Un processus à part (`dindon bot`, service `bot` de Docker Compose, même image que l'application) reste connecté au Gateway de Discord et reçoit chaque **nouveau message** au moment où il est écrit. Il ne contient aucune logique d'analyse : il transforme l'événement en document JSON version 2 et le confie à **la même ingestion** que les deux autres modes (voir [DECISIONS.md](DECISIONS.md)). L'application affiche le lien de la même façon (NOTIFY puis SSE).

@@ -145,6 +145,23 @@ Rien de ce qui suit n'a tourné contre le vrai Discord : tout est testé avec un
 | `compare_with_export` ne compare **que** ce que le bot a écrit et que personne n'a réécrit depuis | après un rattrapage ou un export, la ligne est celle de l'exportateur : la comparer dirait « identique » quoi que le bot ait écrit |
 | Limite connue : `exportedAt` du bot est l'heure du message (horloge de Discord), celui de l'exportateur l'heure de la machine | une machine dont l'horloge retarde (VM Docker après une veille) peut faire ignorer, pour les métadonnées, un export fait dans les secondes qui suivent un message ; le rattrapage suivant le rapporte. Non corrigé : pas de problème concret observé |
 
+# Import d'une partie du serveur (salons, personnes, période)
+
+Testé avec un faux Discord ; l'expression de filtre a été vérifiée contre l'analyseur du vrai exportateur, sans connexion.
+
+| Choix | Pourquoi |
+| --- | --- |
+| Les salons sont choisis **par nom ou par identifiant** ; les personnes **par identifiant seulement** | le nom d'une personne change, son identifiant non (règle du projet) ; le nom d'un salon est lisible et se vérifie tout de suite contre la liste de Discord (erreur claire avec les salons visibles) |
+| Un import restreint par personnes ou par période est **partiel** (`ingest_runs.is_partial`, migration 0002) | trouvé en concevant : « reprendre après le message le plus récent connu » et « le premier import est fait » supposent qu'un import ramène tout jusque-là. Un import filtré ne le fait pas : sans la marque, il cacherait l'historique à un import complet ultérieur (même défaut que celui du bot). Choisir des salons seulement n'est pas partiel : ils sont complets |
+| Un import partiel **n'avance pas** `_exported_up_to` et ne reprend pas « après le dernier connu » | sinon la surveillance croirait le salon à jour ; une fenêtre ou un filtre se refait en entier (c'est sans danger : l'ingestion ne duplique rien) |
+| Les dates sont des **jours UTC, premier et dernier inclus**, transformés en identifiants de messages pour `--after` / `--before` | pas d'ambiguïté de fuseau ni de format de date, et c'est ce que montre un champ de date |
+| `from:` pour les auteurs, `mentions:` pour les mentions, « ou » dans un groupe, « et » entre groupes | la syntaxe de l'exportateur (`.docs/Message-filters.md`), vérifiée contre son analyseur : une expression valide passe, une fausse est refusée |
+| Un import lancé depuis l'interface est **une tâche de l'application**, un seul à la fois, avec progression et annulation | un import long ne doit pas dépendre d'un onglet ouvert ; deux imports en même temps se disputeraient le même verrou et les mêmes requêtes. L'annulation arrête l'exportateur (`Popen`, plus `subprocess.run`) |
+| Une sélection fausse est **refusée avant de démarrer**, avec des mots (liste des salons visibles, identifiant invalide…) | l'erreur ne doit pas arriver après dix minutes d'attente |
+| Seuls les serveurs de `DINDON_GUILD_IDS` peuvent être importés ; aucune réponse ne contient le jeton ni un message ; une erreur inattendue est montrée par son **type seulement** | moindre privilège ; le texte d'une exception pourrait en dire trop |
+| Un salon sauté à cause d'une annulation est signalé comme les autres | trouvé par un test : l'écran aurait compté « 2 annulés » au lieu de 3 |
+| Le formulaire exige au moins un salon choisi | un clic ne doit pas lancer par accident l'import de tout le serveur (la ligne de commande, elle, importe tout sans option) |
+
 ## Ce qui n'est pas fait, et pourquoi
 
 | Reste à faire | Où |
