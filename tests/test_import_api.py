@@ -69,7 +69,7 @@ def test_the_options_list_the_channels_that_discord_shows_now(me, world):
     options = me.get("/api/import/options").json()
     assert options["configured"] is True and len(options["guilds"]) == 1
     guild = options["guilds"][0]
-    assert guild["id"] == str(world.guild_id) and guild["name"] == str(world.guild_id)        # not known to the database yet: its id
+    assert guild["id"] == str(world.guild_id) and guild["name"] == world.name  # named by Discord before the first import
     assert {c["id"] for c in guild["channels"]} == {str(c.id) for c in world.channels if not c.parent_id}
     assert [c["name"].casefold() for c in guild["channels"]] == sorted(c["name"].casefold() for c in guild["channels"])
     assert all(set(c) == {"id", "name", "kind", "empty"} for c in guild["channels"])

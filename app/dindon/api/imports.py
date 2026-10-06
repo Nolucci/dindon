@@ -34,10 +34,14 @@ def options(request: Request) -> dict:
         known = {row["id"]: row["name"] for row in conn.execute("SELECT id, name FROM guilds").fetchall()}
     guilds = []
     try:
+        # Before the first import, the database has no guild row yet. Discord
+        # already knows its name, so the administrator can choose by name.
+        live_names = {server["id"]: server["name"] for server in api.servers()}
         for guild_id in state.settings.followed():
             channels = [{"id": str(c.id), "name": c.name or str(c.id), "kind": c.kind, "empty": c.last_message_id is None}
                         for c in api.channels(guild_id) if c.kind != "thread"]
-            guilds.append({"id": str(guild_id), "name": known.get(guild_id, str(guild_id)), "channels": sorted(channels, key=lambda c: c["name"].casefold())})
+            guilds.append({"id": str(guild_id), "name": live_names.get(str(guild_id)) or known.get(guild_id) or str(guild_id),
+                           "channels": sorted(channels, key=lambda c: c["name"].casefold())})
     except RateLimited as error:
         raise HTTPException(status_code=429, detail=f"Discord demande d'attendre {error.retry_after:.0f} s.") from None
     except DiscordError as error:
