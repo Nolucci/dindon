@@ -187,7 +187,10 @@ def test_what_is_reported_while_it_runs(collector, fake, world, ingest_url):
     collector.backfill(lambda: connection(ingest_url), world.guild_id, progress=lambda _: None,
                        selection=ImportSelection.parse(channels=[world.channels[0].name]), report=events.append)
     assert events[0] == {"event": "planned", "channels": 1, "of": len(world.channels)}
-    assert [e["event"] for e in events[1:]] == ["channel"] and events[1]["messages"] == len(world.channels[0].messages) and events[1]["ok"]
+    assert events[1]["event"] == "started" and events[1]["name"] == world.channels[0].name
+    pages = [event for event in events if event["event"] == "progress"]
+    assert pages and pages[-1]["scanned"] == len(world.channels[0].messages)
+    assert events[-1]["event"] == "channel" and events[-1]["messages"] == len(world.channels[0].messages) and events[-1]["ok"]
 
 
 def test_a_wrong_channel_name_stops_everything_before_any_export(collector, fake, world, ingest_url):

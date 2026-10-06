@@ -34,6 +34,7 @@ class ImportJobs:
         self._cancel = threading.Event()
         self._state = self._idle()
         self._lines: deque[str] = deque(maxlen=40)
+        self._active: dict[str, dict] = {}
 
     @staticmethod
     def _idle() -> dict:
@@ -45,7 +46,7 @@ class ImportJobs:
 
     def status(self) -> dict:
         with self._lock:
-            return {**self._state, "lines": list(self._lines)}
+            return {**self._state, "active": [dict(channel) for channel in self._active.values()], "lines": list(self._lines)}
 
     def start(self, guild_id: int, selection: ImportSelection) -> None:
         """Checks the selection (the channels are looked up on Discord) and starts. Raises NotConfigured, ImportBusy, SelectionError,
@@ -64,6 +65,7 @@ class ImportJobs:
                 raise ImportBusy()
             self._cancel = threading.Event()
             self._lines.clear()
+            self._active.clear()
             self._state = {**self._idle(), "state": "running", "guild": str(guild_id), "selection": selection.describe(), "started_at": utc_iso()}
             self._thread = threading.Thread(target=self._run, args=(collector, guild_id, selection, self._cancel), daemon=True, name="import")
             self._thread.start()
@@ -86,13 +88,21 @@ class ImportJobs:
         with self._lock:
             if event["event"] == "planned":
                 self._state["planned"], self._state["of"] = event["channels"], event["of"]
-            elif event["cancelled"]:
-                self._state["cancelled"] += 1
-            elif event["ok"]:
-                self._state["done"] += 1
-                self._state["messages"] += event["messages"]
-            else:
-                self._state["failed"] += 1
+            elif event["event"] == "started":
+                self._active[event["id"]] = {"id": event["id"], "name": event["name"], "number": event["number"],
+                                              "scanned": 0, "pages": 0, "last_activity_at": utc_iso()}
+            elif event["event"] == "progress":
+                if channel := self._active.get(event["id"]):
+                    channel.update(scanned=event["scanned"], pages=event["pages"], last_activity_at=utc_iso())
+            elif event["event"] == "channel":
+                self._active.pop(event["id"], None)
+                if event["cancelled"]:
+                    self._state["cancelled"] += 1
+                elif event["ok"]:
+                    self._state["done"] += 1
+                    self._state["messages"] += event["messages"]
+                else:
+                    self._state["failed"] += 1
 
     def _new_connection(self):
         conn = connect(self._settings.database_url, wait=5)
@@ -111,6 +121,7 @@ class ImportJobs:
         except Exception as problem:                            # anything else: its kind only (never its text, which could say too much)
             error = f"erreur inattendue ({type(problem).__name__})"
         with self._lock:
+            self._active.clear()
             self._state["finished_at"] = utc_iso()
             self._state["error"] = error
             self._state["state"] = "failed" if error else "cancelled" if cancel.is_set() else "done"

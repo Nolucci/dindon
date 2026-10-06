@@ -169,6 +169,23 @@
           {:else if running}
             <p class="muted">Préparation…</p>
           {/if}
+          {#if running && job.active?.length}
+            <div class="activeChannels">
+              <strong>Salons en cours</strong>
+              {#each job.active as channel (channel.id)}
+                <div class="activeChannel">
+                  <span class="channelName">[{channel.number}/{job.planned}] {channel.name}</span>
+                  <span class="muted">
+                    {#if channel.pages}
+                      {fmt.format(channel.scanned)} messages parcourus · {fmt.format(channel.pages)} page{channel.pages > 1 ? 's' : ''}
+                    {:else}
+                      Connexion à Discord…
+                    {/if}
+                  </span>
+                </div>
+              {/each}
+            </div>
+          {/if}
           {#if job.error}<p class="banner" role="alert">{job.error}</p>{/if}
           {#if job.lines.length}
             <pre class="lines">{job.lines.join('\n')}</pre>
@@ -324,6 +341,23 @@
 
   .progress .banner {
     align-self: stretch;
+  }
+
+  .activeChannels {
+    align-self: stretch;
+    display: grid;
+    gap: 0.375rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+  }
+
+  .activeChannel {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
   }
 
   progress {

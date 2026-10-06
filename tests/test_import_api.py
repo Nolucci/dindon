@@ -5,6 +5,7 @@ Level of proof: SIMULATED (fake Discord, fake exporter, real database, real appl
 import dataclasses
 import shlex
 import sys
+import threading
 import time
 from collections import Counter
 from pathlib import Path
@@ -14,6 +15,7 @@ from fastapi.testclient import TestClient
 
 from dindon.api.main import create_app
 from dindon.collector.watch import Collector
+from dindon.export import Exporter
 from synthetic import settings_for
 from test_collector import TOKEN, fake, message_count, world  # noqa: F401 (fixtures)
 from test_import_selection import connection, ids_in, largest
@@ -121,6 +123,37 @@ def test_an_import_runs_in_the_background_and_says_what_it_did(me, fake, world, 
     assert status["guild"] == str(world.guild_id) and any(channel.name in line and str(len(expected)) in line for line in status["lines"])
     with connection(ingest_url) as conn:
         assert ids_in(conn) == expected
+
+
+def test_an_import_shows_the_active_channel_before_it_finishes(me, fake, world, monkeypatch):
+    reading = threading.Event()
+    continue_reading = threading.Event()
+    original = Exporter.export
+
+    def paused_export(self, *args, **kwargs):
+        on_page = kwargs["on_page"]
+
+        def pause_after_page(count):
+            on_page(count)
+            reading.set()
+            assert continue_reading.wait(timeout=10)
+
+        return original(self, *args, **{**kwargs, "on_page": pause_after_page})
+
+    monkeypatch.setattr(Exporter, "export", paused_export)
+    channel = largest(world)
+    try:
+        assert me.post("/api/import", json=body(world, channels=[str(channel.id)])).status_code == 200
+        assert reading.wait(timeout=10)
+        status = me.get("/api/import").json()
+        assert status["state"] == "running" and status["done"] == 0
+        assert len(status["active"]) == 1
+        active = status["active"][0]
+        assert (active["id"], active["name"], active["number"], active["pages"]) == (str(channel.id), channel.name, 1, 1)
+        assert active["scanned"] > 0 and active["last_activity_at"]
+    finally:
+        continue_reading.set()
+    assert wait_until_finished(me)["state"] == "done"
 
 
 def test_the_channels_only_are_imported_completely_and_the_next_import_can_start(me, fake, world, ingest_url):

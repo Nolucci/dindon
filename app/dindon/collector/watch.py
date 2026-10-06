@@ -113,14 +113,15 @@ class Collector:
 
     def _export(self, conn: psycopg.Connection, channel: Watched, after: int | None, threads: str = "none",
                 prune: bool = False, partition: int | None = None, before: int | None = None, message_filter: str | None = None,
-                partial: bool = False, cancel: threading.Event | None = None) -> ExportOutcome:
+                partial: bool = False, cancel: threading.Event | None = None,
+                on_page: Callable[[int], None] | None = None) -> ExportOutcome:
         root = self.settings.inbox_dir / ".collector"  # hidden: the inbox does not import from there by itself
         root.mkdir(parents=True, exist_ok=True)
         new = 0
         try:
             with tempfile.TemporaryDirectory(dir=root) as tmp:
                 for path in self.exporter.export(channel.id, Path(tmp), after=after, threads=threads, partition=partition, before=before,
-                                                 message_filter=message_filter, cancel=cancel):
+                                                 message_filter=message_filter, cancel=cancel, on_page=on_page):
                     if path.stat().st_size == 0:
                         continue  # (a file that is empty: nothing to import)
                     result = ingest_file(conn, path, prune=prune, partial=partial)
@@ -321,12 +322,23 @@ class Collector:
             if cancel is not None and cancel.is_set():  # asked to stop before this channel started: it is reported like the others
                 totals["cancelled"] += 1
                 progress(f"[{number}/{len(todo)}] {channel.name or channel.id}: cancelled")
-                report({"event": "channel", "name": channel.name or str(channel.id), "ok": False, "cancelled": True, "messages": 0})
+                report({"event": "channel", "id": str(channel.id), "name": channel.name or str(channel.id), "ok": False,
+                        "cancelled": True, "messages": 0})
                 return
+            report({"event": "started", "id": str(channel.id), "name": channel.name or str(channel.id), "number": number})
+            scanned = pages = 0
+
+            def on_page(count: int) -> None:
+                nonlocal scanned, pages
+                scanned += count
+                pages += 1
+                report({"event": "progress", "id": str(channel.id), "scanned": scanned, "pages": pages})
+
             with new_connection() as conn:
                 outcome = self._export(conn, channel, after=selection.after_id() if selection.partial else have, before=selection.before_id(),
                                        message_filter=selection.message_filter(), partial=selection.partial, cancel=cancel,
-                                       threads=mode if channel.kind != "thread" else "none", partition=BACKFILL_PARTITION)
+                                       threads=mode if channel.kind != "thread" else "none", partition=BACKFILL_PARTITION,
+                                       on_page=on_page)
             if outcome.cancelled:
                 totals["cancelled"] += 1
             else:
@@ -335,7 +347,7 @@ class Collector:
             progress(f"[{number}/{len(todo)}] {channel.name or channel.id}: " +
                      ("cancelled" if outcome.cancelled else f"{outcome.new_messages} messages" if outcome.ok else
                       f"failed ({outcome.error})" if outcome.error else "failed"))
-            report({"event": "channel", "name": channel.name or str(channel.id), "ok": outcome.ok, "cancelled": outcome.cancelled,
+            report({"event": "channel", "id": str(channel.id), "name": channel.name or str(channel.id), "ok": outcome.ok, "cancelled": outcome.cancelled,
                     "messages": outcome.new_messages})
 
         with ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:

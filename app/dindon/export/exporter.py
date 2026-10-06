@@ -233,7 +233,8 @@ class Exporter:
         return sorted(found.values(), key=lambda t: int(t["id"]))
 
     def export(self, channel_id: int, out_dir: Path, after: int | None = None, threads: str = "none", partition: int | None = None,
-               before: int | None = None, message_filter: str | None = None, cancel: threading.Event | None = None) -> list[Path]:
+               before: int | None = None, message_filter: str | None = None, cancel: threading.Event | None = None,
+               on_page: Callable[[int], None] | None = None) -> list[Path]:
         """Exports one channel in JSON v2 into `out_dir` and returns the files. `after` and `before` are message ids (only the messages between them),
         `message_filter` is the filter of a narrowed import, `partition` the number of messages per file, `threads` is `none`, `active` or `all`.
         Setting `cancel` ends the requests. No file is written for a channel that has nothing to export."""
@@ -260,7 +261,8 @@ class Exporter:
             try:
                 for target in targets:
                     guild.directory.guilds[guild_id].channels.setdefault(str(target["id"]), target)
-                    files += self._export_one(pool, guild, guild_id, target, out_dir, after, before, keep, partition, cancelled, deadline)
+                    files += self._export_one(pool, guild, guild_id, target, out_dir, after, before, keep, partition, cancelled, deadline,
+                                              on_page)
             except BaseException:
                 pool.shutdown(wait=False, cancel_futures=True)
                 raise
@@ -279,7 +281,8 @@ class Exporter:
                     by_emoji[str(emoji["id"]) if emoji.get("id") else emoji["name"]] = pool.submit(self._reaction_users, cid, str(message["id"]), emoji, cancelled)
 
     def _export_one(self, pool: ThreadPoolExecutor, guild: _Guild, guild_id: str, channel: dict, out_dir: Path, after: int | None, before: int | None,
-                    keep: Callable[[dict], bool], partition: int | None, cancelled: Callable[[], bool], deadline: float) -> list[Path]:
+                    keep: Callable[[dict], bool], partition: int | None, cancelled: Callable[[], bool], deadline: float,
+                    on_page: Callable[[int], None] | None = None) -> list[Path]:
         cid = str(channel["id"])
         files: list[Path] = []
         chunk: list[dict] = []
@@ -306,6 +309,8 @@ class Exporter:
             if self._clock() > deadline:
                 raise ExporterError(f"L'export a pris plus de {self.timeout:.0f} s : il est arrêté.")
             page = self.client.get(f"/channels/{cid}/messages", {"limit": PAGE, "after": cursor}, cancel=cancelled)
+            if on_page is not None:
+                on_page(len(page))
             if not page:
                 break
             page.sort(key=lambda m: int(m["id"]))                 # Discord gives a page newest first
