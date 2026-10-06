@@ -168,6 +168,16 @@ def test_a_failure_inside_the_import_is_shown_by_its_kind_never_by_its_text(me, 
     assert TOKEN not in str(status)
 
 
+def test_a_channel_refused_by_discord_explains_the_failure_in_progress(me, fake, world):
+    channel = largest(world)
+    fake.forbidden_channels.add(str(channel.id))
+    assert me.post("/api/import", json=body(world, channels=[channel.name])).status_code == 200
+    status = wait_until_finished(me)
+    assert status["failed"] == 1 and status["done"] == 0
+    assert any("403" in line and "droit de voir ce salon" in line for line in status["lines"])
+    assert TOKEN not in str(status)
+
+
 def test_the_token_is_in_no_answer(me, fake, world):
     answers = [me.get("/api/import/options").text, me.get("/api/import").text,
                me.post("/api/import", json=body(world, channels=[world.channels[0].name])).text]

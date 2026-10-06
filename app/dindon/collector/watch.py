@@ -49,6 +49,7 @@ class ExportOutcome:
     ok: bool
     new_messages: int = 0
     cancelled: bool = False
+    error: str | None = None
 
 
 class Collector:
@@ -131,7 +132,11 @@ class Collector:
             return ExportOutcome(False, cancelled=True)
         except (ExporterError, InvalidExport, psycopg.Error) as error:
             self._fail(channel.id, error)
-            return ExportOutcome(False)
+            # ExporterError messages are written for the administrator and never
+            # include the token or message content. Other exceptions may contain
+            # imported data or SQL parameters, so show only their type.
+            detail = str(error) if isinstance(error, ExporterError) else type(error).__name__
+            return ExportOutcome(False, error=detail[:240])
         if not partial:  # a narrowed import says nothing of what the channel contains up to its newest message
             self._exported_up_to[channel.id] = channel.last_message_id or 0
         self._failures.pop(channel.id, None)
@@ -328,7 +333,8 @@ class Collector:
                 totals["channels" if outcome.ok else "failed"] += 1
                 totals["messages"] += outcome.new_messages
             progress(f"[{number}/{len(todo)}] {channel.name or channel.id}: " +
-                     ("cancelled" if outcome.cancelled else f"{outcome.new_messages} messages" if outcome.ok else "failed"))
+                     ("cancelled" if outcome.cancelled else f"{outcome.new_messages} messages" if outcome.ok else
+                      f"failed ({outcome.error})" if outcome.error else "failed"))
             report({"event": "channel", "name": channel.name or str(channel.id), "ok": outcome.ok, "cancelled": outcome.cancelled,
                     "messages": outcome.new_messages})
 

@@ -1,4 +1,4 @@
-"""Fill public Discord IDs in .env from a bot token, without printing the token."""
+"""Identify the Discord application without replacing automatic server following."""
 import json
 import os
 import sys
@@ -77,8 +77,6 @@ def main(path: Path) -> int:
     updates = {}
     if not env.get("DISCORD_CLIENT_ID"):
         updates["DISCORD_CLIENT_ID"] = app_id
-    if env.get("DINDON_GUILD_IDS", "") in ("", "all"):
-        updates["DINDON_GUILD_IDS"] = ",".join(guilds) if guilds else "all"
     if updates:
         set_values(path, updates)
     print(f"Application Discord identifiée ; {len(guilds)} serveur(s) actuellement accessibles au bot.")

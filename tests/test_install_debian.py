@@ -1,4 +1,4 @@
-"""The installer keeps the Discord token private while filling the public IDs in .env."""
+"""The installer keeps the token private and preserves automatic server following."""
 import importlib.util
 import stat
 from pathlib import Path
@@ -18,7 +18,7 @@ def test_installer_discovers_application_and_servers_without_printing_the_token(
     assert discover_discord.main(env) == 0
     content = env.read_text()
     assert "DISCORD_CLIENT_ID=123456\n" in content
-    assert "DINDON_GUILD_IDS=456789,987654\n" in content
+    assert "DINDON_GUILD_IDS=all\n" in content
     assert "DISCORD_CLIENT_SECRET=keep-me\n" in content
     assert content.count("DISCORD_TOKEN=secret-token") == 1
     assert "secret-token" not in capsys.readouterr().out
@@ -32,6 +32,15 @@ def test_installer_preserves_an_explicit_server_selection(tmp_path, monkeypatch)
 
     assert discover_discord.main(env) == 0
     assert "DINDON_GUILD_IDS=112233\n" in env.read_text()
+
+
+def test_installer_preserves_an_empty_automatic_server_selection(tmp_path, monkeypatch):
+    env = tmp_path / ".env"
+    env.write_text("DISCORD_TOKEN=secret-token\nDINDON_GUILD_IDS=\n")
+    monkeypatch.setattr(discover_discord, "discover", lambda base, token: ("123456", ["112233"]))
+
+    assert discover_discord.main(env) == 0
+    assert "DINDON_GUILD_IDS=\n" in env.read_text()
 
 
 def test_installer_refuses_an_invalid_token_without_echoing_it(tmp_path, monkeypatch, capsys):
