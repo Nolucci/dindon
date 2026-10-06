@@ -93,8 +93,6 @@ class FakeDiscord:
                         return self._send(401, {"message": "401: Unauthorized"})
                     return self._send(200, {"id": "424242424242424242", "name": "Dindon (faux)", "bot_public": outer.bot_public,
                                             "flags": (1 << 18) if outer.message_content else 0})
-                if path == f"{API}/applications/@me":
-                    return self._send(200, {"id": "424242424242424242", "flags": (1 << 18) if outer.message_content else 0})
                 if path == f"{API}/users/@me/guilds":
                     return self._send(200, [{"id": guild, "name": world.name, "permissions": str(outer.permissions)}, *outer.other_servers])
                 if path == f"{API}/gateway":

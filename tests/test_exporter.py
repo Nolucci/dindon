@@ -429,6 +429,7 @@ def test_a_bot_without_the_message_content_intent_is_told_instead_of_recording_e
         server.message_content = False
         with pytest.raises(ExporterError, match="Message Content Intent"):
             Exporter(TOKEN, server.api_url).export(biggest(world).id, tmp_path)
+        assert any(request.endswith("/oauth2/applications/@me") for request in server.requests)
         assert not list(tmp_path.glob("*.json"))
         server.message_content = True
         assert Exporter(TOKEN, server.api_url).export(biggest(world).id, tmp_path / "ok")

@@ -210,7 +210,7 @@ class Exporter:
         is given messages without their text, and an export of them would silently record empty messages."""
         if self._intent_checked:
             return
-        flags = int((self.client.get("/applications/@me", cancel=cancelled) or {}).get("flags", 0))
+        flags = int((self.client.get("/oauth2/applications/@me", cancel=cancelled) or {}).get("flags", 0))
         if not flags & ((1 << 18) | (1 << 19)):                   # GATEWAY_MESSAGE_CONTENT, GATEWAY_MESSAGE_CONTENT_LIMITED
             raise ExporterError("Les messages arrivent sans leur texte : activez « Message Content Intent » pour le bot "
                                 "(portail développeur Discord, onglet Bot, Privileged Gateway Intents), puis recommencez.")
