@@ -78,7 +78,10 @@ echo "OK : interface sur http://127.0.0.1:$port"
 docker compose exec -T app dindon check >/dev/null
 echo "OK : contrôle de la base par Dindon"
 if [[ -n "$bot_container" ]]; then
-  docker compose exec -T bot dindon preflight
+  # The app receives DINDON_PASSWORD as well as the Discord settings. The bot
+  # deliberately does not receive the web password, so its preflight would
+  # report a false blocking error for an otherwise valid installation.
+  docker compose exec -T app dindon preflight
   echo "OK : configuration Discord et permissions du bot"
 fi
 echo "Dindon est lancé. L’accès est local au serveur ; utilisez un tunnel SSH pour ouvrir l’interface depuis votre poste."
