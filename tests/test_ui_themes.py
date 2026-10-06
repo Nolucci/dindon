@@ -75,7 +75,7 @@ def test_the_page_runs_the_analysis_and_the_person_decides_what_each_topic_becom
         page.click("button[type=submit]")
         page.wait_for_selector("nav", timeout=20000)
 
-        page.get_by_role("button", name="Thèmes").click()
+        page.get_by_role("button", name="Analyse", exact=True).click()
         page.wait_for_selector("text=Ollama prêt", timeout=15000)
         assert page.locator("article.topic").count() == 0 and "Aucun thème à examiner" in page.inner_text(".page")
 

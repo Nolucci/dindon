@@ -50,8 +50,9 @@ def test_the_contradiction_is_listed_and_the_card_shows_the_axes(base):
         page.click("button[type=submit]")
         page.wait_for_selector("nav", timeout=20000)
 
-        page.get_by_role("button", name="Cohérence", exact=True).click()
-        page.get_by_role("heading", name="Cohérence rôles / positions").wait_for()
+        page.get_by_role("button", name="Analyse", exact=True).click()
+        page.get_by_role("button", name="Contradictions", exact=True).click()
+        page.get_by_role("heading", name="Contradictions").wait_for()
         page.wait_for_selector(".person")
         assert page.locator(".person").count() == 1                                      # only Bobby: Alice is coherent
         assert "Propriété des moyens de production" in page.locator(".person").inner_text()

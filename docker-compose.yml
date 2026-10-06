@@ -88,6 +88,7 @@ services:
       DATABASE_URL: postgresql://dindon:${POSTGRES_PASSWORD}@db:5432/dindon
       DISCORD_TOKEN: ${DISCORD_TOKEN:-}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}      # set: the bot also registers the entry point of the Activity (docs/fonctionnement.md)
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
       DINDON_GUILD_IDS: ${DINDON_GUILD_IDS:-}
       DINDON_ERASE_ON_REMOVAL: ${DINDON_ERASE_ON_REMOVAL:-}
       DINDON_INBOX: /data/inbox

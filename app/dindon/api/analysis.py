@@ -37,6 +37,11 @@ class Merge(BaseModel):
     into: int
 
 
+class ValidateTopics(BaseModel):
+    guild: str = Field(pattern=r"^[0-9]{1,20}$")
+    ids: list[int] = Field(min_length=1, max_length=500)
+
+
 @router.get("/analysis")
 def analysis(request: Request, guild: int | None = None) -> dict:
     """Is the analysis possible (Ollama, the models), what is done, and what it is doing."""
@@ -121,6 +126,25 @@ def topics(request: Request, guild: int | None = None, rejected: bool = False, e
                 if text:
                     samples.setdefault(p["topic_id"], []).append(text.replace("\n", " / ")[:EXCERPT_CHARS])
     return [_topic(r, samples) for r in rows]
+
+
+@router.post("/topics/validate-batch")
+def validate_topics(request: Request, body: ValidateTopics) -> dict:
+    """Validate only the proposals explicitly selected by an administrator, in one transaction."""
+    ids = list(dict.fromkeys(body.ids))
+    with request.app.state.pool.connection() as conn, conn.transaction():
+        guild_id = resolve_guild(conn, int(body.guild))
+        found = conn.execute(
+            "SELECT id FROM topics WHERE guild_id = %s AND id = ANY(%s) AND status = 'proposed' FOR UPDATE",
+            (guild_id, ids),
+        ).fetchall()
+        if len(found) != len(ids):
+            raise HTTPException(status_code=409, detail="Certains thèmes ne sont plus proposés. Rechargez la liste avant de valider.")
+        conn.execute(
+            "UPDATE topics SET status = 'validated', validated_at = now(), touched_at = now() WHERE guild_id = %s AND id = ANY(%s)",
+            (guild_id, ids),
+        )
+    return {"validated": len(ids)}
 
 
 @router.patch("/topics/{topic_id}")

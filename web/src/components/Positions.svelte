@@ -4,7 +4,7 @@
   import { day } from '../lib/format.js';
   import { matches, slash } from '../lib/text.js';
 
-  let { guild, onAuthLost } = $props();
+  let { guild, onAuthLost, onAutomate, embedded = false, onUpdate = () => {} } = $props();
 
   const fmt = new Intl.NumberFormat('fr-FR');
   const STATES = { idle: '', running: 'Lecture en cours…', cancelling: 'Arrêt en cours…', done: 'Terminée', cancelled: 'Annulée', failed: 'Échec' };
@@ -50,6 +50,7 @@
     if (d) {
       data = d;
       if (!filtering) themes = d.themes;
+      onUpdate();
     }
     if (i) info = i;
     if (d && i) problem = '';
@@ -181,14 +182,15 @@
   const share = (p, key) => (p.people ? (100 * p[key]) / p.people : 0);
 </script>
 
-<div class="page">
+<div class="page" class:embedded>
+  {#if !embedded}
   <header>
     <h1>Positions</h1>
     <p class="subtitle">
-      Ce qu’un modèle local lit des positions de chaque personne, conversation par conversation, <strong>avec la citation qui le prouve</strong>.
-      Une position sans citation exacte, écrite par la personne elle-même, est refusée par le programme. C’est une lecture, pas un verdict : jugez-la sur les citations.
+      Lisez les conversations, puis ouvrez une proposition pour vérifier qui est pour ou contre et retrouver les citations.
     </p>
   </header>
+  {/if}
 
   {#if problem}<p class="banner" role="alert">{problem}</p>{/if}
 
@@ -212,30 +214,33 @@
           <div class="metric"><dt>Personnes</dt><dd>{fmt.format(data.claims.people)}</dd></div>
           <div class="metric"><dt>Positions retenues</dt><dd>{fmt.format(data.claims.positions)}</dd></div>
           <div class="metric"><dt>Propositions</dt><dd>{fmt.format(data.propositions_total)}</dd></div>
-          <div class="metric"><dt>Refusées (sans preuve)</dt><dd>{fmt.format(data.claims.refused)}</dd></div>
         </dl>
         <div class="actions">
           {#if running}
             <button class="btn btn-danger" onclick={cancel} disabled={job.state === 'cancelling'}>Arrêter la lecture</button>
           {:else}
             <button class="btn btn-primary" onclick={start} disabled={!canStart || busy}>Lire les positions</button>
-            <label class="inline">Combien de conversations
-              <select class="select" bind:value={amount} aria-label="Combien de conversations lire">
-                <option value="20">20 les plus importantes</option>
-                <option value="40">40 les plus importantes</option>
-                <option value="150">150 les plus importantes</option>
-                <option value="all">toutes ({fmt.format(remaining)})</option>
-              </select>
-            </label>
           {/if}
-          <span class="muted hint">Modèle : <code>{info?.models.naming}</code>, environ 15 s par conversation. Rien ne sort de cette machine. Ce qui est lu n’est pas relu.</span>
+          <button type="button" class="btn" onclick={onAutomate}>Automatiser les prochaines lectures</button>
         </div>
+        <p class="muted hint">{fmt.format(remaining)} conversation{remaining > 1 ? 's' : ''} restante{remaining > 1 ? 's' : ''}. Les conversations déjà lues ne sont pas relues.</p>
+        <details class="advanced"><summary>Options de lecture</summary>
+          <label class="inline">Combien de conversations
+            <select class="select" bind:value={amount} aria-label="Combien de conversations lire">
+              <option value="20">20 les plus importantes</option>
+              <option value="40">40 les plus importantes</option>
+              <option value="150">150 les plus importantes</option>
+              <option value="all">toutes ({fmt.format(remaining)})</option>
+            </select>
+          </label>
+          <p class="muted hint">Environ 15 s par conversation. {fmt.format(data.claims.refused)} position{data.claims.refused > 1 ? 's' : ''} refusée{data.claims.refused > 1 ? 's' : ''} faute de preuve. Modèle : <code>{info?.models.naming}</code>. Rien ne sort de cette machine.</p>
+        </details>
         {#if job && job.state !== 'idle'}
           <div class="progress" aria-live="polite">
             <span class="badge" class:success={job.state === 'done'} class:danger={job.state === 'failed'} class:accent={running}>{STATES[job.state]}</span>
             {#if running && job.of}<progress max={job.of} value={job.done}></progress><span class="muted">{job.done} / {job.of}</span>{/if}
             {#if job.error}<p class="banner" role="alert">{job.error}</p>{/if}
-            {#if job.lines.length}<pre class="lines">{job.lines.join('\n')}</pre>{/if}
+            {#if job.lines.length}<details class="jobLog"><summary>Journal de lecture</summary><pre class="lines">{job.lines.join('\n')}</pre></details>{/if}
           </div>
         {/if}
       {/if}
@@ -355,9 +360,9 @@
 
 <style>
   .page { flex: 1; min-height: 0; overflow-y: auto; padding: 1.5rem 1.75rem 2.5rem; display: flex; flex-direction: column; gap: 1.25rem; animation: fadeIn var(--transition-slow) both; }
+  .page.embedded { flex: none; min-height: auto; overflow: visible; padding: 0; animation: none; }
   h1 { font-size: clamp(1.5rem, 2vw, 1.9rem); line-height: 1.1; font-weight: 700; color: var(--text-primary); }
   .subtitle { max-width: 68ch; margin-top: 0.5rem; color: var(--text-secondary); }
-  .subtitle strong { color: var(--text-primary); }
   .card { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
   .head { display: flex; align-items: center; justify-content: space-between; }
   .counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.625rem; }
@@ -368,6 +373,10 @@
   .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
   .inline { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: var(--text-secondary); }
   .hint { font-size: 0.75rem; }
+  .advanced .inline { margin-top: 0.75rem; }
+  .advanced .hint { margin-top: 0.5rem; }
+  .jobLog { flex-basis: 100%; }
+  .jobLog .lines { margin-top: 0.5rem; }
   .progress { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
   .progress progress { flex: 1 1 12rem; }
   .lines { flex-basis: 100%; max-height: 9rem; overflow: auto; padding: 0.625rem 0.75rem; border-radius: var(--radius-md); background: var(--bg-tertiary); font-size: 0.75rem; color: var(--text-secondary); white-space: pre-wrap; }

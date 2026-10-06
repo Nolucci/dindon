@@ -114,7 +114,7 @@ def test_the_themes_page_says_so_when_no_server_is_imported(ingest_url, tmp_path
         with sync_api.sync_playwright() as p:
             browser, page = open_page(p, f"http://127.0.0.1:{port}")
             page.wait_for_selector("nav", timeout=20000)
-            page.get_by_role("button", name="Thèmes").click()
+            page.get_by_role("button", name="Analyse", exact=True).click()
             page.wait_for_selector("text=Aucun serveur n’est encore importé", timeout=10000)
             assert page.get_by_role("button", name="Lancer l’analyse").count() == 0       # no button that cannot work, no English error
             browser.close()

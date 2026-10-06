@@ -556,7 +556,7 @@ def build_interactions(settings: Settings, service):
     from dindon.debate.checker import build_checker
 
     checker = build_checker(settings)
-    interactions = Interactions(settings.discord_token, settings.discord_api_url, service, activity=bool(settings.discord_client_id))
+    interactions = Interactions(settings.discord_token, settings.discord_api_url, service, activity=bool(settings.discord_client_id and settings.discord_client_secret))
     interactions.verification = checker is not None
     from dindon.debate.checker import notice_mode
 

@@ -138,17 +138,9 @@
       <span class="icon"><Icon name="debates" /></span>
       <span class="navLabel">Débats</span>
     </button>
-    <button type="button" class="navItem" class:active={view === 'themes'} aria-current={view === 'themes' ? 'page' : undefined} title="Les sujets dont parle le serveur, à valider" onclick={() => showView('themes')}>
+    <button type="button" class="navItem" class:active={view === 'analyse'} aria-current={view === 'analyse' ? 'page' : undefined} title="Thèmes, positions et contradictions du serveur" onclick={() => showView('analyse')}>
       <span class="icon"><Icon name="themes" /></span>
-      <span class="navLabel">Thèmes</span>
-    </button>
-    <button type="button" class="navItem" class:active={view === 'positions'} aria-current={view === 'positions' ? 'page' : undefined} title="Ce que l’IA lit des positions de chaque personne, avec les citations" onclick={() => showView('positions')}>
-      <span class="icon"><Icon name="positions" /></span>
-      <span class="navLabel">Positions</span>
-    </button>
-    <button type="button" class="navItem" class:active={view === 'coherence'} aria-current={view === 'coherence' ? 'page' : undefined} title="Les rôles que les personnes se sont donnés, comparés à ce qu’elles disent" onclick={() => showView('coherence')}>
-      <span class="icon"><Icon name="coherence" /></span>
-      <span class="navLabel">Cohérence</span>
+      <span class="navLabel">Analyse</span>
     </button>
     <button type="button" class="navItem" title="Importer l’historique de certains salons, de certaines personnes, d’une période" onclick={importing}>
       <span class="icon"><Icon name="import" /></span>

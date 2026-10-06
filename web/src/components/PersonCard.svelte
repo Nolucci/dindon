@@ -210,14 +210,12 @@
   .portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
   aside {
     position: absolute;
-    top: var(--frame, 0);
-    right: var(--frame, 0);
-    bottom: var(--frame, 0);
+    top: 0;
+    right: 0;
+    bottom: 0;
     width: min(22.5rem, 100%);
-    background: rgba(5, 10, 28, 0.86);
-    border: 1px solid rgba(214, 165, 90, 0.28);
-    border-radius: 10px;
-    box-shadow: var(--shadow-lg);
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border-subtle);
     padding: 1.25rem 1.125rem 1.75rem;
     overflow-y: auto;
     z-index: 5;

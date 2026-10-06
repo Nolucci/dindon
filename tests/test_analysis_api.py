@@ -63,7 +63,7 @@ def analyze(client, **body) -> dict:
 
 
 @pytest.mark.parametrize("method, path", [("get", "/api/analysis"), ("post", "/api/analysis"), ("post", "/api/analysis/cancel"), ("get", "/api/topics"),
-                                          ("patch", "/api/topics/1"), ("post", "/api/topics/1/merge")])
+                                          ("patch", "/api/topics/1"), ("post", "/api/topics/1/merge"), ("post", "/api/topics/validate-batch")])
 def test_nothing_of_the_analysis_is_available_without_the_session(app, method, path):
     assert getattr(app, method)(path, **({"json": {}} if method != "get" else {})).status_code == 401
 
@@ -94,6 +94,21 @@ def test_the_person_can_choose_how_many_topics(me):
     analyze(me, topics=6)
     assert len(me.get("/api/topics").json()) == 6
     assert me.get("/api/analysis").json()["last_run"]["chosen_by"] == "person"
+
+
+def test_selected_topics_are_validated_together_and_stale_selection_changes_nothing(me):
+    analyze(me, topics=6)
+    guild = me.get("/api/analysis").json()["guild"]
+    topics = me.get("/api/topics").json()
+    ids = [topics[0]["id"], topics[1]["id"]]
+    response = me.post("/api/topics/validate-batch", json={"guild": guild, "ids": ids + [ids[0]]})
+    assert response.status_code == 200 and response.json() == {"validated": 2}
+    statuses = {t["id"]: t["status"] for t in me.get("/api/topics").json()}
+    assert all(statuses[id] == "validated" for id in ids)
+    assert statuses[topics[2]["id"]] == "proposed"
+    stale = me.post("/api/topics/validate-batch", json={"guild": guild, "ids": [ids[0], topics[2]["id"]]})
+    assert stale.status_code == 409
+    assert next(t for t in me.get("/api/topics").json() if t["id"] == topics[2]["id"])["status"] == "proposed"
 
 
 def test_a_stage_can_be_run_alone_and_again_without_redoing_what_is_done(me, ollama):
@@ -208,4 +223,3 @@ def test_what_the_person_does_to_a_proposal_protects_it_from_the_next_run(me):
     assert "Mon nom" in labels                                                       # the renamed one is still there
     with_merged = [t for t in me.get("/api/topics").json() if t["conversations"]]
     assert len(labels) == 6 + 2 and with_merged                                      # six new proposals, and the two that were touched
-

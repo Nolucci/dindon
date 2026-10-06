@@ -9,12 +9,10 @@
   import PersonCard from './PersonCard.svelte';
   import ImportPanel from './ImportPanel.svelte';
   import InvitePanel from './InvitePanel.svelte';
-  import Themes from './Themes.svelte';
+  import Analyse from './Analyse.svelte';
   import System from './System.svelte';
   import Privacy from './Privacy.svelte';
   import Debates from './Debates.svelte';
-  import Positions from './Positions.svelte';
-  import Coherence from './Coherence.svelte';
 
   let { onLogout } = $props();
 
@@ -44,7 +42,8 @@
   let density = $state('2500'); // how many links to draw at most: the strongest ones first
   let showImport = $state(false); // the window to import a part of the server
   let showInvite = $state(false); // the window to invite the bot to a server
-  let view = $state('map');       // 'map', 'themes', 'positions', 'coherence', 'system', 'debates' or 'privacy': the map is kept alive (hidden) while another page is shown
+  let view = $state('map');       // the map is kept alive (hidden) while another page is shown
+  let analysisSection = $state('themes');
   let stale = false;              // something happened to the map while it was hidden: it is brought up to date when it comes back
   let showIsolated = $state(true); // also the people who wrote and have no link on the map (points on their own)
   let lastExchange = $state(null);
@@ -279,9 +278,15 @@
     }
   }
 
+  function showPerson(id) {
+    showView('map');
+    pick(id);
+  }
+
   // Another server was picked in the left bar: its map is shown
   function guildPicked(id) {
     guild = id;
+    analysisSection = 'themes';
     filterChanged();
   }
 </script>
@@ -370,12 +375,8 @@
       </footer>
     </div>
 
-    {#if view === 'themes'}
-      <Themes {guild} onAuthLost={onLogout} />
-    {:else if view === 'coherence'}
-      <Coherence {guild} onAuthLost={onLogout} />
-    {:else if view === 'positions'}
-      <Positions {guild} onAuthLost={onLogout} />
+    {#if view === 'analyse'}
+      <Analyse {guild} bind:section={analysisSection} onAuthLost={onLogout} onAutomate={() => showView('system')} onPerson={showPerson} />
     {:else if view === 'system'}
       <System onAuthLost={onLogout} />
     {:else if view === 'debates'}
@@ -436,27 +437,23 @@
     padding: 0.625rem 1rem 0;
   }
 
-  /* The map, in the same look as the Activity on Discord: the golden frame of the background hugs the page (stretched, so that it never moves when the map is zoomed: it is
-     behind the map, not in it), and the map and the card are dark translucent panels inside it, dark enough that the names stay readable over the ornaments */
+  /* The web map fills its page on the same neutral color used for the graph's contrast calculations. */
   main {
-    --frame: clamp(0.75rem, 3.6vmin, 2.75rem);
     position: relative;
     flex: 1;
     min-height: 0;
-    background: #050b1d url('/activity-background.webp') center / 100% 100% no-repeat;
+    background: var(--bg-primary);
   }
 
   .canvas {
     position: absolute;
-    inset: var(--frame);
+    inset: 0;
     overflow: hidden;
-    background: rgba(5, 10, 28, 0.68);
-    border: 1px solid rgba(214, 165, 90, 0.28);
-    border-radius: 10px;
+    background: var(--bg-primary);
   }
 
   .canvas.with-card {
-    right: calc(min(22.5rem, 100%) + var(--frame) * 1.5); /* the map stays whole, next to the card */
+    right: min(22.5rem, 100%); /* the map stays whole, next to the card */
   }
 
   /* ui.module.css .emptyState */
@@ -485,8 +482,8 @@
 
   .legend {
     position: absolute;
-    left: calc(var(--frame) + 0.875rem);        /* inside the panel of the map, not over the golden frame */
-    bottom: calc(var(--frame) + 0.75rem);
+    left: 0.875rem;
+    bottom: 0.75rem;
     font-size: 0.75rem;
     color: var(--text-muted);
     display: grid;

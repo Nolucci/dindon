@@ -57,6 +57,7 @@ def test_the_person_reads_the_positions_then_sees_who_says_what_with_the_quote(b
         page.fill("#password", PASSWORD)
         page.click("button[type=submit]")
         page.wait_for_selector("nav", timeout=20000)
+        page.get_by_role("button", name="Analyse", exact=True).click()
         page.get_by_role("button", name="Positions", exact=True).click()
         page.get_by_role("heading", name="Positions", exact=True).wait_for()
         page.get_by_text("Aucune position lue pour l’instant").wait_for()

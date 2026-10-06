@@ -65,6 +65,7 @@ export const api = {
   analysisStart: (body) => request('/api/analysis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   analysisCancel: () => request('/api/analysis/cancel', { method: 'POST' }),
   topics: (guild, rejected) => request(`/api/topics${query({ guild, rejected: rejected ? 'true' : undefined })}`),
+  topicsValidate: (guild, ids) => request('/api/topics/validate-batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guild, ids }) }),
   topicChange: (id, body) => request(`/api/topics/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   topicMerge: (id, into) => request(`/api/topics/${id}/merge`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ into }) }),
 };

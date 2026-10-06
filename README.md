@@ -25,6 +25,7 @@ make demo                 # http://127.0.0.1:8011 ; mot de passe demo
 
 | Fichier | Contenu |
 | --- | --- |
+| [Lancer l'application](LANCER.md) | commandes de première installation, démarrage, arrêt et variantes |
 | [Base de données](docs/base-de-donnees.md) | schéma, migrations, sauvegarde, effacement |
 | [Architecture](docs/architecture.md) | composants, flux, frontières et état de réalisation |
 | [Fonctionnement](docs/fonctionnement.md) | interface, analyse, carte, débats et vie privée |

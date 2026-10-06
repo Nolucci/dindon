@@ -4,7 +4,7 @@
   import { day } from '../lib/format.js';
   import { matches, slash } from '../lib/text.js';
 
-  let { guild, onAuthLost } = $props();
+  let { guild, onAuthLost, onAutomate, embedded = false, onUpdate = () => {} } = $props();
 
   const fmt = new Intl.NumberFormat('fr-FR');
   const STATES = { idle: '', running: 'En cours…', cancelling: 'Arrêt en cours…', done: 'Terminée', cancelled: 'Annulée', failed: 'Échec' };
@@ -18,6 +18,7 @@
   let editing = $state(null);     // { id, label, description }
   let merging = $state(null);     // { id, into }
   let busy = $state(false);
+  let selected = $state([]);
   let poll = null;
 
   const job = $derived(info?.job);
@@ -48,8 +49,12 @@
 
   async function loadTopics() {
     const list = await guard(() => api.topics(guild, showRejected));
-    if (list) topics = list;
+    if (list) {
+      topics = list;
+      selected = selected.filter((id) => list.some((t) => t.id === id && t.status === 'proposed'));
+    }
     loaded = true;
+    onUpdate();
   }
 
   function startPolling() {
@@ -103,6 +108,22 @@
     if (answer) await loadTopics();
   }
 
+  function selectTopic(id, checked) {
+    selected = checked ? [...selected, id] : selected.filter((other) => other !== id);
+  }
+
+  async function validateSelected() {
+    if (!selected.length || busy) return;
+    busy = true;
+    const answer = await guard(() => api.topicsValidate(guild, selected));
+    busy = false;
+    if (answer) {
+      selected = [];
+      await loadTopics();
+      await refresh();
+    }
+  }
+
   async function saveName() {
     const { id, label, description } = editing;
     editing = null;
@@ -120,16 +141,17 @@
   const when = day;
 </script>
 
-<div class="page">
+<div class="page" class:embedded>
+  {#if !embedded}
   <header class="pageHeader">
     <div>
       <h1>Thèmes</h1>
       <p class="subtitle">
-        Les sujets dont parle le serveur, trouvés automatiquement par un modèle local, <strong>sans tenir compte de qui parle</strong>.
-        Vous les validez, les renommez, les fusionnez ou les rejetez : rien n’est utilisé tant que vous n’avez pas validé.
+        Examinez les thèmes proposés à partir des conversations. Validez ceux qui conviennent ; corrigez ou rejetez les autres.
       </p>
     </div>
   </header>
+  {/if}
 
   {#if problem}<p class="banner" role="alert">{problem}</p>{/if}
 
@@ -160,11 +182,8 @@
       {/if}
 
       <dl class="counts">
-        <div class="metric"><dt>Messages</dt><dd>{fmt.format(info.counts.messages)}</dd></div>
-        <div class="metric"><dt>Conversations</dt><dd>{fmt.format(info.counts.conversations)}</dd></div>
-        <div class="metric"><dt>Retenues</dt><dd>{fmt.format(info.counts.kept)}</dd></div>
-        <div class="metric"><dt>Vecteurs</dt><dd>{fmt.format(info.counts.embedded)}</dd></div>
-        <div class="metric"><dt>Thèmes</dt><dd>{fmt.format((info.counts.topics.proposed ?? 0) + (info.counts.topics.validated ?? 0))}</dd></div>
+        <div class="metric"><dt>À examiner</dt><dd>{fmt.format(info.counts.topics.proposed ?? 0)}</dd></div>
+        <div class="metric"><dt>Validés</dt><dd>{fmt.format(info.counts.topics.validated ?? 0)}</dd></div>
       </dl>
 
       <div class="actions">
@@ -172,15 +191,18 @@
           <button class="btn btn-danger" onclick={cancel} disabled={job.state === 'cancelling'}>Annuler l’analyse</button>
         {:else}
           <button class="btn btn-primary" onclick={start} disabled={!canStart || busy}>Lancer l’analyse</button>
-          <label class="inline">Nombre de thèmes
-            <input class="field-input small" type="number" min="2" max="80" placeholder="auto" bind:value={fixedTopics} aria-label="Nombre de thèmes" />
-          </label>
         {/if}
-        <span class="muted hint">
-          Modèles : <code>{info.models.embeddings}</code> (vecteurs), <code>{info.models.naming}</code> (noms). Rien ne sort de cette machine.
-          {#if info.last_run}Dernière recherche : {when(info.last_run.at)}, {info.last_run.k} thèmes ({info.last_run.chosen_by === 'person' ? 'nombre choisi' : 'nombre trouvé'}).{/if}
-        </span>
+        <button type="button" class="btn" onclick={onAutomate}>Automatiser les prochaines analyses</button>
       </div>
+      <details class="advanced">
+        <summary>Réglages et détails de l’analyse</summary>
+        <p class="muted hint">{fmt.format(info.counts.messages)} messages · {fmt.format(info.counts.conversations)} conversations · {fmt.format(info.counts.kept)} retenues · {fmt.format(info.counts.embedded)} vecteurs</p>
+        <label class="inline">Nombre de thèmes
+          <input class="field-input small" type="number" min="2" max="80" placeholder="auto" bind:value={fixedTopics} aria-label="Nombre de thèmes" />
+        </label>
+        <p class="muted hint">Laissez vide pour laisser l’analyse choisir. Modèles : <code>{info.models.embeddings}</code> (vecteurs), <code>{info.models.naming}</code> (noms). Rien ne sort de cette machine.
+          {#if info.last_run} Dernière recherche : {when(info.last_run.at)}, {info.last_run.k} thèmes.{/if}</p>
+      </details>
 
       {#if job.state !== 'idle'}
         <div class="progress" aria-live="polite">
@@ -188,7 +210,7 @@
           {#if running && job.stage}<span class="muted">étape : {job.stage}</span>{/if}
           {#if running && job.of}<progress max={job.of} value={job.done}></progress>{/if}
           {#if job.error}<p class="banner" role="alert">{job.error}</p>{/if}
-          {#if job.lines.length}<pre class="lines">{job.lines.join('\n')}</pre>{/if}
+          {#if job.lines.length}<details class="jobLog"><summary>Journal de l’analyse</summary><pre class="lines">{job.lines.join('\n')}</pre></details>{/if}
         </div>
       {/if}
     {/if}
@@ -236,6 +258,9 @@
         {:else if topic.status === 'rejected'}
           <button class="btn" onclick={() => change(topic, { status: 'proposed' })}>Remettre en proposition</button>
         {:else}
+          {#if topic.status === 'proposed'}
+            <label class="check selectTopic"><input type="checkbox" checked={selected.includes(topic.id)} onchange={(e) => selectTopic(topic.id, e.currentTarget.checked)} aria-label={`Sélectionner ${topic.label}`} /> Sélectionner</label>
+          {/if}
           {#if topic.status === 'proposed'}<button class="btn btn-primary" onclick={() => change(topic, { status: 'validated' })}>Valider</button>{/if}
           {#if topic.status === 'validated'}<button class="btn" onclick={() => change(topic, { status: 'proposed' })}>Annuler la validation</button>{/if}
           <button class="btn" onclick={() => (editing = { id: topic.id, label: topic.label, description: topic.description ?? '' })}>Renommer</button>
@@ -265,6 +290,9 @@
 
   <section>
     <h2 class="eyebrow">À examiner <span class="count">{proposed.length}</span></h2>
+    {#if selected.length}
+      <div class="bulkActions" aria-live="polite"><span>{selected.length} thème{selected.length > 1 ? 's' : ''} sélectionné{selected.length > 1 ? 's' : ''}</span><button type="button" class="btn btn-primary" onclick={validateSelected} disabled={busy}>Valider la sélection</button><button type="button" class="btn" onclick={() => (selected = [])}>Effacer</button></div>
+    {/if}
     {#if !loaded}
       <p class="muted">Chargement…</p>
     {:else if !proposed.length}
@@ -304,6 +332,7 @@
     gap: 1.25rem;
     animation: fadeIn var(--transition-slow) both;
   }
+  .page.embedded { flex: none; min-height: auto; overflow: visible; padding: 0; animation: none; }
 
   h1 {
     font-size: clamp(1.5rem, 2vw, 1.9rem);
@@ -316,10 +345,6 @@
     max-width: 62ch;
     margin-top: 0.5rem;
     color: var(--text-secondary);
-  }
-
-  .subtitle strong {
-    color: var(--text-primary);
   }
 
   .status {
@@ -591,6 +616,12 @@
     color: var(--text-muted);
     cursor: pointer;
   }
+  .selectTopic { margin: 0 0.25rem 0 0; }
+  .bulkActions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; font-size: 0.8125rem; }
+  .advanced { display: flex; flex-direction: column; gap: 0.5rem; }
+  .advanced[open] .inline { margin-top: 0.75rem; }
+  .jobLog { flex-basis: 100%; }
+  .jobLog .lines { margin-top: 0.5rem; }
 
   @media (max-width: 720px) {
     .page {

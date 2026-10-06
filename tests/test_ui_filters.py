@@ -81,7 +81,11 @@ def open_page(browser, base, name):
     page.fill("#password", PASSWORD)
     page.click("button[type=submit]")
     page.wait_for_selector("nav", timeout=20000)
-    if name != "Carte":
+    if name in ("Thèmes", "Positions", "Contradictions"):
+        page.get_by_role("button", name="Analyse", exact=True).click()
+        if name != "Thèmes":
+            page.get_by_role("button", name=name, exact=True).click()
+    elif name != "Carte":
         page.get_by_role("button", name=name, exact=True).click()
     return page
 
@@ -94,6 +98,9 @@ def test_every_list_can_be_searched_and_filtered(base):
         # --- Thèmes: words (accents ignored), state, and the shortcut
         page = open_page(browser, base, "Thèmes")
         page.on("pageerror", lambda e: errors.append(str(e)[:200]))
+        expect(page.get_by_role("heading", name="Analyse", exact=True)).to_be_visible()
+        expect(page.get_by_label("Résumé de l’analyse")).to_be_visible()
+        assert page.locator(".navItems .navItem").filter(has_text="Analyse").count() == 1
         page.wait_for_selector(".topic")
         assert page.locator(".topic").count() == 3
         page.keyboard.press("/")                                                                    # the shortcut puts the cursor in the box
@@ -131,7 +138,7 @@ def test_every_list_can_be_searched_and_filtered(base):
         assert page.locator(".prop >> nth=0 >> .nums").inner_text().split("·")[2].strip().startswith(("1", "5"))
 
         # --- Cohérence: the verdict, the name, the role
-        page.get_by_role("button", name="Cohérence", exact=True).click()
+        page.get_by_role("button", name="Contradictions", exact=True).click()
         page.wait_for_selector(".person")
         assert page.locator(".person").count() == 1                                                 # the contradictions by default
         page.get_by_label("Filtrer par verdict").select_option("all")
@@ -178,6 +185,24 @@ def test_the_map_keeps_its_search_and_filters(base):
         page.wait_for_selector(".search li button")
         assert "Bobby" in page.locator(".search li button").first.inner_text()
         assert page.get_by_role("button", name="Réponses").count() == 1 and page.get_by_role("group", name="Période").count() == 1
+        browser.close()
+
+
+def test_bulk_topic_review_and_contradiction_evidence(base, ingest_db):
+    with sync_api.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
+        page = open_page(browser, base, "Thèmes")
+        page.get_by_label("Sélectionner Économie et salaires").check()
+        page.get_by_label("Sélectionner Écologie et énergie").check()
+        page.get_by_role("button", name="Valider la sélection").click()
+        expect(page.locator(".topic.isValidated")).to_have_count(3)
+        assert ingest_db.execute("SELECT count(*) FROM topics WHERE status = 'validated'").fetchone()[0] == 3
+
+        page.get_by_role("button", name="Contradictions", exact=True).click()
+        page.get_by_role("button", name="Voir les citations").first.click()
+        expect(page.get_by_role("complementary", name="Fiche de la personne")).to_be_visible()
+        page.get_by_role("button", name="Analyse", exact=True).click()
+        expect(page.get_by_role("heading", name="Contradictions", exact=True)).to_be_visible()
         browser.close()
 
 

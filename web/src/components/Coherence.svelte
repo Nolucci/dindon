@@ -3,7 +3,7 @@
   import AxisBar from './AxisBar.svelte';
   import { matches, slash } from '../lib/text.js';
 
-  let { guild, onAuthLost } = $props();
+  let { guild, onAuthLost, onPerson, embedded = false } = $props();
 
   let data = $state(null);
   let problem = $state('');
@@ -32,15 +32,15 @@
                           expected: [{ role: '', min: a.expected[0], max: a.expected[1], verdict: 'incompatible' }] });
 </script>
 
-<div class="page">
+<div class="page" class:embedded>
+  {#if !embedded}
   <header>
-    <h1>Cohérence rôles / positions</h1>
+    <h1>Contradictions</h1>
     <p class="subtitle">
-      Les personnes qui se sont donné un rôle d’idées (« Féministe », « Patriote »…) : ce qu’elles disent correspond-il à ce que ce rôle implique ?
-      <strong>Contradiction</strong> : au moins un axe où ce qu’elles disent est incompatible avec le rôle, avec assez de propos pour en juger.
-      C’est une lecture à vérifier sur les citations (fiche de la personne sur la carte), pas un verdict.
+      Compare les rôles d’idées choisis par les personnes avec leurs positions lues. Ouvrez une fiche pour examiner les citations avant de conclure.
     </p>
   </header>
+  {/if}
 
   {#if problem}<p class="banner" role="alert">{problem}</p>{/if}
 
@@ -72,7 +72,7 @@
         <span class="found" aria-live="polite">{shown.length} personne{shown.length > 1 ? 's' : ''} sur {data.totals.people}</span>
       </div>
       {#if data.totals.not_verifiable === data.totals.people && data.totals.people > 0}
-        <p class="banner info">Rien n’est encore vérifiable : il faut avoir lu les positions (page <strong>Positions</strong>) et les avoir reliées aux axes (étape « axes » de la lecture), et assez de propos par personne.</p>
+        <p class="banner info">Rien n’est encore vérifiable : il faut avoir lu les positions (section <strong>Positions</strong>) et les avoir reliées aux axes (étape « axes » de la lecture), et assez de propos par personne.</p>
       {/if}
     </section>
 
@@ -80,18 +80,26 @@
     <ul class="list">
       {#each shown as p (p.id)}
         <li class="panel person">
-          <header><strong>{p.label}</strong>{#if p.role_conflict}<span class="badge small danger">rôles qui s’excluent</span>{/if}</header>
+          <header><strong>{p.label}</strong>{#if p.role_conflict}<span class="badge small danger">rôles qui s’excluent</span>{/if}<button type="button" class="btn evidence" onclick={() => onPerson(p.id)}>Voir les citations</button></header>
+          {#if p.role_conflict}<p class="small">Cette personne porte aussi des rôles d’idées incompatibles entre eux.</p>{/if}
           {#each p.roles as r}
+            {#if verdictFilter !== 'discordant' || r.verdict === 'discordant'}
             <div class="role">
               <div class="roleHead"><span class="roleName">{r.role}</span><span class="badge small" class:success={r.verdict === 'concordant'} class:danger={r.verdict === 'discordant'}>{VERDICT[r.verdict][0]}</span></div>
               {#each r.against as a}
                 <div class="against">
-                  <p class="small">Sur « {a.axis} » : elle se situe à <strong>{a.score.toFixed(2)}</strong> (± {a.uncertainty.toFixed(2)}, {a.positions} position{a.positions > 1 ? 's' : ''}), le rôle attend entre {a.expected[0]} et {a.expected[1]}.</p>
-                  <AxisBar axis={asAxis(a)} compact />
+                  <p class="small">« {a.axis} » : {a.positions} position{a.positions > 1 ? 's' : ''} lue{a.positions > 1 ? 's' : ''} vont à l’encontre de ce rôle.</p>
+                  <details><summary>Voir le calcul</summary><AxisBar axis={asAxis(a)} compact /><p class="small">Score {a.score.toFixed(2)} (± {a.uncertainty.toFixed(2)}) ; ce rôle attend entre {a.expected[0]} et {a.expected[1]}.</p></details>
                 </div>
               {/each}
             </div>
+            {/if}
           {/each}
+          {#if verdictFilter === 'discordant' && p.roles.some((r) => r.verdict !== 'discordant')}
+            <details><summary>Voir les autres rôles ({p.roles.filter((r) => r.verdict !== 'discordant').length})</summary>
+              {#each p.roles.filter((r) => r.verdict !== 'discordant') as r}<p class="small">{r.role} · {VERDICT[r.verdict][0]}</p>{/each}
+            </details>
+          {/if}
         </li>
       {/each}
     </ul>
@@ -100,9 +108,9 @@
 
 <style>
   .page { flex: 1; min-height: 0; overflow-y: auto; padding: 1.5rem 1.75rem 2.5rem; display: flex; flex-direction: column; gap: 1.25rem; animation: fadeIn var(--transition-slow) both; }
+  .page.embedded { flex: none; min-height: auto; overflow: visible; padding: 0; animation: none; }
   h1 { font-size: clamp(1.5rem, 2vw, 1.9rem); line-height: 1.1; font-weight: 700; color: var(--text-primary); }
   .subtitle { max-width: 70ch; margin-top: 0.5rem; color: var(--text-secondary); }
-  .subtitle strong { color: var(--text-primary); }
   .card { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
   .counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.625rem; }
   .metric { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.75rem 0.875rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-control); }
@@ -112,11 +120,14 @@
   .list { list-style: none; display: flex; flex-direction: column; gap: 0.625rem; }
   .person { padding: 1rem 1.125rem; display: flex; flex-direction: column; gap: 0.625rem; }
   .person > header { display: flex; align-items: center; gap: 0.625rem; }
+  .evidence { margin-left: auto; }
   .role { display: flex; flex-direction: column; gap: 0.375rem; }
   .roleHead { display: flex; align-items: center; gap: 0.5rem; }
   .roleName { font-weight: 600; color: var(--text-primary); }
   .against { max-width: 36rem; display: flex; flex-direction: column; gap: 0.375rem; }
   .small { font-size: 0.75rem; color: var(--text-secondary); }
+  details summary { cursor: pointer; font-size: 0.75rem; color: var(--text-secondary); }
+  details .small { margin-top: 0.375rem; }
   .badge.small { min-height: 1.5rem; font-size: 0.6875rem; }
   @media (max-width: 720px) { .page { padding: 1rem 1rem 2rem; } }
 </style>
