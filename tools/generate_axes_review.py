@@ -1,4 +1,4 @@
-"""Writes AXES.md: a readable page with every axis and every ideology of the database, to be reviewed.
+"""Writes a generated axis review: a readable page with every axis and every ideology of the database, to be reviewed.
 
 The page is generated from the database, so that it always says what the database says. Run it again
 after changing the axes or the ideologies:
@@ -58,7 +58,7 @@ w("Cette page est **générée à partir de la base** (`generate_axes_review.py`
 w("## Comment lire\n")
 w("- Chaque axe va de **−1 à +1**. −1 est le pôle de gauche du modèle [12 Axes](https://12axes.vercel.app), +1 son pôle de droite. Les pôles ne sont pas des jugements de valeur.")
 w("- Pour chaque axe : la question qu'il pose, ce qu'il couvre, **ce qu'il ne couvre pas** (pour qu'un sujet n'appartienne qu'à un seul axe), et ce que veulent dire −1, 0 et +1.")
-w("- Les **12 axes du modèle 12 Axes** (leurs noms et leurs pôles) et les **9 axes ajoutés** sont tous **actifs** (décision du 4 octobre 2026 : mesuré sur 55 phrases, le modèle range bien moins de phrases sur un mauvais axe quand il voit l'Europe, l'écologie, le genre, la redistribution, les animaux : voir [VALIDATION-AXES.md](VALIDATION-AXES.md)). Un axe inactif n'est ni proposé à l'IA ni calculé.")
+w("- Les **12 axes du modèle 12 Axes** (leurs noms et leurs pôles) et les **9 axes ajoutés** sont tous **actifs** (décision du 4 octobre 2026 : mesuré sur 55 phrases, le modèle range bien moins de phrases sur un mauvais axe quand il voit l'Europe, l'écologie, le genre, la redistribution, les animaux : voir docs/fonctionnement.md). Un axe inactif n'est ni proposé à l'IA ni calculé.")
 w("- Pour éteindre un axe : `UPDATE axes SET is_active = false WHERE code = 'europe';`\n")
 w("## Les axes en un coup d'œil\n")
 w("| N° | Axe | −1 | +1 | Origine | État |")
@@ -115,5 +115,5 @@ w("- Une plage d'idéologie est trop étroite ou trop large : changez ses bornes
 w("- Il manque un axe ou une idéologie : ajoutez une ligne dans `seed-axes.sql`.")
 w("- Vous voulez éteindre un axe : `UPDATE axes SET is_active = false WHERE code = '...';`")
 
-pathlib.Path(__file__).resolve().parents[1].joinpath("docs", "AXES.md").write_text("\n".join(out) + "\n", encoding="utf-8")
-print(f"AXES.md written: {len(axes)} axes, {len(ideologies)} ideologies, {sum(len(v) for v in ranges.values())} ranges")
+pathlib.Path(__file__).resolve().parents[1].joinpath("political", "axes-review.txt").write_text("\n".join(out) + "\n", encoding="utf-8")
+print(f"axes-review.txt written: {len(axes)} axes, {len(ideologies)} ideologies, {sum(len(v) for v in ranges.values())} ranges")

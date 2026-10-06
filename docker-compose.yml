@@ -39,19 +39,19 @@ services:
       # Collection from Discord: only active with a token and a server ID (see README.md)
       DISCORD_TOKEN: ${DISCORD_TOKEN:-}
       DINDON_GUILD_IDS: ${DINDON_GUILD_IDS:-}
-      # The Activity (the map in a voice channel, docs/ACTIVITE.md): the identifiers of the Discord application
+      # The Activity (the map in a voice channel, docs/fonctionnement.md): the identifiers of the Discord application
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
       DINDON_POLL_SECONDS: ${DINDON_POLL_SECONDS:-30}
       DINDON_THREADS: ${DINDON_THREADS:-active}
-      # Dindon's own exporter (docs/EXPORTATEUR.md): requests in parallel; who reacted is one request per reaction, so by default only for recent messages
+      # Dindon's own exporter (docs/api-export.md): requests in parallel; who reacted is one request per reaction, so by default only for recent messages
       DINDON_EXPORT_WORKERS: ${DINDON_EXPORT_WORKERS:-6}
       DINDON_EXPORT_REACTIONS: ${DINDON_EXPORT_REACTIONS:-recent}
       DINDON_EXPORT_REACTIONS_DAYS: ${DINDON_EXPORT_REACTIONS_DAYS:-30}
       # "off" switches the watcher off (to run the live bot alone, see COLLECTE.md)
       DINDON_COLLECTOR: ${DINDON_COLLECTOR:-on}
       DINDON_RETENTION_DAYS: ${DINDON_RETENTION_DAYS:-0}
-      # What the page Débats says of the checks of the debates: the same settings as the bot's (which is the one that runs them, docs/DEBAT.md)
+      # What the page Débats says of the checks of the debates: the same settings as the bot's (which is the one that runs them, docs/regles-du-bot.md)
       DINDON_DEBATE_CHECKS: ${DINDON_DEBATE_CHECKS:-off}
       DINDON_DEBATE_PRECISION: ${DINDON_DEBATE_PRECISION:-}
       DINDON_DEBATE_MIN_PRECISION: ${DINDON_DEBATE_MIN_PRECISION:-}
@@ -72,7 +72,7 @@ services:
       retries: 6
       start_period: 15s
 
-  # Optional: the live bot (mode C of docs/COLLECTE.md). It receives the new messages of the followed servers from Discord's
+  # Optional: the live bot (mode C of docs/import-des-donnees.md). It receives the new messages of the followed servers from Discord's
   # Gateway the moment they are written, and hands them to the same ingestion as everything else. Same image as the application.
   # It needs the token of a BOT and the server IDs in .env, and the "Message Content Intent" switched on for the bot.
   #   docker compose --profile bot up -d --build
@@ -87,12 +87,12 @@ services:
     environment:
       DATABASE_URL: postgresql://dindon:${POSTGRES_PASSWORD}@db:5432/dindon
       DISCORD_TOKEN: ${DISCORD_TOKEN:-}
-      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}      # set: the bot also registers the entry point of the Activity (docs/ACTIVITE.md)
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}      # set: the bot also registers the entry point of the Activity (docs/fonctionnement.md)
       DINDON_GUILD_IDS: ${DINDON_GUILD_IDS:-}
       DINDON_ERASE_ON_REMOVAL: ${DINDON_ERASE_ON_REMOVAL:-}
       DINDON_INBOX: /data/inbox
       DINDON_ARCHIVE: /data/archive
-      # The debates (docs/DEBAT.md). "off" (default): nothing is read and nothing leaves the machine. "observe": the claims of a debate are checked on the Internet and
+      # The debates (docs/regles-du-bot.md). "off" (default): nothing is read and nothing leaves the machine. "observe": the claims of a debate are checked on the Internet and
       # noted in the database, nothing is published. "answer": Dindon answers first, with its local model and without the Internet, and the participants judge (works without a
       # search service). "live": answer + corrections by trusted sources. All of them need the local AI (OLLAMA_URL).
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
@@ -114,7 +114,7 @@ services:
       retries: 3
       start_period: 60s
 
-  # Optional: a search service for the debates, that you run yourself (docs/DEBAT.md). No account, no key, no port published: only the bot reaches it, at http://searxng:8080.
+  # Optional: a search service for the debates, that you run yourself (docs/regles-du-bot.md). No account, no key, no port published: only the bot reaches it, at http://searxng:8080.
   # It asks other search engines for you, and they may refuse a machine that asks too often: fine for a few claims an hour. Set SEARXNG_SECRET in .env (any long random text).
   #   docker compose --profile search up -d searxng      then DINDON_SEARXNG_URL=http://searxng:8080 and DINDON_DEBATE_CHECKS=observe
   # NOT TESTED: the configuration (docker/searxng/settings.yml) was never run.

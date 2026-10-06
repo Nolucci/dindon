@@ -14,7 +14,7 @@ here validates a proposition. A conversation that was read is recorded and is no
 
 KNOWN WEAKNESS: a proposition worded in the opposite sense ("Il ne faut pas augmenter le SMIC") has a close vector and may be merged with
 its opposite while the stance keeps the sense of the wording: the model is told to word every proposition in the positive sense, which
-reduces the problem without removing it. What is measured is in docs/SERVEUR-DE-TEST.md.
+reduces the problem without removing it. What is measured is in docs/commandes.md.
 """
 import logging
 import re

@@ -1,4 +1,4 @@
-"""Reading the web for the verification of claims (docs/DEBAT.md, step D4a): the safe fetcher, the quotations that are checked against the page, the sources that count, the two search
+"""Reading the web for the verification of claims (docs/regles-du-bot.md, step D4a): the safe fetcher, the quotations that are checked against the page, the sources that count, the two search
 services.
 
 Level of proof: SIMULATED. Everything talks to a small web server on this machine (the tests may not leave it), with invented pages; the names of hosts are mapped to this machine by an

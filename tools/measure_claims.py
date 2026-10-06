@@ -1,8 +1,8 @@
-"""Measures the checking of claims against tools/claims_reference.json (docs/DEBAT.md « Mesure »). Prints the figures and writes what was predicted, so that it can be scored again.
+"""Measures the checking of claims against tools/claims_reference.json (docs/regles-du-bot.md « Mesure »). Prints the figures and writes what was predicted, so that it can be scored again.
 
     python tools/measure_claims.py reading                     # the local model only: nothing leaves this machine
     python tools/measure_claims.py local                       # what Dindon answers WITHOUT the Internet (the local model only: nothing leaves this machine)
-    python tools/measure_claims.py verify --searxng http://127.0.0.1:8088   # the search service, the pages and the model: THIS SENDS SEARCHES (see the notice of docs/DEBAT.md)
+    python tools/measure_claims.py verify --searxng http://127.0.0.1:8088   # the search service, the pages and the model: THIS SENDS SEARCHES (see the notice of docs/regles-du-bot.md)
     python tools/measure_claims.py score reading|local|verify FILE   # the figures again, from a file that was written before
 
 `verify` sends, for each claim of the reference set, one or two neutral searches and reads at most three trusted pages (the same limits as in a debate). The claims of the reference set are public

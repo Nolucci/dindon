@@ -45,11 +45,11 @@ class Settings:
     # DINDON_GUILD_IDS empty or "all": the bot follows every server that it is in (being invited is the decision). Only with a BOT token:
     # an account is in all the servers of a person, and never follows them all.
     follow_all: bool = False
-    # The local models of the analysis (see docs/ANALYSE.md): the vectors of the conversations, and the names of the topics
+    # The local models of the analysis (see docs/fonctionnement.md): the vectors of the conversations, and the names of the topics
     embed_model: str = "bge-m3"
     naming_model: str = "qwen3:14b"
-    # Who the members can write to about their data (shown by /dindon info and in docs/INFORMATION-MEMBRES.md), and how long messages are
-    # kept (DINDON_RETENTION_DAYS, 0 = no limit; see docs/CONFORMITE.md)
+    # Who the members can write to about their data (shown by /dindon info and in docs/regles-du-bot.md), and how long messages are
+    # kept (DINDON_RETENTION_DAYS, 0 = no limit; see docs/regles-du-bot.md)
     # Dindon's own exporter (export/exporter.py): requests in parallel, and who reacted (one request per reaction): `recent` (the last
     # DINDON_EXPORT_REACTIONS_DAYS days), `all` or `none` (the count of each reaction is always kept)
     export_workers: int = 6
@@ -60,7 +60,7 @@ class Settings:
     discord_client_id: str = ""
     discord_client_secret: str = field(default="", repr=False)      # a password: never in a log or a trace that prints the settings
     erase_on_removal: bool = False   # the bot is removed from a server: everything held of it is deleted
-    # The debates (docs/DEBAT.md). DINDON_DEBATE_CHECKS: `off` (default: nothing is read, nothing leaves the machine) or `observe` (the claims of the messages of a debate are checked on the
+    # The debates (docs/regles-du-bot.md). DINDON_DEBATE_CHECKS: `off` (default: nothing is read, nothing leaves the machine) or `observe` (the claims of the messages of a debate are checked on the
     # Internet and written to the database, nothing is published). The search services: the key of Google's Fact Check Tools API, and/or the address of a SearXNG that you run.
     debate_checks: str = "off"                # off | observe | answer | live (answer: Dindon answers first and the participants judge; live: + the corrections that sources make by themselves, which need a measured precision: debate/checker.resolve_mode)
     debate_precision: float | None = None     # the precision of « contredit » that tools/measure_claims.py measured: the owner copies it here, it is what unlocks `live`

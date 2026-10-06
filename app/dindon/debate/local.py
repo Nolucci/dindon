@@ -1,4 +1,4 @@
-"""Dindon's first answer to a claim: from what its local model knows, without going on the Internet (docs/DEBAT.md, « Répondre d'abord, chercher ensuite »).
+"""Dindon's first answer to a claim: from what its local model knows, without going on the Internet (docs/regles-du-bot.md, « Répondre d'abord, chercher ensuite »).
 
 It is **blind**, like the reading of messages: the model gets the claim, alone. Not who said it, not the debate, not the camps. It is asked for certainty, in both directions, and it is told that
 whatever changes with time, whatever it does not know precisely, and whatever needs a source is `unsure`: Dindon then does not answer, and goes on the Internet as before.
@@ -35,7 +35,7 @@ MIN_CERTAINTY = 90                                                              
 _NOT_CLEAN = re.compile(r"https?://|www\.|\[|\]|<|>|@", re.I)
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 # A claim that compares a figure with a threshold (« plus de 50 % », « inférieur à 1 000 euros ») needs the exact figure AND the arithmetic: a language model that answers from memory gets the comparison
-# wrong too often (measured: docs/DEBAT.md « Mesure »). Dindon does not answer those on its own: they go on the Internet, or nothing is said.
+# wrong too often (measured: docs/regles-du-bot.md « Mesure »). Dindon does not answer those on its own: they go on the Internet, or nothing is said.
 _COMPARES = re.compile(r"\b(?:plus|moins) (?:de|que|d')|\bau (?:moins|plus)\b|\b(?:sup[ée]rieur|inf[ée]rieur)e?s?\b|\bd[ée]pass\w*|\bexc[èe]d\w*|\bau[- ](?:dessus|dessous)\b|\ben dessous\b|\bla moiti[ée]\b|\ble (?:double|triple|quart|tiers)\b|\bmajorit|\bminorit|[<>]", re.I)
 
 

@@ -1,8 +1,8 @@
-"""Dindon's first answer to a claim, from its local model and without the Internet (docs/DEBAT.md, « Répondre d'abord, chercher ensuite »): what the CODE does with whatever a model says, and
+"""Dindon's first answer to a claim, from its local model and without the Internet (docs/regles-du-bot.md, « Répondre d'abord, chercher ensuite »): what the CODE does with whatever a model says, and
 how a message is shared between what Dindon answers itself and what goes on the Internet.
 
 Level of proof: SIMULATED. The model is a script (it can lie, ramble or fail); no database, no network. These tests cannot show that a real model knows what it is asked: that is measured
-separately (tools/measure_claims.py local, docs/DEBAT.md « Mesure »).
+separately (tools/measure_claims.py local, docs/regles-du-bot.md « Mesure »).
 """
 import dataclasses
 import logging

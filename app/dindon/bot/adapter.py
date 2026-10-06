@@ -3,7 +3,7 @@
 It is pure: dictionaries in, dictionaries out. It knows nothing of discord.py, of the database or of the clock, so that
 it can be tested with recorded payloads, and so that the core of Dindon stays independent of Discord's library.
 
-The contract is the one that the exporter writes (contracts/JSON-format.md), and a message must come out the same whether
+The contract is the one that the exporter writes (docs/import-des-donnees.md), and a message must come out the same whether
 it was exported or announced by the bot: otherwise the nightly catch-up would rewrite what the bot wrote, and the analysis
 would later read two dialects. The mappings below therefore mirror the exporter's code (DiscordChatExporter.Core:
 JsonMessageWriter, PlainTextMarkdownVisitor, MessageKind, ChannelKind, User, Member, Role, ImageCdn). The expected values

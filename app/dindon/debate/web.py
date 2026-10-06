@@ -1,4 +1,4 @@
-"""Reading a page of the web, safely. Used by the verification of claims in a debate (docs/DEBAT.md): the address of a page comes from a search, that is to say from
+"""Reading a page of the web, safely. Used by the verification of claims in a debate (docs/regles-du-bot.md): the address of a page comes from a search, that is to say from
 anybody, and what the page says is text written by anybody. Nothing here trusts either.
 
 What it protects against:

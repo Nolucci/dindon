@@ -262,7 +262,7 @@ def _drop_derived(cur: psycopg.Cursor, table: str, guild_id: int) -> int:
     conversation is made again, without it, by the next analysis. `table` is a temporary table of message ids. Returns how many conversations were removed."""
     cur.execute(f"DELETE FROM conversations WHERE id IN (SELECT conversation_id FROM conversation_messages WHERE message_id IN (SELECT id FROM {table}))")
     removed = cur.rowcount
-    # The claims that a debate read in these messages (and the sources behind them) are gone, and an edited message is to be read again (docs/DEBAT.md)
+    # The claims that a debate read in these messages (and the sources behind them) are gone, and an edited message is to be read again (docs/regles-du-bot.md)
     cur.execute(f"DELETE FROM debate_claims WHERE message_id IN (SELECT id FROM {table})")
     cur.execute(f"DELETE FROM debate_answers WHERE message_id IN (SELECT id FROM {table})")                  # and what Dindon answered itself (its message on Discord is taken back)
     cur.execute(f"UPDATE debate_messages SET read_at = NULL WHERE message_id IN (SELECT id FROM {table})")
@@ -291,7 +291,7 @@ def forget_messages(conn: psycopg.Connection, guild_id: int, message_ids: list[i
     with conn.transaction():
         cur = conn.cursor()
         cur.execute("SELECT pg_advisory_xact_lock(%s)", (locks.DATA,))
-        # A debate no longer counts a message that was deleted (docs/DEBAT.md). Whether or not the map ever stored it: the debate sees messages the map may not have.
+        # A debate no longer counts a message that was deleted (docs/regles-du-bot.md). Whether or not the map ever stored it: the debate sees messages the map may not have.
         cur.execute("DELETE FROM debate_claims WHERE message_id = ANY(%s)", (message_ids,))
         cur.execute("DELETE FROM debate_answers WHERE message_id = ANY(%s)", (message_ids,))
         cur.execute("DELETE FROM debate_messages WHERE message_id = ANY(%s)", (message_ids,))

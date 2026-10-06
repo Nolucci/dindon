@@ -1,9 +1,9 @@
-"""The debates on Discord (docs/DEBAT.md, step D2): the command and its popup, the place of the debate (a thread, or the channel itself), the buttons, the end (button or silence, never a
+"""The debates on Discord (docs/regles-du-bot.md, step D2): the command and its popup, the place of the debate (a thread, or the channel itself), the buttons, the end (button or silence, never a
 timer), the closing, and what happens after a stop.
 
 Level of proof: SIMULATED. Real PostgreSQL, the real engine and the real command handlers, but Discord is a fake kept in memory (`FakeDiscord`: threads, messages, edits,
 errors on demand) and the clock is moved by hand. Only the HTTP client has its own test against a local server. Nothing here has talked to the real Discord, and the
-assumptions about it (the popup's fields, the permissions sent with a button) are listed in docs/DEBAT.md (« à vérifier sur un vrai Discord »).
+assumptions about it (the popup's fields, the permissions sent with a button) are listed in docs/regles-du-bot.md (« à vérifier sur un vrai Discord »).
 """
 import asyncio
 import itertools

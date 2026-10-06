@@ -9,7 +9,7 @@ the axes on which AGREEING with it moves someone are known, and in which directi
   elsewhere     a loading on an axis that is not in the acceptable list (it may be defensible: the list is short, written by one person)
   nothing       no loading at all for the statement
 
-    .venv/bin/python tools/check_axes.py [--model qwen3:14b] [--limit 120] [--report political/RAPPORT-AXES.md]
+    .venv/bin/python tools/check_axes.py [--model qwen3:14b] [--limit 120] [--report political/RAPPORT-AXES.txt]
 
 It needs Ollama and an analyzed database only for the axes' text: it reads the axes from the database of DATABASE_URL (default: the political server's).
 """

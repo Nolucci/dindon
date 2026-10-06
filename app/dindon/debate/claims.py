@@ -1,4 +1,4 @@
-"""What is kept of the claims that were checked in a debate, and the queue of messages that wait to be read (docs/DEBAT.md).
+"""What is kept of the claims that were checked in a debate, and the queue of messages that wait to be read (docs/regles-du-bot.md).
 
 * **The queue is the database**: a counted message (`debate_messages`) whose `read_at` is null waits to be read, in the order they were written. Nothing is lost by a restart; a message
   that is edited becomes unread again and loses its claims (ingest/loader.py); a message that is deleted loses them too. The text of a message is read from `messages` (where the ingestion
@@ -181,7 +181,7 @@ def parity(conn: psycopg.Connection, debate_id: int) -> dict:
     return {position: {**counts, "total": sum(counts.values())} for position, counts in sorted(table.items(), key=lambda item: ([*rules.POSITIONS, "none"].index(item[0])))}
 
 
-# --- the corrections posted in public (docs/DEBAT.md, « Corrections publiques ») ------------------------------------------------------------------------
+# --- the corrections posted in public (docs/regles-du-bot.md, « Corrections publiques ») ------------------------------------------------------------------------
 
 CORRECTION_MAX_AGE_MINUTES = 30      # a claim checked longer ago than this is not corrected any more: a late correction in a conversation that has moved on does more harm than good
 CORRECTION_SPACING_SECONDS = 20      # between two corrections in the same debate

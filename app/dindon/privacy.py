@@ -1,5 +1,5 @@
 """The rights of the people whose messages Dindon holds: to stop being recorded, to be erased, to see what is held, and the limit of
-how long things are kept. See docs/CONFORMITE.md for the reasons, and what this does not do.
+how long things are kept. See docs/regles-du-bot.md for the reasons, and what this does not do.
 
 * **The register** (`privacy_subjects`) keeps the Discord id, and nothing else, of whoever asked to stop. It is read before anything is
   written (ingest/loader.py, the live bot): a later export, a catch-up or a new Gateway event never brings the person back.
@@ -86,7 +86,7 @@ def erase_person(conn: psycopg.Connection, user_id: int, *, reason: str = "erasu
         # A reply keeps a copy of what it answered, with the author id if it is known: forget_user() finds those by author, this by message
         cur.execute("""UPDATE messages SET reference_content = NULL, reference_author_id = NULL
                        WHERE reference_message_id IN (SELECT id FROM messages WHERE author_id = %s)""", (user_id,))
-        # Their part in debates (docs/DEBAT.md): the messages counted, the positions, the claims read in their messages. The debate itself stays, without them as its author.
+        # Their part in debates (docs/regles-du-bot.md): the messages counted, the positions, the claims read in their messages. The debate itself stays, without them as its author.
         counts["debate_traces"] = sum(cur.execute(f"DELETE FROM {table} WHERE {column} = %s", (user_id,)).rowcount
                                       for table, column in DEBATE_PERSON_COLUMNS)
         cur.execute("UPDATE debates SET created_by = NULL WHERE created_by = %s", (user_id,))

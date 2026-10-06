@@ -66,7 +66,7 @@ COMMAND = {
 }
 
 
-# What makes the application appear in the rocket of a voice channel (the Activity, docs/ACTIVITE.md): a command of type 4 that Discord itself handles. The list of
+# What makes the application appear in the rocket of a voice channel (the Activity, docs/fonctionnement.md): a command of type 4 that Discord itself handles. The list of
 # commands is replaced as a whole at each start, so a command that is not in it is deleted: the entry point must be in it, or the Activity disappears from the channels.
 ENTRY_POINT = {"name": "carte", "description": "Ouvrir la carte de Dindon dans le salon vocal", "type": 4, "handler": 2, "integration_types": [0], "contexts": [0]}
 

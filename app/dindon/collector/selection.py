@@ -81,7 +81,7 @@ class ImportSelection:
         return bool(self.authors or self.mentions or self.after or self.before)
 
     def message_filter(self) -> str | None:
-        """The exporter's filter: people of a group are 'or', the groups are 'and' (see .docs/Message-filters.md)."""
+        """The exporter's filter: people of a group are 'or', the groups are 'and' (see docs/import-des-donnees.md)."""
         groups = [f"({' | '.join(f'{key}:{i}' for i in ids)})" for key, ids in (("from", self.authors), ("mentions", self.mentions)) if ids]
         return " ".join(groups) or None
 

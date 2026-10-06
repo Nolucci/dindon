@@ -43,7 +43,7 @@ def read(request: Request) -> dict:
 def write(request: Request, body: Body) -> dict:
     """Saves the settings. Switching on the positions without `positions_acknowledged` is refused (it would be switched off silently otherwise)."""
     if body.positions and not body.positions_acknowledged:
-        raise HTTPException(status_code=422, detail="Pour lire les positions des personnes, confirmez qu'elles sont informées (docs/CONFORMITE.md).")
+        raise HTTPException(status_code=422, detail="Pour lire les positions des personnes, confirmez qu'elles sont informées (docs/regles-du-bot.md).")
     with request.app.state.pool.connection() as conn:
         automation.save(conn, body.model_dump())
         return _answer(request, conn)

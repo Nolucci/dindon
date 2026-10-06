@@ -16,7 +16,7 @@ help:
 	@echo "make migrate  apply the SQL files to the database"
 	@echo "make check    print what the database is made of"
 	@echo "make test     run all the tests (starts and removes a throwaway database)"
-	@echo "make axes     rewrite docs/AXES.md from the database (page to review the axes)"
+	@echo "make axes     write political/axes-review.txt from the database (page to review the axes)"
 	@echo "make lint     ruff: style and likely bugs"
 	@echo "make backup   dump the database to backups/ (compressed)"
 
@@ -30,7 +30,7 @@ setup: $(BIN)/dindon
 web:
 	cd web && npm ci --no-audit --no-fund && npm run build
 
-politique:  ## the invented political test server on http://127.0.0.1:8012 (password: test), see docs/SERVEUR-DE-TEST.md
+politique:  ## the invented political test server on http://127.0.0.1:8012 (password: test), see docs/commandes.md
 	./tools/politique.sh
 
 demo: setup

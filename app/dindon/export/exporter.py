@@ -1,5 +1,5 @@
 """Dindon's own exporter: reads a channel (and its threads) from Discord's REST API and writes it as JSON v2 documents, the format of
-contracts/JSON-format.md, which the ingestion reads. It replaces the original exporter (DiscordChatExporter, a .NET program written for someone else's
+docs/import-des-donnees.md, which the ingestion reads. It replaces the original exporter (DiscordChatExporter, a .NET program written for someone else's
 needs): no second runtime in the image, no process to start, no files that Dindon does not use.
 
 What makes it cheap, for what Dindon does with an export:

@@ -1,4 +1,4 @@
-"""Checking ONE claim against the Internet (docs/DEBAT.md, « Vérification sur Internet »).
+"""Checking ONE claim against the Internet (docs/regles-du-bot.md, « Vérification sur Internet »).
 
 The path of a claim, with what each step is allowed to do:
 

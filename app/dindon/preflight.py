@@ -224,7 +224,7 @@ def check_runtime(settings: Settings, conn: psycopg.Connection) -> list[Check]:
 
 
 def check_debates(settings: Settings) -> list[Check]:
-    """The checking of claims in the debates (docs/DEBAT.md): what is configured, whether the local model is there, and whether the public corrections are really allowed. Read only: the
+    """The checking of claims in the debates (docs/regles-du-bot.md): what is configured, whether the local model is there, and whether the public corrections are really allowed. Read only: the
     only thing asked is the list of the local model's models, on this machine."""
     area = "Débats"
     if settings.debate_checks == "off":

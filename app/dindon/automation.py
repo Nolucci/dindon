@@ -6,7 +6,7 @@
 * `vectors`: the new messages become conversations, and the conversations get their vector (the first stages; they do not look at people).
 * `themes`: the topics are searched again once enough conversations are not in any (a search replaces the proposals that nobody touched).
 * `positions`: what each person claims is read in the conversations not read yet (the most important first), then linked to the axes. **This looks at
-  what people think**: it cannot be switched on without saying that the people are informed (`positions_acknowledged`, docs/CONFORMITE.md), and it never
+  what people think**: it cannot be switched on without saying that the people are informed (`positions_acknowledged`, docs/regles-du-bot.md), and it never
   reads the messages of a person who asked to stop being recorded.
 
 A cycle goes through the servers one after the other, only does what there is to do, and does nothing when an analysis is already running (started by a

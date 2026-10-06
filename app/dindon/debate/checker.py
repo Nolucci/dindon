@@ -1,4 +1,4 @@
-"""What checks the claims of a message, from the reading of the message to the verdicts (docs/DEBAT.md, « Vérification sur Internet »). Synchronous: the engine runs it in a thread.
+"""What checks the claims of a message, from the reading of the message to the verdicts (docs/regles-du-bot.md, « Vérification sur Internet »). Synchronous: the engine runs it in a thread.
 
 `Checker.check(text)` takes **the text of a message and nothing else** and returns the results for the claims found in it. Each claim gets a `Lookup` of its own, so that what one claim
 found is not available to the next and the budget (2 queries, 3 pages) is per claim.

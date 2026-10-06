@@ -1,4 +1,4 @@
-"""The checking of claims inside the bot (docs/DEBAT.md, step D4b): the queue of messages to read, what is kept, what is cleaned, what the members are told, and that nothing is published.
+"""The checking of claims inside the bot (docs/regles-du-bot.md, step D4b): the queue of messages to read, what is kept, what is cleaned, what the members are told, and that nothing is published.
 
 Level of proof: SIMULATED. Real PostgreSQL, the real engine and ingestion; the Discord is the fake of test_debate_bot.py; the checker (what reads the message and checks on the Internet) is a script
 here, tested for itself in test_debate_verify.py. Nothing talks to the Internet or to a model.

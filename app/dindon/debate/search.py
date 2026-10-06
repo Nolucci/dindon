@@ -1,4 +1,4 @@
-"""Searching the web for the verification of a claim (docs/DEBAT.md). Two services behind one shape, so that one can be changed without touching the rest:
+"""Searching the web for the verification of a claim (docs/regles-du-bot.md). Two services behind one shape, so that one can be changed without touching the rest:
 
 * `FactCheckSearch`: Google's Fact Check Tools API, which finds **fact-checks that press desks already published** for a claim (a rating, the desk, the link). Needs an API key
   (`DINDON_FACTCHECK_API_KEY`).
@@ -11,7 +11,7 @@ as soon as this is switched on.
 
 Nothing here logs a query, an address or a key. An error says what kind it is and the HTTP status, nothing else.
 
-The shape of the answers is that of the services' documentation; it has not been checked against the real services (docs/DEBAT.md).
+The shape of the answers is that of the services' documentation; it has not been checked against the real services (docs/regles-du-bot.md).
 """
 from __future__ import annotations
 

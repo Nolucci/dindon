@@ -1,4 +1,4 @@
-"""The state of the debates in the database: opening, positions, messages, the end. See docs/DEBAT.md.
+"""The state of the debates in the database: opening, positions, messages, the end. See docs/regles-du-bot.md.
 
 Everything here takes the time as an argument (`now`), so that a test can make a debate last a week in a millisecond; the engine passes the real clock. No function talks to Discord: they answer
 what the database says, and the engine does what has to be done on Discord.

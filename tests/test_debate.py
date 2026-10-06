@@ -1,4 +1,4 @@
-"""The debates (docs/DEBAT.md), step D1: the rules, the state kept in the database, the end (button or silence, never a timer), and what the privacy rights do to it.
+"""The debates (docs/regles-du-bot.md), step D1: the rules, the state kept in the database, the end (button or silence, never a timer), and what the privacy rights do to it.
 
 Level of proof: SIMULATED. A real PostgreSQL, invented people, and a clock that the tests move by hand (a silence of a week lasts a millisecond).
 Nothing here talks to Discord or to an AI: those come in the next steps.

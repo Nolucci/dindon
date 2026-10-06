@@ -1,4 +1,4 @@
-"""The public corrections (docs/DEBAT.md « Corrections publiques », step D5): what Dindon says when trusted sources contradict a claim, what it never says, and how it takes it back.
+"""The public corrections (docs/regles-du-bot.md « Corrections publiques », step D5): what Dindon says when trusted sources contradict a claim, what it never says, and how it takes it back.
 
 Level of proof: SIMULATED, like test_debate_checks.py: the real engine, ingestion and database, a fake Discord in memory, a script for the checker. Nothing has been posted on a real Discord.
 """

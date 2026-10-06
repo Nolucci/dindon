@@ -119,7 +119,7 @@ def test_the_verdict_follows_what_blocks(settings):
     assert "OUI" in render(check_configuration(dataclasses.replace(settings, database_url=STRONG_DATABASE)))
 
 
-# --- the debates (docs/DEBAT.md) ---------------------------------------------------------------------------------------------------------------
+# --- the debates (docs/regles-du-bot.md) ---------------------------------------------------------------------------------------------------------------
 
 
 @pytest.fixture

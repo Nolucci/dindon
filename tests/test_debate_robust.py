@@ -1,4 +1,4 @@
-"""The debates when things change under them (docs/DEBAT.md, step D3): messages deleted or edited, the bot's own messages deleted by a moderator, a thread or a channel deleted,
+"""The debates when things change under them (docs/regles-du-bot.md, step D3): messages deleted or edited, the bot's own messages deleted by a moderator, a thread or a channel deleted,
 and what was written while the bot could not hear (it was stopped, or Discord started a new Gateway session).
 
 Level of proof: SIMULATED, like test_debate_bot.py (real PostgreSQL and engine, a fake Discord in memory, a clock moved by hand). The events are shaped like Discord's

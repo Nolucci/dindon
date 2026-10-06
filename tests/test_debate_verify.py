@@ -1,4 +1,4 @@
-"""Reading a message for claims and checking a claim on the Internet (docs/DEBAT.md, « Vérification sur Internet »), without a database.
+"""Reading a message for claims and checking a claim on the Internet (docs/regles-du-bot.md, « Vérification sur Internet »), without a database.
 
 Level of proof: SIMULATED. The local model is a script that says what each test needs it to say (including what a bad or fooled model would say), the search services and the pages are in
 memory, nothing is sent anywhere. What these tests show is what the CODE does with whatever a model says: they cannot show that a real model reads well. That is measured separately (D4c).

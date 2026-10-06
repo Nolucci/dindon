@@ -35,7 +35,7 @@ KEY = "discord_map"
 KINDS = ("reply", "mention", "reaction")
 PERIODS = {"7": ("7 derniers jours", 7), "30": ("30 derniers jours", 30), "90": ("90 derniers jours", 90), "all": ("Depuis le début", None)}
 # What the card of a person shows (Activity). `roles` and `axes` are readings of what people say of themselves or think: like the automatic reading of the positions, they need
-# the admin to confirm that the people are informed (`acknowledged`, docs/CONFORMITE.md), else they are never shown.
+# the admin to confirm that the people are informed (`acknowledged`, docs/regles-du-bot.md), else they are never shown.
 SECTIONS = ("activity", "months", "habits", "links", "roles", "axes")
 SENSITIVE = ("roles", "axes")
 MIN_SCORE = 0.3          # an axis is shown when the person stands at least this far from the middle (as on the card of /dindon card)

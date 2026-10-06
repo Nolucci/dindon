@@ -178,7 +178,7 @@ def _cmd_forget_server(settings, args) -> int:
 
 
 def _cmd_debate_report(settings, args) -> int:
-    """What the claims of the debates came to, for the owner to read (docs/DEBAT.md): each claim with its verdict and its sources, and the parity table by position."""
+    """What the claims of the debates came to, for the owner to read (docs/regles-du-bot.md): each claim with its verdict and its sources, and the parity table by position."""
     from dindon.debate import claims, store
 
     with connect(settings.database_url) as conn:
@@ -216,7 +216,7 @@ def _build_parser() -> argparse.ArgumentParser:
                           help="only the messages that mention this person, by Discord id (can be repeated). A partial import")
     backfill.add_argument("--after", metavar="YYYY-MM-DD", help="only from this day (included). A partial import")
     backfill.add_argument("--before", metavar="YYYY-MM-DD", help="only up to this day (included). A partial import")
-    analyze = sub.add_parser("analyze", help="the analysis: conversations, vectors, topics to validate (needs Ollama, see docs/ANALYSE.md)")
+    analyze = sub.add_parser("analyze", help="the analysis: conversations, vectors, topics to validate (needs Ollama, see docs/fonctionnement.md)")
     analyze.add_argument("--guild", type=int, help="server ID (default: the first of DINDON_GUILD_IDS, else the most recently imported)")
     analyze.add_argument("--stage", action="append", dest="stages", choices=["conversations", "embeddings", "themes", "claims", "axes"],
                          help="only this stage (can be repeated; default: all, in order). A stage never redoes what is done")
@@ -232,13 +232,13 @@ def _build_parser() -> argparse.ArgumentParser:
     export.add_argument("--reactions", choices=["all", "recent", "none"], help="who reacted: all, only the recent messages, none (default: DINDON_EXPORT_REACTIONS)")
     export.add_argument("--partition", type=int, help="messages per file")
     export.add_argument("--filter", help="people who wrote and who are mentioned, e.g. \"(from:1 | from:2) (mentions:3)\"")
-    rights = sub.add_parser("privacy", help="the rights of the people recorded: stop recording one, erase one, give them their data (docs/CONFORMITE.md)")
+    rights = sub.add_parser("privacy", help="the rights of the people recorded: stop recording one, erase one, give them their data (docs/regles-du-bot.md)")
     rights.add_argument("action", choices=["list", "stop", "erase", "release", "export", "purge"],
                         help="stop: no longer record the person; erase: stop AND delete everything of them; release: record again; "
                              "export: print what is held of them (JSON); purge: delete what is older than DINDON_RETENTION_DAYS")
     rights.add_argument("user_id", nargs="?", type=int, help="Discord id of the person")
     rights.add_argument("--reason", default="", help="why (kept in the register; do not put anything personal)")
-    report = sub.add_parser("debate-report", help="what the claims of the debates came to: each claim, its verdict and its sources, and the parity table by position (docs/DEBAT.md)")
+    report = sub.add_parser("debate-report", help="what the claims of the debates came to: each claim, its verdict and its sources, and the parity table by position (docs/regles-du-bot.md)")
     report.add_argument("--debate", type=int, help="one debate (default: the last 20)")
     forget = sub.add_parser("forget-server", help="delete everything held of one server (messages, members, links, scores, files). Cannot be undone")
     forget.add_argument("guild_id", type=int, help="Discord id of the server")

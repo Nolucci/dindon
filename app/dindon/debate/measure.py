@@ -1,4 +1,4 @@
-"""Measuring how well the checking of claims works, against a reference set (tools/claims_reference.json, docs/DEBAT.md « Mesure »).
+"""Measuring how well the checking of claims works, against a reference set (tools/claims_reference.json, docs/regles-du-bot.md « Mesure »).
 
 Two stages are measured apart, because they fail in different ways:
 
@@ -8,7 +8,7 @@ Two stages are measured apart, because they fail in different ways:
   of the claims that it declares contradicted, how many really are. Declaring false what is true is the worst thing it can do, so it is counted on its own (`false_accusations`), and so is the
   precision **side by side** on the mirrored pairs: the same standard for every camp means the same results whatever the camp.
 
-`ready_for_live` says whether the figures allow public corrections, by the thresholds of the owner (docs/DEBAT.md). It never says that Dindon is right: only how often it was right on this reference set,
+`ready_for_live` says whether the figures allow public corrections, by the thresholds of the owner (docs/regles-du-bot.md). It never says that Dindon is right: only how often it was right on this reference set,
 whose labels are the work of one person (to be verified).
 """
 from __future__ import annotations

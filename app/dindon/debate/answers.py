@@ -1,4 +1,4 @@
-"""Dindon's first answers, without the Internet, and what the participants say of them (docs/DEBAT.md, « Répondre d'abord, chercher ensuite »).
+"""Dindon's first answers, without the Internet, and what the participants say of them (docs/regles-du-bot.md, « Répondre d'abord, chercher ensuite »).
 
 * A claim that Dindon is **certain** is false gets an answer under the message (`debate_answers`, written with the reading, see claims.finish_reading). The answer comes from the local model
   alone, has **no source**, and says so. A claim that it is certain is true is noted and nothing is said. A claim that it is not sure of goes on the Internet, as before.

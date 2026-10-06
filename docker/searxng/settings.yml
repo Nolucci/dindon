@@ -1,4 +1,4 @@
-# SearXNG for Dindon's debates (docs/DEBAT.md): a private search service on the Docker network, reached by the bot at http://searxng:8080 and by nobody else
+# SearXNG for Dindon's debates (docs/regles-du-bot.md): a private search service on the Docker network, reached by the bot at http://searxng:8080 and by nobody else
 # (no port is published). NOT TESTED: this file was written from SearXNG's documentation and never run. If the bot says that the search service refused or did not answer
 # JSON, look at `docker compose logs searxng` first.
 use_default_settings: true

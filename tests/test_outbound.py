@@ -1,4 +1,4 @@
-"""Where Dindon's code can reach out of the machine. The rule (docs/DEBAT.md): **nothing leaves except what is posted on the Discord server where the bot is connected,
+"""Where Dindon's code can reach out of the machine. The rule (docs/regles-du-bot.md): **nothing leaves except what is posted on the Discord server where the bot is connected,
 and, to check what a person says, a short neutral search sentence and the reading of the pages that the search returned.**
 
 This test reads the source (it runs nothing) and lists every module that can open a network connection or run a program. The list must be exactly the one below, each with

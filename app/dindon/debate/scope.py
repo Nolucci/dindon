@@ -1,4 +1,4 @@
-"""What Dindon may do on the Internet for ONE claim, and nothing more (docs/DEBAT.md, « Vérification sur Internet »).
+"""What Dindon may do on the Internet for ONE claim, and nothing more (docs/regles-du-bot.md, « Vérification sur Internet »).
 
 The rule given by the owner: the AI goes out on the Internet **only to check what a person says, without looking further**. This module is where that rule is enforced by the
 shape of the code instead of being promised in a text. Whatever reads the claim (the model, the code around it) reaches the Internet only through a `Lookup`, and a `Lookup`:

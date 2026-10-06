@@ -1,4 +1,4 @@
-"""The rules of a debate, with no database and no Discord: its limits and its vocabulary. See docs/DEBAT.md.
+"""The rules of a debate, with no database and no Discord: its limits and its vocabulary. See docs/regles-du-bot.md.
 
 A debate has **no time limit**. It is opened from a popup where the person chooses its parameters, people take a position with a button (for / not sure / against) and write, and it ends when
 somebody who may (the person who opened it, or a moderator) presses « Terminer », or by itself after a silence that the person chose in the popup.

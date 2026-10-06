@@ -1,5 +1,5 @@
 """The debates, for the person in charge (everything needs the session cookie): the list, and for each debate its statistics and, when the claims were checked, each claim with its verdict,
-its exact quotations and its links (docs/DEBAT.md). Read only. People who asked not to be recorded are in none of it. The names come from the people table: this is the owner's interface,
+its exact quotations and its links (docs/regles-du-bot.md). Read only. People who asked not to be recorded are in none of it. The names come from the people table: this is the owner's interface,
 not Discord."""
 from fastapi import APIRouter, Depends, HTTPException, Request
 

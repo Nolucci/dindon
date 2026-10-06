@@ -1,6 +1,6 @@
-"""The measure of the checking of claims (docs/DEBAT.md « Mesure »): the reference set is well formed, and the figures are computed as they say.
+"""The measure of the checking of claims (docs/regles-du-bot.md « Mesure »): the reference set is well formed, and the figures are computed as they say.
 
-Level of proof: SIMULATED (invented predictions). What these tests show is that the calculation is right; the figures of the real model are in docs/DEBAT.md, from a run of tools/measure_claims.py.
+Level of proof: SIMULATED (invented predictions). What these tests show is that the calculation is right; the figures of the real model are in docs/regles-du-bot.md, from a run of tools/measure_claims.py.
 """
 import json
 from pathlib import Path

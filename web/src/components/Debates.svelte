@@ -64,7 +64,7 @@
     <section class="panel card" aria-label="État de la vérification">
       <h2 class="eyebrow">Vérification des affirmations</h2>
       {#if overview.checks.mode === 'off'}
-        <p class="muted">Désactivée : rien n’est lu et rien ne sort de la machine. Pour l’activer, voir « Comment l’activer » dans <code>docs/DEBAT.md</code>.</p>
+        <p class="muted">Désactivée : rien n’est lu et rien ne sort de la machine. Pour l’activer, voir « Comment l’activer » dans <code>docs/regles-du-bot.md</code>.</p>
       {:else}
         <p>
           Mode <strong>{overview.checks.mode === 'live' ? 'Dindon répond, et les sources corrigent' : overview.checks.mode === 'answer' ? 'Dindon répond d’abord, sans Internet' : 'observation (rien n’est publié)'}</strong>

@@ -1,4 +1,4 @@
-"""Reading ONE message for the claims that can be checked, blind (docs/DEBAT.md, « Vérification sur Internet »).
+"""Reading ONE message for the claims that can be checked, blind (docs/regles-du-bot.md, « Vérification sur Internet »).
 
 **Blind** is the point. The model that reads a message is given the text of that message and nothing else: not who wrote it, not the position that person took, not the subject or the
 camps of the debate, not the other messages. It cannot lean towards anyone, because it does not know who anybody is. What the message contains of Discord (mentions, channels, custom

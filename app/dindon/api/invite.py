@@ -13,7 +13,7 @@ from dindon.collector.discord_api import DiscordAPI, DiscordError, RateLimited
 
 router = APIRouter(prefix="/api/bot", dependencies=[Depends(require_session)])
 
-# What the bot needs, and no more. To record: see the channels and read their history. For the debates (`/dindon debat`, docs/DEBAT.md): open a public thread,
+# What the bot needs, and no more. To record: see the channels and read their history. For the debates (`/dindon debat`, docs/regles-du-bot.md): open a public thread,
 # write in channels and in threads, and show embeds. It moderates and manages nothing, and does not mention anyone (every message it writes forbids mentions).
 # (The Gateway intents, the privileged one for the content of messages included, are set in the Developer Portal, not here.)
 PERMISSIONS = {"VIEW_CHANNEL": 1 << 10, "SEND_MESSAGES": 1 << 11, "EMBED_LINKS": 1 << 14, "READ_MESSAGE_HISTORY": 1 << 16,

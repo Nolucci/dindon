@@ -1,7 +1,7 @@
 """The first stages of the analysis: conversations, triage, vectors, topics.
 
 Level of proof: SIMULATED. The models are a fake Ollama (tools/fake_ollama.py: words hashed into vectors, names made from keywords), the
-messages are invented. What a real model makes of real conversations is measured elsewhere (docs/MESURES.md), never here.
+messages are invented. What a real model makes of real conversations is measured elsewhere (docs/fonctionnement.md), never here.
 """
 from datetime import datetime, timedelta, timezone, UTC
 

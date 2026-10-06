@@ -1,6 +1,6 @@
 """How close are the links that the AI proposed to the links that a person judged right? On the propositions that a person reviewed.
 
-    DATABASE_URL=… .venv/bin/python tools/score_axes_reference.py political/axes-reference.json [--report political/RAPPORT-AXES-PROPOSITIONS.md]
+    DATABASE_URL=… .venv/bin/python tools/score_axes_reference.py political/axes-reference.json [--report political/RAPPORT-AXES-PROPOSITIONS.txt]
     DATABASE_URL=… .venv/bin/python tools/score_axes_reference.py reference.json --answers answers.jsonl      # the answers of the model that a run kept, not the database
 
 With `--answers`, what the model said is read from a file (one JSON per line: {"sentence": …, "answer": …}) instead of the links of the database: a link that coincides

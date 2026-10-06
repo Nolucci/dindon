@@ -1,4 +1,4 @@
-"""The Activity: the map inside a Discord voice channel (docs/ACTIVITE.md). The page is `activity.html`, opened by Discord in an iframe.
+"""The Activity: the map inside a Discord voice channel (docs/fonctionnement.md). The page is `activity.html`, opened by Discord in an iframe.
 
 The one part of the API that is not behind the password of the interface, so it is kept as small as it can be:
 

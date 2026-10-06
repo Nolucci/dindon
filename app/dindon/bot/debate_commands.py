@@ -1,4 +1,4 @@
-"""The debates on Discord: `/dindon debat sujet`, its popup, the buttons, the end. The rules and the state are in `dindon/debate/`; this module does what they decide, on Discord. See docs/DEBAT.md.
+"""The debates on Discord: `/dindon debat sujet`, its popup, the buttons, the end. The rules and the state are in `dindon/debate/`; this module does what they decide, on Discord. See docs/regles-du-bot.md.
 
 * `/dindon debat sujet` creates **nothing**: the person gets a popup (a Discord modal) where they choose the parameters: the subject and its context, a thread or the channel itself, whether the
   claims are checked, and the silence after which the debate ends by itself. When they send it the debate is written (refused here if a limit says so), its place is made (a **public thread**

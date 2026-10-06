@@ -27,6 +27,6 @@ def read(request: Request) -> dict:
 def write(request: Request, body: Body) -> dict:
     """Saves the settings. The sections that read the people (roles, axes) are refused without the confirmation that the people are informed (it would be dropped silently otherwise)."""
     if not body.acknowledged and set(body.sections) & set(discord_map.SENSITIVE):
-        raise HTTPException(status_code=422, detail="Pour montrer les rôles ou les positions, confirmez que les personnes sont informées (docs/CONFORMITE.md).")
+        raise HTTPException(status_code=422, detail="Pour montrer les rôles ou les positions, confirmez que les personnes sont informées (docs/regles-du-bot.md).")
     with request.app.state.pool.connection() as conn:
         return discord_map.save(conn, body.model_dump())

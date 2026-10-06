@@ -1,4 +1,4 @@
-"""The limit on what Dindon does on the Internet for one claim (docs/DEBAT.md): two queries, three pages, only pages that the search returned, nothing for an empty query.
+"""The limit on what Dindon does on the Internet for one claim (docs/regles-du-bot.md): two queries, three pages, only pages that the search returned, nothing for an empty query.
 
 Level of proof: SIMULATED. In-memory search services and fetcher: nothing is sent anywhere.
 """

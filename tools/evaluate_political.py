@@ -1,8 +1,8 @@
 """What the AI made of the invented political server, against its ground truth (political/truth.json).
 
-    DATABASE_URL=…/dindon_politique .venv/bin/python tools/evaluate_political.py [--report political/RAPPORT.md]
+    DATABASE_URL=…/dindon_politique .venv/bin/python tools/evaluate_political.py [--report political/RAPPORT.txt]
 
-Today the AI stages that exist are the conversations, their vectors and the topics (docs/ANALYSE.md). This measures THAT: do the
+Today the AI stages that exist are the conversations, their vectors and the topics (docs/fonctionnement.txt). This measures THAT: do the
 conversations that talk about the same subject end up in the same topic, and what did the model call each topic? The extraction of what
 each person claims does not exist yet: when it does, its output is to be compared with `stance_told` of truth.json the same way.
 

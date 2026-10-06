@@ -93,7 +93,7 @@
     <h1>Vie privée</h1>
     <p class="subtitle">
       Les personnes qui ont demandé à ne plus être enregistrées, et ce que vous pouvez faire pour elles. Une personne s’arrête et s’efface seule depuis Discord avec
-      <code>/dindon stop</code> ; ici vous traitez une demande reçue autrement. Le cadre (ce que cela couvre et ne couvre pas) est dans <code>docs/CONFORMITE.md</code>.
+      <code>/dindon stop</code> ; ici vous traitez une demande reçue autrement. Le cadre (ce que cela couvre et ne couvre pas) est dans <code>docs/regles-du-bot.md</code>.
     </p>
   </header>
 

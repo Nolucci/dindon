@@ -6,7 +6,7 @@
 * **other**: anything else. It can be shown as context (« à vérifier »), but alone it is never enough to say that a claim is false.
 
 An entry is a host (`insee.fr`: the host and its subdomains) or a host and a path (`lemonde.fr/les-decodeurs`: only that part of the site: a newspaper is not
-a checker as a whole). The lists are a **starting point for the owner to read and change** (docs/DEBAT.md), not a judgement on anyone.
+a checker as a whole). The lists are a **starting point for the owner to read and change** (docs/regles-du-bot.md), not a judgement on anyone.
 """
 from __future__ import annotations
 

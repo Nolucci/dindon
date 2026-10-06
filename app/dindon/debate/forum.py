@@ -1,4 +1,4 @@
-"""The forum where the debates of a server are created, when there is one (docs/DEBAT.md, « Un forum pour les débats »).
+"""The forum where the debates of a server are created, when there is one (docs/regles-du-bot.md, « Un forum pour les débats »).
 
 Many servers keep their debates in a **forum channel** (Discord's type 15): every debate is a *post* with labels (« étiquettes », Discord's *tags*: Économie, Religion…). A moderator tells Dindon
 once, with `/dindon forum`, which forum it is; from then on a debate that is opened in a thread is created there, as a post, instead of a thread under the channel where the command was

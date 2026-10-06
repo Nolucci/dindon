@@ -1,4 +1,4 @@
-"""The statistics of a debate (docs/DEBAT.md « Statistiques de fin », step D6): what is counted, the message picked out for each person, the pages, the buttons that turn them, and the closing
+"""The statistics of a debate (docs/regles-du-bot.md « Statistiques de fin », step D6): what is counted, the message picked out for each person, the pages, the buttons that turn them, and the closing
 message that waits for what is still being read.
 
 Level of proof: SIMULATED: real PostgreSQL, real engine and ingestion, fake Discord, a script for the checker. Nothing has been posted on a real Discord.

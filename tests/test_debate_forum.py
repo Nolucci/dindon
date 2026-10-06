@@ -1,4 +1,4 @@
-"""The forum of the debates (docs/DEBAT.md, « Un forum pour les débats »): a moderator tells Dindon which forum channel of the server holds the debates, and a debate opened in a thread is then
+"""The forum of the debates (docs/regles-du-bot.md, « Un forum pour les débats »): a moderator tells Dindon which forum channel of the server holds the debates, and a debate opened in a thread is then
 created there, as a post with labels, instead of a thread under the channel where the command was used.
 
 Level of proof: SIMULATED, like test_debate_bot.py: the forum is a fake in memory built from Discord's documentation (https://docs.discord.com/developers/resources/channel: starting a thread in

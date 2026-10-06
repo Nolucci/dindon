@@ -1,4 +1,4 @@
-"""Writes a JSON v2 document to a file, laid out as the contract wants it: every user, role, emoji and message on its own line (contracts/JSON-format.md).
+"""Writes a JSON v2 document to a file, laid out as the contract wants it: every user, role, emoji and message on its own line (docs/import-des-donnees.md).
 
 The file is written to a temporary name and renamed at the end: a reader of the folder never sees a file that is half written.
 """

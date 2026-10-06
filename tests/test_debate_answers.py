@@ -1,8 +1,8 @@
-"""Dindon answers first, without the Internet, and the participants judge its answer (docs/DEBAT.md, « Répondre d'abord, chercher ensuite »): the answer under the message, Valide and Invalide,
+"""Dindon answers first, without the Internet, and the participants judge its answer (docs/regles-du-bot.md, « Répondre d'abord, chercher ensuite »): the answer under the message, Valide and Invalide,
 the search on the Internet only where there is more Invalide, and the message corrected with what was found.
 
 Level of proof: SIMULATED. Real PostgreSQL and engine, a fake Discord, and a script for the checker (what the local model answers, what the search finds). Nothing here shows that a real model
-knows what it says: that is measured (docs/DEBAT.md « Mesure »). Nothing has been posted on a real Discord.
+knows what it says: that is measured (docs/regles-du-bot.md « Mesure »). Nothing has been posted on a real Discord.
 """
 import dataclasses
 import json

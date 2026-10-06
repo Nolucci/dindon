@@ -1,4 +1,4 @@
-"""The statistics of a debate (docs/DEBAT.md « Statistiques de fin »): who took part, what positions, how many messages, the message of each that Dindon picks out, and what was checked.
+"""The statistics of a debate (docs/regles-du-bot.md « Statistiques de fin »): who took part, what positions, how many messages, the message of each that Dindon picks out, and what was checked.
 
 Everything is computed from the database **each time it is asked** (when the closing message is posted, at every click on its page buttons, by the interface): a message that was deleted since, a
 person who erased themselves or asked not to be recorded are simply not there. Nothing is stored that could outlive them.

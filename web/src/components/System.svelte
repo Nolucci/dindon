@@ -274,7 +274,7 @@
           <label class="check"><input type="checkbox" bind:checked={autoForm.themes} /> <span><strong>Thèmes</strong> : nouvelle recherche quand 25 conversations ne sont dans aucun thème. Remplace les propositions que personne n’a touchées.</span></label>
           <label class="check"><input type="checkbox" bind:checked={autoForm.positions} /> <span><strong>Positions des personnes</strong> : ce que chacun pense, avec citations, puis les axes et la cohérence des rôles. <em>Regarde les opinions des gens.</em></span></label>
           {#if autoForm.positions}
-            <label class="check ack"><input type="checkbox" bind:checked={autoForm.positions_acknowledged} aria-label="Les personnes sont informées" /> <span>Je confirme que les personnes de ce serveur <strong>sont informées</strong> et que le cadre juridique est validé (<code>docs/CONFORMITE.md</code>). Les messages d’une personne qui a demandé à ne plus être enregistrée ne sont jamais lus.</span></label>
+            <label class="check ack"><input type="checkbox" bind:checked={autoForm.positions_acknowledged} aria-label="Les personnes sont informées" /> <span>Je confirme que les personnes de ce serveur <strong>sont informées</strong> et que le cadre juridique est validé (<code>docs/regles-du-bot.md</code>). Les messages d’une personne qui a demandé à ne plus être enregistrée ne sont jamais lus.</span></label>
           {/if}
         </fieldset>
         <div class="knobs">
@@ -332,7 +332,7 @@
           <label class="check"><input type="checkbox" value="roles" bind:group={dmap.sections} /> <span><strong>Rôles</strong> que la personne s’est donnés. <em>Lecture de ce qu’elle dit d’elle-même.</em></span></label>
           <label class="check"><input type="checkbox" value="axes" bind:group={dmap.sections} /> <span><strong>Positions sur les axes</strong> (les 5 plus nettes, sans citation). <em>Lecture de l’IA : regarde les opinions des gens.</em></span></label>
           {#if dmapSensitive}
-            <label class="check ack"><input type="checkbox" bind:checked={dmap.acknowledged} aria-label="Les personnes sont informées" /> <span>Je confirme que les personnes de ce serveur <strong>sont informées</strong> et que le cadre juridique est validé (<code>docs/CONFORMITE.md</code>). Cette fiche est visible de tous ceux qui sont dans le salon vocal.</span></label>
+            <label class="check ack"><input type="checkbox" bind:checked={dmap.acknowledged} aria-label="Les personnes sont informées" /> <span>Je confirme que les personnes de ce serveur <strong>sont informées</strong> et que le cadre juridique est validé (<code>docs/regles-du-bot.md</code>). Cette fiche est visible de tous ceux qui sont dans le salon vocal.</span></label>
           {/if}
           <span class="muted small">Seules les personnes dont le nom est affiché sur la carte ont une fiche. Jamais un message, jamais un salon.</span>
         </fieldset>
