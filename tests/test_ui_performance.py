@@ -76,6 +76,32 @@ def test_the_person_limits_the_machine_from_the_page_systeme(base, ingest_db):
     assert errors == []
 
 
+def test_the_discord_map_names_follow_the_chosen_person_limit(base, ingest_db):
+    from dindon import discord_map
+
+    with sync_api.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
+        page = browser.new_page(viewport={"width": 1440, "height": 1200})
+        page.goto(base)
+        page.fill("#password", PASSWORD)
+        page.click("button[type=submit]")
+        page.wait_for_selector("nav", timeout=20000)
+        page.get_by_role("button", name="Système", exact=True).click()
+        panel = page.get_by_role("region", name="Carte sur Discord")
+        people = panel.get_by_role("slider", name="Personnes sur l’image")
+        names = panel.get_by_role("slider", name="Noms affichés")
+        people.fill("350")
+        expect(names).to_have_attribute("max", "350")
+        names.fill("350")
+        panel.get_by_role("button", name="Enregistrer").click()
+        panel.get_by_text("Enregistré.").wait_for()
+        assert discord_map.load(ingest_db)["max_people"] == discord_map.load(ingest_db)["names"] == 350
+        people.fill("120")
+        expect(names).to_have_value("120")
+        expect(names).to_have_attribute("max", "120")
+        browser.close()
+
+
 def test_the_person_switches_on_the_automatic_reading_and_the_positions_ask_for_an_acknowledgement(base, ingest_db):
     from dindon import automation
 

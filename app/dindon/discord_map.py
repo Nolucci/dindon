@@ -50,9 +50,10 @@ BACKGROUND, EDGE, FOCUS_RING, DEFAULT_NODE = (49, 51, 56), (181, 186, 193), (240
 def clean(values: dict) -> dict:
     out = dict(DEFAULT)
     out["enabled"] = bool(values.get("enabled", False))
-    for key, (low, high) in {"max_people": (5, 80), "names": (0, 40)}.items():
+    for key, (low, high) in {"max_people": (5, 350), "names": (0, 350)}.items():
         with contextlib.suppress(TypeError, ValueError):
             out[key] = min(max(int(values.get(key, DEFAULT[key])), low), high)
+    out["names"] = min(out["names"], out["max_people"])
     kinds = [k for k in KINDS if k in (values.get("kinds") or [])] if "kinds" in values else list(KINDS)
     out["kinds"] = kinds or list(KINDS)
     out["acknowledged"] = bool(values.get("acknowledged", False))

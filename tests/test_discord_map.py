@@ -105,7 +105,9 @@ def test_the_settings_limit_the_people_and_the_kinds(ingest_db, ingest_url, tmp_
     assert cfg["kinds"] == ["reaction"] and cfg["max_people"] == 5
     assert discord_map.collect(ingest_db, int(GUILD), 30, None, cfg) is None                      # nobody reacted: the replies and mentions are not shown
     cfg = discord_map.save(ingest_db, {"enabled": True, "max_people": 2000, "names": -4, "kinds": ["bogus"]})
-    assert cfg["max_people"] == 80 and cfg["names"] == 0 and cfg["kinds"] == list(discord_map.KINDS)
+    assert cfg["max_people"] == 350 and cfg["names"] == 0 and cfg["kinds"] == list(discord_map.KINDS)
+    cfg = discord_map.save(ingest_db, {"enabled": True, "max_people": 120, "names": 350})
+    assert cfg["max_people"] == cfg["names"] == 120
 
 
 def test_the_menu_draws_the_same_message_again(ingest_db, ingest_url, tmp_path):
@@ -130,6 +132,9 @@ def test_the_admin_sets_it_from_the_interface(ingest_url, tmp_path):
         assert web.get("/api/discord-map").json()["enabled"] is False
         saved = web.put("/api/discord-map", json={"enabled": True, "max_people": 20, "names": 5, "kinds": ["reply"]}).json()
         assert saved == {"enabled": True, "max_people": 20, "names": 5, "kinds": ["reply"], "sections": ["activity", "months", "habits", "links"], "acknowledged": False} == web.get("/api/discord-map").json()
+        many = web.put("/api/discord-map", json={"enabled": True, "max_people": 350, "names": 350})
+        assert many.status_code == 200 and many.json()["max_people"] == many.json()["names"] == 350
+        assert web.put("/api/discord-map", json={"max_people": 351}).status_code == 422
         assert web.put("/api/discord-map", json={"max_people": 1}).status_code == 422
         refused = web.put("/api/discord-map", json={"enabled": True, "sections": ["activity", "axes"]})                     # what reads the people needs the confirmation
         assert refused.status_code == 422 and "informées" in refused.json()["detail"]

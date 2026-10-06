@@ -10,8 +10,8 @@ router = APIRouter(prefix="/api/discord-map", dependencies=[Depends(require_sess
 
 class Body(BaseModel):
     enabled: bool = False
-    max_people: int = Field(default=40, ge=5, le=80)
-    names: int = Field(default=15, ge=0, le=40)
+    max_people: int = Field(default=40, ge=5, le=350)
+    names: int = Field(default=15, ge=0, le=350)
     kinds: list[str] = Field(default_factory=lambda: list(discord_map.KINDS))
     sections: list[str] = Field(default_factory=lambda: list(discord_map.DEFAULT["sections"]))     # what the card of a person shows in the Activity
     acknowledged: bool = False                                                                       # the people are informed: needed for the sections that read them

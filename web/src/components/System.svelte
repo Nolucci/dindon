@@ -73,6 +73,10 @@
     }
   }
 
+  function limitDmapNames(event) {
+    dmap.names = Math.min(Number(dmap.names), Number(event.currentTarget.value));
+  }
+
   async function runNow() {
     try {
       auto = await api.automationRun();
@@ -338,11 +342,11 @@
         </fieldset>
         <div class="knobs">
           <label class="knob"><span class="knobHead"><span>Personnes sur l’image</span><output>{dmap.max_people}</output></span>
-            <input type="range" min="5" max="80" step="1" bind:value={dmap.max_people} aria-label="Personnes sur l’image" />
+            <input type="range" min="5" max="350" step="1" bind:value={dmap.max_people} oninput={limitDmapNames} aria-label="Personnes sur l’image" />
             <span class="muted small">Les plus connectées. Quand quelqu’un est demandé : cette personne et ses liens les plus forts.</span>
           </label>
           <label class="knob"><span class="knobHead"><span>Noms affichés</span><output>{dmap.names}</output></span>
-            <input type="range" min="0" max="40" step="1" bind:value={dmap.names} aria-label="Noms affichés" />
+            <input type="range" min="0" max={dmap.max_people} step="1" bind:value={dmap.names} aria-label="Noms affichés" />
             <span class="muted small">Les plus connectées portent leur nom ; 0 : aucun nom (la personne demandée garde le sien).</span>
           </label>
         </div>
