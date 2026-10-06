@@ -78,6 +78,8 @@ let token = null;
 let guild = null;
 let map = null;
 let shown = null;          // the person whose card is open
+let focused = null;        // the person whose links and name the server is showing
+let loadNumber = 0;
 const nodeColors = new Map();   // person -> color of their name (ring of their picture)
 const KIND_NAMES = { reply: 'Réponses', mention: 'Mentions', reaction: 'Réactions' };
 let kinds = null;               // the kinds of exchange ticked (null: not known yet, the server sends them all that the admins allow)
@@ -153,9 +155,11 @@ function tile(value, label, note) {
 
 function closeCard() {
   shown = null;
+  focused = null;
   $('card').hidden = true;
   map.select(null);
   map.resized();
+  void load();
 }
 
 function openCard(card) {
@@ -225,7 +229,7 @@ function openCard(card) {
       const text = el('span', 'linkText');
       text.append(el('span', 'name', link.label), el('span', 'muted', `${fmt.format(link.n)} échanges`));
       button.append(portrait(link.id, link.label, nodeColors.get(link.id), 30), text);
-      button.onclick = () => { map.select(link.id); map.focus(link.id); showCard(link.id); };
+      button.onclick = () => { void choosePerson(link.id); };
       const bar = el('div', 'meter');
       bar.append(Object.assign(el('div'), { style: `width:${Math.max(6, (link.weight / strongest) * 100)}%` }));
       item.append(button, bar);
@@ -263,7 +267,7 @@ let pictures = new Map();   // person -> local address of their photo, or null
 let loader = null;
 
 // What the map asked for: the same words for the map and for a card, so that a card is read in the map that is on the screen
-const mapQuery = () => `guild=${guild}&period=${$('period').value}${kinds ? `&kinds=${[...kinds].join(',')}` : ''}`;
+const mapQuery = () => `guild=${guild}&period=${$('period').value}${kinds ? `&kinds=${[...kinds].join(',')}` : ''}${focused ? `&focus=${focused}` : ''}`;
 
 function drawKinds(allowed) {
   const box = $('kinds');
@@ -276,8 +280,7 @@ function drawKinds(allowed) {
     chip.onclick = () => {
       if (kinds.has(kind) && kinds.size === 1) return;       // at least one stays ticked
       kinds.has(kind) ? kinds.delete(kind) : kinds.add(kind);
-      load();
-      if (shown) showCard(shown);
+      void load().then((loaded) => { if (loaded && shown) showCard(shown); });
     };
     return chip;
   }));
@@ -304,9 +307,16 @@ function chooseFromSearch(person) {
   $('suggest').hidden = true;
   $('q').setAttribute('aria-expanded', 'false');
   $('q').value = '';
-  map.select(person.id);
-  map.focus(person.id);
-  showCard(person.id);
+  void choosePerson(person.id);
+}
+
+async function choosePerson(id) {
+  shown = id;
+  focused = id;
+  if (!await load() || shown !== id) return;
+  map.select(id);
+  map.focus(id);
+  await showCard(id);
 }
 
 function suggest() {
@@ -345,24 +355,28 @@ function searchKeys(event) {
 }
 
 async function load() {
+  const number = ++loadNumber;
   note('Chargement…');
   try {
     const data = await get(`/activity/map?${mapQuery()}`);
+    if (number !== loadNumber) return false;
     map.load(data);
     drawKinds(data.meta.kinds_allowed ?? []);
     people = data.nodes.filter((n) => n.label).sort((a, b) => b.influence - a.influence);
     for (const node of data.nodes) nodeColors.set(node.id, node.color || '#dbdee1');
     loader.show(data.nodes);
     note(data.nodes.length ? `${data.nodes.length} personnes, ${data.edges.length} liens` : 'Rien à montrer pour cette période.');
+    return true;
   } catch (error) {
-    note(error.message);
+    if (number === loadNumber) note(error.message);
+    return false;
   }
 }
 
 async function start() {
   for (const [value, label] of Object.entries(PERIODS)) $('period').add(new Option(label, value, false, value === '30'));
   map = new MapGraph($('canvas'), {
-    onSelect: (id) => (id ? showCard(id) : closeCard()),
+    onSelect: (id) => (id ? void choosePerson(id) : closeCard()),
     onHover: () => {},
     imageProgram,
   });
@@ -375,7 +389,7 @@ async function start() {
   document.addEventListener('keydown', (event) => {            // "/" goes to the search, as on the page of the interface
     if (event.key === '/' && !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) { event.preventDefault(); $('q').focus(); }
   });
-  $('period').onchange = () => { load(); if (shown) showCard(shown); };
+  $('period').onchange = () => { void load().then((loaded) => { if (loaded && shown) showCard(shown); }); };
 
   const { client_id: clientId } = await get('/activity/config');
   const sdk = new DiscordSDK(clientId);

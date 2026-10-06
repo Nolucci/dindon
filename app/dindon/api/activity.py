@@ -143,6 +143,8 @@ def activity_person(request: Request, user_id: int, guild: int, period: str = Qu
         data = discord_map.collect(conn, guild, discord_map.PERIODS[period][1], focus, cfg)
         card = discord_map.person(conn, guild, user_id, data, cfg) if data else None
     if card is None:
+        if data and user_id in discord_map.named(data, cfg):
+            raise HTTPException(status_code=404, detail="Aucun message importé pour cette personne sur ce serveur.")
         raise HTTPException(status_code=404, detail="Pas de fiche pour cette personne : les administrateurs n'affichent pas son nom, ou elle n'est pas enregistrée.")
     return card
 

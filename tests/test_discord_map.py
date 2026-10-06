@@ -251,6 +251,7 @@ def test_the_card_follows_the_names_that_the_admins_allow(ingest_db, ingest_url,
     talk(ingest_url)
     discord_map.save(ingest_db, {"enabled": True, "names": 0})
     assert member_card(activity_web, BOB_ID).status_code == 404                                                    # no names on the map: no card either
+    assert member_card(activity_web, BOB_ID, focus=str(BOB_ID)).status_code == 200                                   # choosing a point names that person
     discord_map.save(ingest_db, {"enabled": True, "names": 1})
     named = [n["id"] for n in member_map(activity_web).json()["nodes"] if n["label"]]
     assert len(named) == 1
