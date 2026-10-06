@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from dindon import privacy
 from dindon.analysis.conversations import build_conversations
-from dindon.analysis.extraction import PROMPT_VERSION, extract_claims, prepare, validate
+from dindon.analysis.extraction import MAX_CHARS, PROMPT_VERSION, extract_claims, prepare, prepare_windows, validate
 from dindon.analysis.ollama import Ollama, OllamaError
 from dindon.api.main import create_app
 from fake_ollama import FakeOllama
@@ -117,6 +117,17 @@ def test_a_conversation_that_was_read_is_not_read_again(ingest_db, client, ollam
     assert ingest_db.execute("SELECT count(*) FROM claims").fetchone() == (2,)
 
 
+def test_reanalysis_preserves_a_reviewed_claim_without_duplicating_it(ingest_db, client, ollama):
+    debate(ingest_db)
+    read(ingest_db, client, ollama, GOOD)
+    ingest_db.execute("UPDATE claims SET review_status = 'confirmed' WHERE user_id = %s", (ALICE_ID,))
+    ingest_db.execute("DELETE FROM claims WHERE review_status = 'auto'")
+    ingest_db.execute("DELETE FROM conversation_extractions")
+    result = read(ingest_db, client, ollama, GOOD)
+    assert result["claims"] == 1
+    assert ingest_db.execute("SELECT count(*) FROM claims").fetchone() == (2,)
+
+
 def test_a_conversation_with_nothing_in_it_is_recorded_so_that_it_is_not_read_again(ingest_db, client, ollama):
     debate(ingest_db)
     result = read(ingest_db, client, ollama, [])
@@ -170,6 +181,55 @@ def test_validate_works_on_the_text_that_the_model_was_given():
     assert r.text == "#1 P1: Je suis pour la hausse\n#2 P2: moi contre la hausse" and r.people == {"P1": 10, "P2": 20}
     kept, refused = validate({"claims": [claim(evidence=((1, "Je suis pour la hausse"),)), "pas un objet", {"participant": "P1"}]}, r)
     assert len(kept) == 1 and refused == 2
+
+
+def test_long_messages_are_sent_in_bounded_windows_with_their_source_refs():
+    end = "il faut augmenter le salaire minimum pour tous"
+    rows = [(1, 10, "début " + "mot " * 1800 + end, None), (2, 20, SAYS_B, None)]
+    windows = prepare_windows(rows)
+    assert len(windows) > 1 and all(len(window.text) <= MAX_CHARS for window in windows)
+    assert "début" in windows[0].text and end in windows[-1].text
+    assert windows[-1].message_ids[1] == 1 and windows[-1].message_ids[2] == 2
+
+
+def test_the_last_window_can_produce_a_claim(ingest_db, client, ollama):
+    talk = Talk()
+    ending = "il faut augmenter le salaire minimum pour tout le monde"
+    messages = [talk.say("mot " * 400) for _ in range(4)]
+    source = talk.say("mot " * 350 + ending)
+    ingest(ingest_db, [*messages, source, talk.say(SAYS_B, BOB)])
+    build_conversations(ingest_db, GUILD_ID, now=NOW)
+
+    def respond(body):
+        content = body["messages"][-1]["content"]
+        return {"claims": [claim(evidence=((5, ending),))]} if ending in content else {"claims": []}
+
+    ollama.chat_handler = respond
+    result = extract_claims(ingest_db, client, "qwen3:14b", "bge-m3", GUILD_ID)
+    assert result["done"] == 1 and result["claims"] == 1
+    assert len([r for r in ollama.requests if r[0] == "/api/chat"]) > 1
+    assert ingest_db.execute("SELECT message_id FROM claim_evidence").fetchone() == (int(source["id"]),)
+
+
+def test_a_failed_later_window_leaves_the_whole_conversation_to_retry(ingest_db, client, monkeypatch):
+    talk = Talk()
+    ingest(ingest_db, [talk.say("mot " * 400) for _ in range(5)])
+    build_conversations(ingest_db, GUILD_ID, now=NOW)
+    calls = 0
+
+    def fail_later(*args):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OllamaError("second window failed")
+        return {"claims": []}
+
+    monkeypatch.setattr(client, "chat_json", fail_later)
+    result = extract_claims(ingest_db, client, "qwen3:14b", "bge-m3", GUILD_ID)
+    assert result["failed"] == 1 and result["done"] == 0
+    assert ingest_db.execute("SELECT count(*) FROM conversation_extractions").fetchone() == (0,)
+    monkeypatch.setattr(client, "chat_json", lambda *args: {"claims": []})
+    assert extract_claims(ingest_db, client, "qwen3:14b", "bge-m3", GUILD_ID)["done"] == 1
 
 
 def test_a_conversation_alone_is_not_read(ingest_db, client, ollama):

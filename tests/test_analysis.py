@@ -156,6 +156,19 @@ def test_the_vectors_are_made_once_without_the_names_of_the_people(ingest_db, cl
     assert ingest_db.execute("SELECT count(*) FROM conversation_embeddings WHERE model = 'bge-m3'").fetchone()[0] == 1
 
 
+def test_a_long_conversations_vector_includes_its_end(ingest_db, client, ollama):
+    talk = Talk()
+    ending = "une proposition écologique singulière à la fin"
+    ingest(ingest_db, [talk.say("argument " * 170), talk.say("argument " * 170, BOB), talk.say("argument " * 170),
+                       talk.say("argument " * 160 + ending, BOB)])
+    build_conversations(ingest_db, GUILD_ID, now=NOW)
+    assert embed_conversations(ingest_db, client, "bge-m3", GUILD_ID)["done"] == 1
+    requests = [body for path, body in ollama.requests if path == "/api/embed"]
+    pieces = [piece for body in requests for piece in body["input"]]
+    assert len(pieces) > 1 and all(len(piece) <= 6000 for piece in pieces)
+    assert ending in pieces[-1] and requests[0]["truncate"] is False
+
+
 def test_only_the_kept_conversations_get_a_vector(ingest_db, client):
     talk = Talk()
     ingest(ingest_db, [talk.say("mdr"), talk.say("oui", BOB), talk.say(SAYS, after_minutes=60), talk.say(SAYS, BOB)])
@@ -310,4 +323,3 @@ def test_a_model_of_the_wrong_size_is_told_with_what_to_do(ingest_db, ollama):
 
     with pytest.raises(OllamaError, match="1024"):
         embed_conversations(ingest_db, Short(ollama.url), "small-model", GUILD_ID)
-

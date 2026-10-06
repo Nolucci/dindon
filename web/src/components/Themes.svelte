@@ -208,7 +208,7 @@
         <div class="progress" aria-live="polite">
           <span class="badge" class:success={job.state === 'done'} class:danger={job.state === 'failed'} class:accent={running}>{STATES[job.state]}</span>
           {#if running && job.stage}<span class="muted">étape : {job.stage}</span>{/if}
-          {#if running && job.of}<progress max={job.of} value={job.done}></progress>{/if}
+          {#if running && job.of}<progress max={job.of} value={job.done}></progress><span class="muted">{fmt.format(job.done)} / {fmt.format(job.of)}</span>{/if}
           {#if job.error}<p class="banner" role="alert">{job.error}</p>{/if}
           {#if job.lines.length}<details class="jobLog"><summary>Journal de l’analyse</summary><pre class="lines">{job.lines.join('\n')}</pre></details>{/if}
         </div>

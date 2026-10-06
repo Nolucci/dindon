@@ -2,6 +2,7 @@
 import dataclasses
 import json
 import re
+import threading
 from datetime import datetime, timedelta, timezone, UTC
 from pathlib import Path
 
@@ -115,6 +116,28 @@ def test_an_interrupted_first_import_goes_on_where_it_stopped(collector, fake, i
     assert any(f"channel={half.id}" in r and f"after={last_known}" in r for r in asked)  # the rest of the half-done one
     with connection(ingest_url) as conn:
         assert message_count(conn) == sum(len(c.messages) for c in world.channels)
+
+
+def test_completed_partitions_are_saved_before_cancellation_and_resume_without_gaps(collector, fake, ingest_db, ingest_url, world):
+    channel = max(collector._channels_of(world.guild_id), key=lambda c: len(next(w for w in world.channels if w.id == c.id).messages))
+    stop = threading.Event()
+    saved = []
+
+    def checkpoint(count):
+        saved.append(count)
+        stop.set()
+
+    result = collector._export(ingest_db, channel, after=None, partition=100, cancel=stop, on_saved=checkpoint)
+    assert result.cancelled and result.new_messages == 100 and saved == [100]
+    assert message_count(ingest_db) == 100
+    assert len(list(collector.settings.archive_dir.rglob('*.json'))) == 1
+    known = collector._known(ingest_db, [channel], exported_only=True)[channel.id]
+    fake.requests.clear()
+    resumed = collector._export(ingest_db, channel, after=known, partition=100)
+    expected = len(next(w for w in world.channels if w.id == channel.id).messages)
+    assert resumed.ok and resumed.new_messages == expected - 100
+    assert message_count(ingest_db) == expected
+    assert any(f"after={known}" in request for request in exports_asked(fake))
 
 
 # ---------------------------------------------------------------------------------------------

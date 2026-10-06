@@ -65,7 +65,7 @@
           <span>Thèmes à examiner</span><strong>{summary ? fmt.format(summary.proposed) : '…'}</strong>
         </div>
         <div>
-          <span>Conversations lues</span><strong>{summary ? `${fmt.format(summary.read)} / ${fmt.format(summary.kept)}` : '…'}</strong>
+          <span>Conversations lues pour les positions</span><strong>{summary ? `${fmt.format(summary.read)} / ${fmt.format(summary.kept)}` : '…'}</strong>
         </div>
         <div>
           <span>Contradictions</span><strong>{summary ? fmt.format(summary.contradictions) : '…'}</strong>

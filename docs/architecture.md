@@ -19,10 +19,12 @@
 1. Un export manuel, l'exportateur REST du collecteur ou le Gateway du bot produit le même document JSON v2. L'adaptateur `bot/adapter.py` est partagé par le bot et l'exportateur.
 2. `ingest/loader.py` valide le document, crée ou actualise les messages et leurs relations, et maintient les liens de la carte. Un import répété est reconnu par son empreinte ; les modifications de message invalident les résultats qui en dépendent.
 3. La base sert les routes `/api/*` de l'interface. Un flux `/events` annonce les changements pour animer la carte.
-4. L'analyse locale regroupe les messages en conversations, trie celles qui ont du contenu, calcule leurs vecteurs et propose des thèmes. Les étapes `claims` et `axes` lisent des positions, rapprochent les propositions, proposent leurs liens aux axes et calculent des scores avec incertitude. Les liens aux axes sont soumis à validation humaine dans l'interface.
+4. L'analyse locale regroupe les messages en conversations, trie celles qui ont du contenu, calcule leurs vecteurs et propose des thèmes. Une conversation longue est envoyée au modèle par fenêtres bornées : toutes les fenêtres contribuent au vecteur, et l'extraction lit chacune avant de marquer la conversation comme traitée. Les messages originaux et les références des citations restent en base. Les étapes `claims` et `axes` lisent des positions, rapprochent les propositions, proposent leurs liens aux axes et calculent des scores avec incertitude. Les liens aux axes sont soumis à validation humaine dans l'interface.
 5. Les débats utilisent des tables distinctes pour leurs messages, positions, affirmations, sources, réponses et votes. Selon le mode choisi, une vérification peut envoyer une requête neutre à un service de recherche puis lire des pages trouvées.
 
 Les tâches de l'application sont démarrées dans `api/background.py` : surveillance de `inbox/` toutes les deux secondes, collecteur s'il est configuré, analyse automatique si activée, et purge quotidienne lorsque `DINDON_RETENTION_DAYS` est positif. Le service `bot` dépend de la santé de l'application, qui applique les migrations au démarrage.
+
+Le premier import enregistre et archive chaque lot de 5 000 messages dès que ses profils et réactions ont été récupérés. Les lots déjà enregistrés restent disponibles après une annulation ou un échec ; un import complet reprend à son dernier message enregistré. L'interface distingue la lecture Discord, les profils, les réactions, la préparation du lot et l'enregistrement en base. Le délai maximal de l'export mesure l'absence de progression, pas la durée totale d'un grand salon.
 
 ## Accès et limites
 

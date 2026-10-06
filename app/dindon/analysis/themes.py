@@ -23,7 +23,7 @@ from collections.abc import Callable
 import numpy as np
 import psycopg
 
-from dindon.analysis.embeddings import conversation_texts
+from dindon.analysis.embeddings import conversation_chunks, conversation_texts
 from dindon.analysis.ollama import Ollama, OllamaError
 
 log = logging.getLogger("dindon.analysis")
@@ -226,8 +226,8 @@ def discover_themes(conn: psycopg.Connection, client: Ollama, guild_id: int, *, 
     keyword_counter = Keywords()
     ordered = sorted(group_of)
     for start in range(0, len(ordered), 500):                  # the texts come 500 conversations at a time, and are forgotten
-        for cid, text in conversation_texts(conn, ordered[start:start + 500]).items():
-            keyword_counter.add(group_of[cid], text)
+        for cid, chunks in conversation_chunks(conn, ordered[start:start + 500]).items():
+            keyword_counter.add(group_of[cid], "\n".join(chunks))
     words = keyword_counter.result()
     nearest_of = {g: sorted(members, key=lambda i: -similarity[i])[:6] for g, members in groups.items()}
     wanted = [ids[i] for nearest in nearest_of.values() for i in nearest]

@@ -27,6 +27,8 @@
   const narrowed = $derived(Boolean(authors.trim() || mentions.trim() || after || before));
   const fmt = new Intl.NumberFormat('fr-FR');
   const STATES = { idle: '', running: 'En cours…', cancelling: 'Arrêt en cours…', done: 'Terminé', cancelled: 'Annulé', failed: 'Échec' };
+  const STAGES = { reading: 'Lecture Discord', profiles: 'Récupération des profils', reactions: 'Récupération des réactions',
+                   writing: 'Préparation du lot', importing: 'Enregistrement en base' };
 
   async function guard(action) {
     try {
@@ -178,9 +180,11 @@
                   <span class="muted">
                     {#if channel.pages}
                       {fmt.format(channel.scanned)} messages parcourus · {fmt.format(channel.pages)} page{channel.pages > 1 ? 's' : ''}
+                      {#if channel.saved != null} · {fmt.format(channel.saved)} nouveaux messages enregistrés{/if}
                     {:else}
                       Connexion à Discord…
                     {/if}
+                    {#if channel.stage}<br />{STAGES[channel.stage] ?? channel.stage}{/if}
                   </span>
                 </div>
               {/each}

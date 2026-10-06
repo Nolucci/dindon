@@ -147,19 +147,13 @@ class Exporter:
                 ids.update(str(u["id"]) for u in parent.get("mentions", []))      # (the text of what was replied to names them too)
         return ids
 
-    def _attach_members(self, guild_id: str, messages: list[dict], cancelled: Callable[[], bool]) -> None:
+    def _attach_members(self, guild_id: str, messages: list[dict], wait_for: Callable[[Future], object]) -> None:
         """Puts the profile of each person on the messages, as the Gateway does (the REST API does not)."""
         for key in [(guild_id, uid) for uid in self._people_of(messages)]:
             with self._lock:
                 future = self._inflight.get(key)
             if future is not None:
-                while True:
-                    try:
-                        future.result(timeout=0.25)
-                        break
-                    except TimeoutError:
-                        if cancelled():
-                            raise ExporterCancelled() from None
+                wait_for(future)
         with self._lock:
             profiles = {uid: m for (g, uid), (_, m) in self._members.items() if g == guild_id}
         for m in messages:
@@ -234,12 +228,16 @@ class Exporter:
 
     def export(self, channel_id: int, out_dir: Path, after: int | None = None, threads: str = "none", partition: int | None = None,
                before: int | None = None, message_filter: str | None = None, cancel: threading.Event | None = None,
-               on_page: Callable[[int], None] | None = None) -> list[Path]:
+               on_page: Callable[[int], None] | None = None, on_file: Callable[[Path], None] | None = None,
+               on_stage: Callable[[str], None] | None = None) -> list[Path]:
         """Exports one channel in JSON v2 into `out_dir` and returns the files. `after` and `before` are message ids (only the messages between them),
         `message_filter` is the filter of a narrowed import, `partition` the number of messages per file, `threads` is `none`, `active` or `all`.
+        `on_file` receives each complete partition immediately and may move it after importing it.
         Setting `cancel` ends the requests. No file is written for a channel that has nothing to export."""
+        aborted = threading.Event()
+
         def cancelled() -> bool:
-            return cancel is not None and cancel.is_set()
+            return aborted.is_set() or (cancel is not None and cancel.is_set())
 
         deadline = self._clock() + self.timeout
         keep = compile_filter(message_filter)
@@ -262,8 +260,10 @@ class Exporter:
                 for target in targets:
                     guild.directory.guilds[guild_id].channels.setdefault(str(target["id"]), target)
                     files += self._export_one(pool, guild, guild_id, target, out_dir, after, before, keep, partition, cancelled, deadline,
-                                              on_page)
+                                              on_page, on_file, on_stage)
+                    deadline = self._clock() + self.timeout
             except BaseException:
+                aborted.set()
                 pool.shutdown(wait=False, cancel_futures=True)
                 raise
         return files
@@ -282,33 +282,66 @@ class Exporter:
 
     def _export_one(self, pool: ThreadPoolExecutor, guild: _Guild, guild_id: str, channel: dict, out_dir: Path, after: int | None, before: int | None,
                     keep: Callable[[dict], bool], partition: int | None, cancelled: Callable[[], bool], deadline: float,
-                    on_page: Callable[[int], None] | None = None) -> list[Path]:
+                    on_page: Callable[[int], None] | None = None, on_file: Callable[[Path], None] | None = None,
+                    on_stage: Callable[[str], None] | None = None) -> list[Path]:
         cid = str(channel["id"])
         files: list[Path] = []
         chunk: list[dict] = []
         reactions: dict[str, dict[str, Future]] = {}              # message id -> emoji key -> the people who reacted (being fetched)
 
+        def wait_for(future: Future):
+            nonlocal deadline
+            while True:
+                if cancelled():
+                    raise ExporterCancelled()
+                if self._clock() > deadline:
+                    raise ExporterError(f"L'export a pris plus de {self.timeout:.0f} s sans progression : il est arrêté.")
+                try:
+                    value = future.result(timeout=0.25)
+                    deadline = self._clock() + self.timeout
+                    return value
+                except TimeoutError:
+                    if future.done():
+                        raise
+
         def flush() -> None:
+            nonlocal deadline
             if not chunk:
                 return
-            self._attach_members(guild_id, chunk, cancelled)
-            people = {mid: {key: future.result() for key, future in by_emoji.items()} for mid, by_emoji in reactions.items()}
+            if on_stage:
+                on_stage("profiles")
+            self._attach_members(guild_id, chunk, wait_for)
+            if on_stage:
+                on_stage("reactions")
+            people = {mid: {key: wait_for(future) for key, future in by_emoji.items()} for mid, by_emoji in reactions.items()}
+            if cancelled():
+                raise ExporterCancelled()
+            if on_stage:
+                on_stage("writing")
             limits = {"after": created_at(after) if after else None, "before": created_at(before) if before else None}
             document = build_document(guild.directory, guild_id, cid, chunk, exported_at=utc_now(), date_range=limits, reaction_users=people)
             name = f"export [{cid}]" + (f" part{len(files) + 1}" if partition else "") + ".json"
             files.append(write_document(out_dir / name, document))
             self.stats["messages"] += len(chunk)
             self.stats["files"] += 1
+            if on_file:
+                on_file(files[-1])
             chunk.clear()
             reactions.clear()
+            deadline = self._clock() + self.timeout
 
         cursor = after or 0
         while True:
             if cancelled():
                 raise ExporterCancelled()
             if self._clock() > deadline:
-                raise ExporterError(f"L'export a pris plus de {self.timeout:.0f} s : il est arrêté.")
+                raise ExporterError(f"L'export a pris plus de {self.timeout:.0f} s sans progression : il est arrêté.")
+            if on_stage:
+                on_stage("reading")
             page = self.client.get(f"/channels/{cid}/messages", {"limit": PAGE, "after": cursor}, cancel=cancelled)
+            if self._clock() > deadline:
+                raise ExporterError(f"L'export a pris plus de {self.timeout:.0f} s sans progression : il est arrêté.")
+            deadline = self._clock() + self.timeout
             if on_page is not None:
                 on_page(len(page))
             if not page:

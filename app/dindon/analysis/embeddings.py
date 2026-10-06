@@ -1,10 +1,10 @@
 """Stage 3 of the cascade: the vector of each kept conversation.
 
-The text that is embedded is what was said, in order, without the names of the people (the first stages do not look at people), and only
-the messages that say something. It is cut at `MAX_CHARS`: what a model reads is limited, and the start of a long discussion carries
-its subject. A conversation that already has a vector for the model is not done again, so this can be stopped and started at will.
+The text that is embedded is what was said, in order, without the names of the people, and only the messages that say something.
+Long conversations are embedded in bounded pieces and their vectors are combined, so their ends still affect the result.
 """
 import logging
+import math
 import re
 from collections.abc import Callable
 
@@ -12,6 +12,7 @@ import psycopg
 from psycopg.rows import tuple_row
 
 from dindon.analysis.ollama import Ollama, OllamaError
+from dindon.analysis.chunks import pack_lines
 
 log = logging.getLogger("dindon.analysis")
 
@@ -55,15 +56,26 @@ def vector_literal(vector: list[float]) -> str:
     return "[" + ",".join(f"{x:.7g}" for x in vector) + "]"
 
 
-def conversation_texts(conn: psycopg.Connection, ids: list[int]) -> dict[int, str]:
-    """What each conversation says, cleaned (the application's connections give rows as dicts, the others as tuples: both work)."""
+def conversation_chunks(conn: psycopg.Connection, ids: list[int]) -> dict[int, list[str]]:
+    """All substantive text, cleaned and bounded for the embedding model."""
     parts: dict[int, list[str]] = {}
     with conn.cursor(row_factory=tuple_row) as cursor:
         for cid, content, names in cursor.execute(_TEXTS, (ids,)).fetchall():
             text = clean_text(content, names)
             if text:
                 parts.setdefault(cid, []).append(text)
-    return {cid: "\n".join(texts)[:MAX_CHARS] for cid, texts in parts.items()}
+    return {cid: pack_lines(texts, MAX_CHARS) for cid, texts in parts.items()}
+
+
+def conversation_texts(conn: psycopg.Connection, ids: list[int]) -> dict[int, str]:
+    """A bounded opening excerpt for topic names; full text is used for the vector."""
+    return {cid: chunks[0] for cid, chunks in conversation_chunks(conn, ids).items() if chunks}
+
+
+def _combined(vectors: list[list[float]], weights: list[int]) -> list[float]:
+    total = [sum(vector[i] * weight for vector, weight in zip(vectors, weights, strict=True)) for i in range(len(vectors[0]))]
+    norm = math.sqrt(sum(value * value for value in total))
+    return [value / norm for value in total] if norm else total
 
 
 def embed_conversations(conn: psycopg.Connection, client: Ollama, model: str, guild_id: int, *, limit: int | None = None, batch: Callable[[], int] | int = BATCH,
@@ -72,6 +84,8 @@ def embed_conversations(conn: psycopg.Connection, client: Ollama, model: str, gu
     todo = [row[0] for row in conn.execute(_TODO, {"guild": guild_id, "model": model}).fetchall()]
     if limit is not None:
         todo = todo[:limit]
+    if progress:
+        progress(0, len(todo))
     done = 0
     start = 0
     while start < len(todo):
@@ -79,15 +93,23 @@ def embed_conversations(conn: psycopg.Connection, client: Ollama, model: str, gu
             break
         size = max(1, batch() if callable(batch) else batch)       # the size of a batch is a setting that can change while this runs
         ids = todo[start:start + size]
-        texts = conversation_texts(conn, ids)
-        ids = [i for i in ids if texts.get(i)]
+        chunks = conversation_chunks(conn, ids)
+        ids = [i for i in ids if chunks.get(i)]
         if ids:
-            vectors = client.embed(model, [texts[i] for i in ids])
-            with conn.transaction():
-                for cid, vector in zip(ids, vectors, strict=True):
+            pieces = [(cid, text) for cid in ids for text in chunks[cid]]
+            by_id: dict[int, list[tuple[list[float], int]]] = {cid: [] for cid in ids}
+            for offset in range(0, len(pieces), size):
+                group = pieces[offset:offset + size]
+                vectors = client.embed(model, [text for _, text in group])
+                for (cid, piece), vector in zip(group, vectors, strict=True):
                     if len(vector) != 1024:
                         raise OllamaError(f"Le modèle de vecteurs « {model} » en donne de {len(vector)} nombres : la base en attend 1024 "
                                           "(schema-vector.sql). Choisissez un modèle à 1024 dimensions, comme bge-m3.")
+                    by_id[cid].append((vector, len(piece)))
+            with conn.transaction():
+                for cid in ids:
+                    parts = by_id[cid]
+                    vector = _combined([part[0] for part in parts], [part[1] for part in parts])
                     conn.execute("INSERT INTO conversation_embeddings (conversation_id, model, embedding) VALUES (%s, %s, %s::vector) "
                                  "ON CONFLICT DO NOTHING", (cid, model, vector_literal(vector)))
         done += len(ids)

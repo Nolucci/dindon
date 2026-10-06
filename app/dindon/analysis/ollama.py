@@ -35,11 +35,16 @@ class Ollama:
         """After a call: wait, so that the models work only `ai_max_load` percent of the time."""
         from dindon.performance import pause_for
 
-        wait = pause_for(time.monotonic() - started, int(settings.get("ai_max_load", 100)))
-        while wait > 0 and not self.cancelled():
+        elapsed = time.monotonic() - started
+        waited = 0.0
+        while not self.cancelled():
+            current = self._settings() if self.limits else settings
+            wait = pause_for(elapsed, int(current.get("ai_max_load", settings.get("ai_max_load", 100)))) - waited
+            if wait <= 0:
+                break
             step = min(wait, 0.5)
             self.sleep(step)
-            wait -= step
+            waited += step
 
     def _call(self, path: str, body: dict | None = None, timeout: float | None = None) -> dict:
         data = None if body is None else json.dumps(body).encode()
@@ -69,7 +74,7 @@ class Ollama:
     def embed(self, model: str, texts: list[str]) -> list[list[float]]:
         """One vector per text, of length 1 (the direction is what counts)."""
         settings = self._settings()
-        body = {"model": model, "input": texts, "truncate": True, "keep_alive": settings.get("ai_keep_alive", "10m")}
+        body = {"model": model, "input": texts, "truncate": False, "keep_alive": settings.get("ai_keep_alive", "10m")}
         if settings.get("ai_threads"):
             body["options"] = {"num_thread": int(settings["ai_threads"])}
         started = time.monotonic()

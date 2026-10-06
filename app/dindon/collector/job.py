@@ -90,17 +90,23 @@ class ImportJobs:
                 self._state["planned"], self._state["of"] = event["channels"], event["of"]
             elif event["event"] == "started":
                 self._active[event["id"]] = {"id": event["id"], "name": event["name"], "number": event["number"],
-                                              "scanned": 0, "pages": 0, "last_activity_at": utc_iso()}
+                                              "scanned": 0, "pages": 0, "saved": 0, "stage": "reading", "last_activity_at": utc_iso()}
             elif event["event"] == "progress":
                 if channel := self._active.get(event["id"]):
                     channel.update(scanned=event["scanned"], pages=event["pages"], last_activity_at=utc_iso())
+            elif event["event"] == "stage":
+                if channel := self._active.get(event["id"]):
+                    channel.update(stage=event["stage"], last_activity_at=utc_iso())
+            elif event["event"] == "saved":
+                self._state["messages"] += event["messages"]
+                if channel := self._active.get(event["id"]):
+                    channel.update(saved=channel["saved"] + event["messages"], last_activity_at=utc_iso())
             elif event["event"] == "channel":
                 self._active.pop(event["id"], None)
                 if event["cancelled"]:
                     self._state["cancelled"] += 1
                 elif event["ok"]:
                     self._state["done"] += 1
-                    self._state["messages"] += event["messages"]
                 else:
                     self._state["failed"] += 1
 

@@ -71,6 +71,15 @@ def test_a_long_pause_ends_at_once_when_the_person_stops_the_analysis(ollama):
     assert len(slept) == 2
 
 
+def test_switching_to_full_speed_interrupts_an_existing_pause(ollama):
+    client = Ollama(ollama.url, timeout=30)
+    slept = []
+    client.sleep = slept.append
+    client.limits = lambda: {"ai_max_load": 100 if slept else 25}
+    client._pause(time.monotonic() - 100, {"ai_max_load": 25})
+    assert slept == [0.5]
+
+
 def test_without_limits_nothing_is_asked_and_nothing_is_waited_for(ollama):
     client = Ollama(ollama.url, timeout=30)
     slept = []

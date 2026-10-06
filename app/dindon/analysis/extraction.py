@@ -25,12 +25,13 @@ from dataclasses import dataclass
 import psycopg
 from psycopg.rows import tuple_row
 
+from dindon.analysis.chunks import split_long
 from dindon.analysis.embeddings import vector_literal
 from dindon.analysis.ollama import Ollama, OllamaError
 
 log = logging.getLogger("dindon.analysis")
 
-PROMPT_VERSION = "extract-3"
+PROMPT_VERSION = "extract-4"
 MAX_CHARS = 7000
 SAME_PROPOSITION = 0.80
 MAX_CLAIMS_PER_PERSON = 3
@@ -89,9 +90,28 @@ class Read:
 
 
 def prepare(rows: list[tuple]) -> Read | None:
+    """Prepare a small conversation for one model call (also used by validation tests)."""
+    windows = prepare_windows(rows)
+    return windows[0] if len(windows) == 1 else None
+
+
+def prepare_windows(rows: list[tuple]) -> list[Read]:
+    """Give every message a stable reference and send all its text in bounded windows."""
     people: dict[str, int] = {}
     label_of: dict[int, str] = {}
-    lines, messages, ids = [], {}, {}
+    windows: list[Read] = []
+    lines: list[str] = []
+    messages: dict[int, tuple[int, str, object]] = {}
+    ids: dict[int, int] = {}
+    size = 0
+    number = 0
+
+    def flush() -> None:
+        nonlocal lines, messages, ids, size
+        if lines:
+            windows.append(Read("\n".join(lines), people.copy(), messages, ids))
+        lines, messages, ids, size = [], {}, {}, 0
+
     for message_id, author, content, when in rows:
         text = _SPACES.sub(" ", _URL.sub(" ", content or "")).strip()
         if not text:
@@ -99,13 +119,18 @@ def prepare(rows: list[tuple]) -> Read | None:
         if author not in label_of:
             label_of[author] = f"P{len(label_of) + 1}"
             people[label_of[author]] = author
-        n = len(messages) + 1
-        messages[n], ids[n] = (author, text, when), message_id
-        lines.append(f"#{n} {label_of[author]}: {text}")
-    if len(people) < 1 or len(messages) < 2:
-        return None
-    text = "\n".join(lines)
-    return Read(text[:MAX_CHARS], people, messages, ids)
+        number += 1
+        prefix = f"#{number} {label_of[author]}: "
+        for piece in split_long(text, MAX_CHARS - len(prefix)):
+            line = prefix + piece
+            if lines and size + 1 + len(line) > MAX_CHARS:
+                flush()
+            lines.append(line)
+            messages[number] = (author, piece, when)
+            ids[number] = message_id
+            size += len(line) + (1 if size else 0)
+    flush()
+    return windows
 
 
 @dataclass
@@ -190,14 +215,24 @@ def extract_claims(conn: psycopg.Connection, client: Ollama, model: str, embed_m
         if cancelled():
             break
         with conn.cursor(row_factory=tuple_row) as cur:
-            read = prepare(cur.execute(_MESSAGES, (cid,)).fetchall())
-        if read is None:                                                  # nothing to read: recorded, not read again
+            reads = prepare_windows(cur.execute(_MESSAGES, (cid,)).fetchall())
+        if not reads:                                                     # nothing to read: recorded, not read again
             conn.execute("INSERT INTO conversation_extractions (conversation_id, model, prompt_version, claims, refused) VALUES (%s, %s, %s, 0, 0) "
                          "ON CONFLICT DO NOTHING", (cid, model, PROMPT_VERSION))
             unread += 1
             continue
+        validated: list[tuple[Claim, Read]] = []
+        bad = 0
         try:
-            answer = client.chat_json(model, SYSTEM, "Conversation :\n" + read.text, SCHEMA)
+            for read in reads:
+                if cancelled():
+                    break
+                answer = client.chat_json(model, SYSTEM, "Conversation :\n" + read.text, SCHEMA)
+                claims, refused_here = validate(answer, read)
+                validated.extend((claim, read) for claim in claims)
+                bad += refused_here
+            if cancelled():
+                break
             in_a_row = 0
         except OllamaError as error:
             failed += 1
@@ -206,23 +241,34 @@ def extract_claims(conn: psycopg.Connection, client: Ollama, model: str, embed_m
             if in_a_row >= FAILURES_IN_A_ROW:
                 raise
             continue
-        claims, bad = validate(answer, read)
         with conn.transaction():
-            ids = _proposition_ids(conn, client, embed_model, [c.proposition for c in claims if c.stance is not None], model) if claims else {}
-            for c in claims:
+            ids = _proposition_ids(conn, client, embed_model, [c.proposition for c, _ in validated if c.stance is not None], model) if validated else {}
+            reviewed = conn.execute("SELECT EXISTS (SELECT 1 FROM claims WHERE conversation_id = %s AND review_status <> 'auto')", (cid,)).fetchone()[0]
+            stored = 0
+            for c, read in validated:
+                proposition_id = ids.get(c.proposition) if c.stance is not None else None
+                proof_ids = [read.message_ids[ref] for ref, _ in c.evidence]
+                if reviewed and conn.execute(
+                    """SELECT EXISTS (SELECT 1 FROM claims cl JOIN claim_evidence e ON e.claim_id = cl.id
+                       WHERE cl.conversation_id = %s AND cl.user_id = %s AND cl.review_status <> 'auto'
+                         AND cl.kind = %s AND cl.proposition_id IS NOT DISTINCT FROM %s AND e.message_id = ANY(%s))""",
+                    (cid, c.user_id, c.kind, proposition_id, proof_ids),
+                ).fetchone()[0]:
+                    continue
                 first = min(read.messages[ref][2] for ref, _ in c.evidence)
                 claim_id = conn.execute(
                     """INSERT INTO claims (guild_id, user_id, proposition_id, kind, text, stance, confidence, stated_at, model, prompt_version, conversation_id)
                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
-                    (guild_id, c.user_id, ids.get(c.proposition) if c.stance is not None else None, c.kind, c.text, c.stance, c.confidence, first,
+                    (guild_id, c.user_id, proposition_id, c.kind, c.text, c.stance, c.confidence, first,
                      model, PROMPT_VERSION, cid)).fetchone()[0]
+                stored += 1
                 for ref, quote in c.evidence:
                     conn.execute("INSERT INTO claim_evidence (claim_id, message_id, quote) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
                                  (claim_id, read.message_ids[ref], quote))
             conn.execute("INSERT INTO conversation_extractions (conversation_id, model, prompt_version, claims, refused) VALUES (%s, %s, %s, %s, %s) "
-                         "ON CONFLICT DO NOTHING", (cid, model, PROMPT_VERSION, len(claims), bad))
+                         "ON CONFLICT DO NOTHING", (cid, model, PROMPT_VERSION, stored, bad))
         done += 1
-        kept += len(claims)
+        kept += stored
         refused += bad
         if progress:
             progress(n, len(todo))

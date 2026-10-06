@@ -406,6 +406,24 @@ def test_an_export_that_takes_too_long_is_stopped_in_words(fake, world, tmp_path
         Exporter(TOKEN, fake.api_url, timeout=0.01).export(biggest(world).id, tmp_path)
 
 
+def test_progress_keeps_a_long_export_alive(fake, world, tmp_path, monkeypatch):
+    elapsed = 0.0
+    ex = exporter(fake, timeout=1, clock=lambda: elapsed)
+    get = ex.client.get
+
+    def advancing(path, *args, **kwargs):
+        nonlocal elapsed
+        result = get(path, *args, **kwargs)
+        if path.endswith('/messages'):
+            elapsed += 0.6
+        return result
+
+    monkeypatch.setattr(ex.client, 'get', advancing)
+    paths = ex.export(biggest(world).id, tmp_path, partition=100)
+    assert elapsed > ex.timeout
+    assert sum(read(path)['messageCount'] for path in paths) == len(biggest(world).messages)
+
+
 def test_a_channel_that_cannot_be_read_is_said(fake, world, tmp_path):
     channel = biggest(world)
     fake.forbidden_channels.add(str(channel.id))

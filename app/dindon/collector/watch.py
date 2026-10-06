@@ -41,7 +41,7 @@ log = logging.getLogger("dindon.collector")
 CATCHUP_KEY = "collector.last_catchup"  # in runtime_settings: when the last catch-up was made
 BOT_SEEN_KEY = "collector.bot_seen"      # in runtime_settings: which start and session of the bot the gaps were last looked at for
 GAP_FILL_MIN_SECONDS = 600               # a bot that restarts in a loop does not make a round of the watcher every time
-BACKFILL_PARTITION = 50_000  # messages per file in a first import: each file is complete, so progress is kept
+BACKFILL_PARTITION = 5_000  # bounded files: save progress frequently, without holding a huge reaction backlog
 
 
 @dataclass
@@ -114,30 +114,39 @@ class Collector:
     def _export(self, conn: psycopg.Connection, channel: Watched, after: int | None, threads: str = "none",
                 prune: bool = False, partition: int | None = None, before: int | None = None, message_filter: str | None = None,
                 partial: bool = False, cancel: threading.Event | None = None,
-                on_page: Callable[[int], None] | None = None) -> ExportOutcome:
+                on_page: Callable[[int], None] | None = None, on_stage: Callable[[str], None] | None = None,
+                on_saved: Callable[[int], None] | None = None) -> ExportOutcome:
         root = self.settings.inbox_dir / ".collector"  # hidden: the inbox does not import from there by itself
         root.mkdir(parents=True, exist_ok=True)
         new = 0
+
+        def import_ready(path: Path) -> None:
+            nonlocal new
+            if path.stat().st_size == 0:
+                return
+            if on_stage:
+                on_stage("importing")
+            result = ingest_file(conn, path, prune=prune, partial=partial)
+            new += result.messages_new
+            if on_saved:
+                on_saved(result.messages_new)
+            if result.prune_skipped:
+                log.warning("channel %s: %d messages seem deleted but it is too many to be believed: kept", channel.id, result.prune_skipped)
+            archive_file(path, self.settings.archive_dir, result.sha256)
+
         try:
             with tempfile.TemporaryDirectory(dir=root) as tmp:
-                for path in self.exporter.export(channel.id, Path(tmp), after=after, threads=threads, partition=partition, before=before,
-                                                 message_filter=message_filter, cancel=cancel, on_page=on_page):
-                    if path.stat().st_size == 0:
-                        continue  # (a file that is empty: nothing to import)
-                    result = ingest_file(conn, path, prune=prune, partial=partial)
-                    if result.prune_skipped:
-                        log.warning("channel %s: %d messages seem deleted but it is too many to be believed: kept", channel.id, result.prune_skipped)
-                    archive_file(path, self.settings.archive_dir, result.sha256)
-                    new += result.messages_new
+                self.exporter.export(channel.id, Path(tmp), after=after, threads=threads, partition=partition, before=before,
+                                     message_filter=message_filter, cancel=cancel, on_page=on_page, on_file=import_ready, on_stage=on_stage)
         except ExporterCancelled:
-            return ExportOutcome(False, cancelled=True)
+            return ExportOutcome(False, new_messages=new, cancelled=True)
         except (ExporterError, InvalidExport, psycopg.Error) as error:
             self._fail(channel.id, error)
             # ExporterError messages are written for the administrator and never
             # include the token or message content. Other exceptions may contain
             # imported data or SQL parameters, so show only their type.
             detail = str(error) if isinstance(error, ExporterError) else type(error).__name__
-            return ExportOutcome(False, error=detail[:240])
+            return ExportOutcome(False, new_messages=new, error=detail[:240])
         if not partial:  # a narrowed import says nothing of what the channel contains up to its newest message
             self._exported_up_to[channel.id] = channel.last_message_id or 0
         self._failures.pop(channel.id, None)
@@ -334,16 +343,23 @@ class Collector:
                 pages += 1
                 report({"event": "progress", "id": str(channel.id), "scanned": scanned, "pages": pages})
 
+            def on_stage(stage: str) -> None:
+                report({"event": "stage", "id": str(channel.id), "stage": stage})
+
+            def on_saved(messages: int) -> None:
+                report({"event": "saved", "id": str(channel.id), "messages": messages})
+                log.info("backfill channel %s: partition saved, %d new messages", channel.id, messages)
+
             with new_connection() as conn:
                 outcome = self._export(conn, channel, after=selection.after_id() if selection.partial else have, before=selection.before_id(),
                                        message_filter=selection.message_filter(), partial=selection.partial, cancel=cancel,
                                        threads=mode if channel.kind != "thread" else "none", partition=BACKFILL_PARTITION,
-                                       on_page=on_page)
+                                       on_page=on_page, on_stage=on_stage, on_saved=on_saved)
+            totals["messages"] += outcome.new_messages
             if outcome.cancelled:
                 totals["cancelled"] += 1
             else:
                 totals["channels" if outcome.ok else "failed"] += 1
-                totals["messages"] += outcome.new_messages
             progress(f"[{number}/{len(todo)}] {channel.name or channel.id}: " +
                      ("cancelled" if outcome.cancelled else f"{outcome.new_messages} messages" if outcome.ok else
                       f"failed ({outcome.error})" if outcome.error else "failed"))
