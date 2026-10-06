@@ -54,7 +54,7 @@ class FakeGateway:
 
     # --- life -------------------------------------------------------------------------------------------------------
 
-    async def start(self) -> "FakeGateway":
+    async def start(self) -> FakeGateway:
         app = web.Application()
         app.router.add_get("/api/v10/users/@me", self._me)
         app.router.add_get("/api/v10/oauth2/applications/@me", self._application)   # discord.py asks for it right after logging in

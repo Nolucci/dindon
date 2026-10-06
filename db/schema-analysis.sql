@@ -287,6 +287,7 @@ BEGIN
         FROM current_stances s
         JOIN propositions p      ON p.id = s.proposition_id AND p.status NOT IN ('rejected', 'merged')
         JOIN proposition_axis pa ON pa.proposition_id = s.proposition_id AND pa.loading <> 0
+             AND (pa.is_validated OR COALESCE((SELECT value FROM scoring_settings WHERE key = 'only_validated_loadings'), 0) = 0)
         JOIN axes a              ON a.id = pa.axis_id AND a.is_active
         WHERE p_guild IS NULL OR s.guild_id = p_guild
     ), agg AS (

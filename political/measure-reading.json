@@ -1,0 +1,72 @@
+{
+ "kind": "reading",
+ "model": "qwen3:14b",
+ "seconds": 147,
+ "predictions": {
+  "m01": [],
+  "m02": [
+   "Le SMIC brut mensuel dépasse 1 800 euros depuis janvier 2025.",
+   "Le SMIC n'est pas bloqué depuis janvier 2025."
+  ],
+  "m03": [
+   "Le taux de chômage en France est de 12 %."
+  ],
+  "m04": [
+   "Le Sénat compte 348 sénateurs.",
+   "L'Assemblée nationale compte 577 députés."
+  ],
+  "m05": [
+   "La dette publique dépasse les 3 000 milliards d'euros."
+  ],
+  "m06": [],
+  "m07": [],
+  "m08": [],
+  "m09": [
+   "L'Union européenne compte 27 États membres depuis le Brexit.",
+   "L'Union européenne comptait 28 États membres avant le Brexit."
+  ],
+  "m10": [],
+  "m11": [],
+  "m12": [
+   "La Banque centrale européenne a son siège à Francfort."
+  ],
+  "m13": [
+   "Le taux de TVA normal est de 20 % en France depuis 2014."
+  ],
+  "m14": [],
+  "m15": [],
+  "m16": [],
+  "m17": [],
+  "m18": [],
+  "m19": [],
+  "m20": [],
+  "m21": [
+   "Le Parlement européen se réunit à Strasbourg depuis longtemps selon les traités."
+  ],
+  "m22": [],
+  "m23": [],
+  "m24": [
+   "Le nucléaire fournit environ 65 % de l'électricité française."
+  ],
+  "m25": [],
+  "m26": [],
+  "m27": [],
+  "m28": [],
+  "m29": [],
+  "m30": [],
+  "m31": [],
+  "m32": [],
+  "m33": [],
+  "m34": [],
+  "m35": [],
+  "m36": [],
+  "m37": [],
+  "m38": [],
+  "m39": [],
+  "m40": [],
+  "m41": [],
+  "m42": [],
+  "m43": [],
+  "m44": []
+ }
+}

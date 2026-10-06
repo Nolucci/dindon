@@ -1,0 +1,274 @@
+{
+ "kind": "verify",
+ "split": "test",
+ "prompt": "verify-2",
+ "model": "qwen3:14b",
+ "searxng": true,
+ "seconds": 300,
+ "predictions": {
+  "c02": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 3,
+   "evidence": []
+  },
+  "c04": {
+   "verdict": "confirmed",
+   "reason": null,
+   "period": null,
+   "queries": 1,
+   "pages": 3,
+   "evidence": [
+    {
+     "url": "https://www.service-public.gouv.fr/particuliers/vosdroits/F1940",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "Son mandat dure cinq ans et est renouvelable une 1 fois consécutivement."
+    }
+   ]
+  },
+  "c06": {
+   "verdict": "confirmed",
+   "reason": null,
+   "period": null,
+   "queries": 1,
+   "pages": 3,
+   "evidence": [
+    {
+     "url": "https://www.douane.gouv.fr/lexique/etats-membres-de-lunion-europeenne",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "L'Union européenne (UE) regroupe 27 États membres."
+    },
+    {
+     "url": "https://european-union.europa.eu/principles-countries-history/facts-and-figures-european-union_fr",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "Nombre actuel d’États membres: 27."
+    },
+    {
+     "url": "https://www.insee.fr/fr/metadonnees/definition/c1461",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "Actuellement, les 27 États membres de l'Union européenne (UE) sont les suivants :"
+    }
+   ]
+  },
+  "c08": {
+   "verdict": "confirmed",
+   "reason": null,
+   "period": "1981",
+   "queries": 1,
+   "pages": 3,
+   "evidence": [
+    {
+     "url": "https://formation-civique.interieur.gouv.fr/fiches-par-thematiques/histoire-geographie-et-culture/la-cinquieme-republique/focus-sur-la-cinquieme-republique-5/",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "La loi du 9 octobre 1981 met définitivement fin à la peine capitale en France."
+    }
+   ]
+  },
+  "c10": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 1,
+   "evidence": []
+  },
+  "c12": {
+   "verdict": "confirmed",
+   "reason": null,
+   "period": "1905",
+   "queries": 1,
+   "pages": 3,
+   "evidence": [
+    {
+     "url": "https://www.senat.fr/connaitre-le-senat/lhistoire-du-senat/en-2025-la-loi-de-separation-des-eglises-et-de-letat-fete-ses-120-ans.html",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "La loi est promulguée le 11 décembre 1905."
+    },
+    {
+     "url": "https://www.archives-nationales.culture.gouv.fr/actualites/la-loi-de-separation-des-eglises-et-de-letat-fete-ses-120-ans",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "Le 9 décembre 1905, la loi de séparation des Églises et de l’État est promulguée après des débats passionnés tant au Parlement que dans la société civile."
+    }
+   ]
+  },
+  "c14": {
+   "verdict": "confirmed",
+   "reason": null,
+   "period": "2002",
+   "queries": 1,
+   "pages": 3,
+   "evidence": [
+    {
+     "url": "https://www.ecb.europa.eu/euro/changeover/2002/html/index.fr.html",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "l’euro est devenu, le 1er mars 2002, la seule monnaie ayant cours légal dans la zone euro."
+    },
+    {
+     "url": "https://www.banque-france.fr/fr/billets",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "Les premiers billets en euro ont été mis en circulation le 1er janvier 2002"
+    }
+   ]
+  },
+  "c16": {
+   "verdict": "contradicted",
+   "reason": null,
+   "period": "2e trimestre 2026",
+   "queries": 1,
+   "pages": 2,
+   "evidence": [
+    {
+     "url": "https://www.insee.fr/fr/statistiques/4805248",
+     "tier": "official",
+     "stance": "contradicts",
+     "quote": "au 2e trimestre 2026, le taux de chômage au sens du BIT est de 8,3 % en France."
+    }
+   ]
+  },
+  "c18": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 1,
+   "evidence": []
+  },
+  "c20": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 2,
+   "evidence": []
+  },
+  "c22": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 3,
+   "evidence": []
+  },
+  "c24": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 3,
+   "evidence": []
+  },
+  "c26": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 2,
+   "evidence": []
+  },
+  "c28": {
+   "verdict": "confirmed",
+   "reason": null,
+   "period": "2024",
+   "queries": 1,
+   "pages": 3,
+   "evidence": [
+    {
+     "url": "https://www.insee.fr/fr/statistiques/5759045",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "en 2024, 15,4 % de la population vit sous le seuil de pauvreté monétaire"
+    },
+    {
+     "url": "https://www.insee.fr/fr/statistiques/8242357?sommaire=8242421",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "En 2022, le taux de pauvreté monétaire s’élève à 14,4 % de la"
+    }
+   ]
+  },
+  "c29": {
+   "verdict": "confirmed",
+   "reason": null,
+   "period": "2025",
+   "queries": 1,
+   "pages": 2,
+   "evidence": [
+    {
+     "url": "https://www.insee.fr/fr/statistiques/2381412",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "en 2025, le taux de prélèvements obligatoires s’établit à 43,6 % du produit intérieur brut (PIB)."
+    },
+    {
+     "url": "https://www.insee.fr/fr/statistiques/2381410",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "en 2024, le taux de prélèvements obligatoires s’établit à 45,3 % du produit intérieur brut (PIB) en France"
+    }
+   ]
+  },
+  "c32": {
+   "verdict": "confirmed",
+   "reason": null,
+   "period": "2024",
+   "queries": 1,
+   "pages": 3,
+   "evidence": [
+    {
+     "url": "https://www.statistiques.developpement-durable.gouv.fr/edition-numerique/chiffres-cles-energies-renouvelables/fr/4-lelectricite-renouvelable-en-france",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "La production d'électricité renouvelable s'élève à 152 TWh en 2024, soit 27 % de la production totale d'électricité."
+    },
+    {
+     "url": "https://www.insee.fr/fr/statistiques/4318263",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "en 2024, la part des énergies renouvelables dans la consommation finale brute d'énergie est de 23,0 % en France"
+    }
+   ]
+  },
+  "c33": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 1,
+   "evidence": []
+  },
+  "c36": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 3,
+   "evidence": []
+  },
+  "c37": {
+   "verdict": "contradicted",
+   "reason": null,
+   "period": null,
+   "queries": 1,
+   "pages": 3,
+   "evidence": [
+    {
+     "url": "https://www2.assemblee-nationale.fr/decouvrir-l-assemblee/juniors",
+     "tier": "official",
+     "stance": "contradicts",
+     "quote": "L'Assemblée nationale compte 577 députés élus au suffrage universel direct"
+    }
+   ]
+  }
+ }
+}

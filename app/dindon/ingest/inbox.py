@@ -14,11 +14,11 @@ import logging
 import shutil
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 
 import psycopg
 
+from dindon.clock import utc_now
 from dindon.ingest.loader import IngestResult, InvalidExport, ingest_file
 
 log = logging.getLogger("dindon.inbox")
@@ -35,7 +35,7 @@ class InboxOutcome:
 
 
 def archive_file(path: Path, archive: Path, sha256: str) -> Path:
-    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    month = utc_now().strftime("%Y-%m")
     target = archive / month / f"{sha256[:8]}-{path.name}"
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(path), target)  # the same content has the same name: moving it again changes nothing

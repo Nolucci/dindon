@@ -9,19 +9,21 @@ would later read two dialects. The mappings below therefore mirror the exporter'
 JsonMessageWriter, PlainTextMarkdownVisitor, MessageKind, ChannelKind, User, Member, Role, ImageCdn). The expected values
 in the tests come from reading that code, not from running the exporter (see tests/test_adapter.py).
 
-What a MESSAGE_CREATE does not carry, or what is not covered here yet (a later export or the nightly catch-up brings it):
-embeds (link previews are added later by Discord through MESSAGE_UPDATE), polls, forwarded messages, and the standard
-(Unicode) emoji of the text, which the exporter finds with its full emoji index. Reactions do not exist yet at creation.
+The same adapter builds the documents of Dindon's own exporter (export/exporter.py), whose messages come from the REST API: embeds, polls,
+forwarded messages and reactions (with the people who reacted, when the exporter fetched them) are written when the message has them.
+What a MESSAGE_CREATE does not carry (a later export or the nightly catch-up brings it): link previews are added later by Discord, and the
+reactions do not exist yet at creation. Not covered at all: the standard (Unicode) emoji *of the text*, which the original exporter
+found with its full emoji index (they are not written to `inlineEmojis`), and the shortcode (`code`) of a standard emoji.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Iterable
 
 # --- names, as the exporter writes them (the enums of DiscordChatExporter.Core.Discord.Data) -----------------------
 
@@ -63,7 +65,7 @@ def parse_time(value: str) -> datetime:
 
 def format_time(value: datetime) -> str:
     """Always UTC, always the same shape (2025-10-21T00:38:02.164Z): milliseconds are cut, not rounded, as the exporter does."""
-    value = value.astimezone(timezone.utc)
+    value = value.astimezone(UTC)
     return f"{value:%Y-%m-%dT%H:%M:%S}.{value.microsecond // 1000:03d}Z"
 
 
@@ -181,7 +183,7 @@ def format_content(text: str, names: Names) -> str:
         if match["emoji_id"]:
             return f":{match['emoji_name']}:"
         try:  # a timestamp
-            instant = datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=int(match["instant"]))
+            instant = datetime(1970, 1, 1, tzinfo=UTC) + timedelta(seconds=int(match["instant"]))
         except (OverflowError, ValueError):
             return "Invalid date"
         if match["style"] and match["style"] not in "tTdDfFrR":
@@ -286,19 +288,41 @@ def _user_entry(user: dict, member: dict | None, guild: GuildInfo) -> dict:
 # --- the document ---------------------------------------------------------------------------------------------------
 
 
+def _twemoji(name: str) -> str:
+    """The name of the image of a standard emoji at Twemoji: its code points in hexadecimal, joined by '-' (the variation selector is left out
+    unless the emoji is a sequence joined by a zero-width joiner)."""
+    codes = [ord(c) for c in name]
+    if 0x200D not in codes:
+        codes = [c for c in codes if c != 0xFE0F]
+    return "-".join(f"{c:x}" for c in codes)
+
+
 class _Tables:
     """The lookup tables of a document (users, emoji), filled as messages are read."""
 
-    def __init__(self, guild: GuildInfo):
+    def __init__(self, guild: GuildInfo, reaction_users: dict[str, dict[str, list[dict]]] | None = None):
         self.guild = guild
         self.people: dict[str, tuple[dict, dict | None]] = {}
         self.emojis: dict[str, dict] = {}
+        self.reaction_users = reaction_users or {}      # message id -> emoji key -> the users who reacted (only when they were fetched)
 
     def user(self, user: dict, member: dict | None = None) -> str:
         uid = str(user["id"])
         known = self.people.get(uid)
         self.people[uid] = (user, member if member is not None else (known[1] if known else None))  # the latest member data wins
         return uid
+
+    def emoji_of(self, emoji: dict) -> str:
+        """The key of an emoji of a reaction or a poll (its id if it is a custom one, else the character), written to the table of emoji."""
+        if emoji.get("id"):
+            key = str(emoji["id"])
+            animated = bool(emoji.get("animated"))
+            self.emojis.setdefault(key, {"id": key, "name": emoji.get("name") or key, "isAnimated": animated,
+                                         "imageUrl": f"{_CDN}/emojis/{key}.{'gif' if animated else 'png'}"})
+            return key
+        name = emoji.get("name") or ""
+        self.emojis.setdefault(name, {"name": name, "isAnimated": False, "imageUrl": f"https://twemoji.maxcdn.com/v/latest/svg/{_twemoji(name)}.svg"})
+        return name
 
     def inline_emojis(self, text: str) -> list[str]:
         keys: list[str] = []
@@ -310,6 +334,132 @@ class _Tables:
                 self.emojis.setdefault(key, {"id": key, "name": match["emoji_name"], "isAnimated": animated,
                                              "imageUrl": f"{_CDN}/emojis/{key}.{'gif' if animated else 'png'}"})
         return keys
+
+
+def _media(media: dict) -> dict:
+    out: dict = {}
+    if media.get("url"):
+        out["url"] = media.get("proxy_url") or media["url"]          # the copy that Discord keeps, as the exporter writes it
+        out["canonicalUrl"] = media["url"]
+    for key in ("width", "height"):
+        if media.get(key) is not None:
+            out[key] = media[key]
+    return out
+
+
+def _with_icon(entry: dict, source: dict) -> dict:
+    """The icon of an author or a footer of an embed: the URL that Discord proxies when there is one, and the original one as the canonical URL."""
+    if source.get("icon_url"):
+        entry["iconUrl"] = source.get("proxy_icon_url") or source["icon_url"]
+        entry["iconCanonicalUrl"] = source["icon_url"]
+    return entry
+
+
+def _embed_entry(embed: dict, names: Names, tables: _Tables) -> dict:
+    out: dict = {}
+    title = format_content(embed.get("title") or "", names)
+    if title:
+        out["title"] = title
+    if embed.get("url"):
+        out["url"] = embed["url"]
+    if embed.get("timestamp"):
+        out["timestamp"] = format_time(parse_time(embed["timestamp"]))
+    description = format_content(embed.get("description") or "", names)
+    if description:
+        out["description"] = description
+    if embed.get("color") is not None:
+        out["color"] = f"#{embed['color'] & 0xFFFFFF:06X}"
+    if embed.get("author"):
+        out["author"] = _with_icon({k: v for k, v in (("name", embed["author"].get("name")), ("url", embed["author"].get("url"))) if v}, embed["author"])
+    for source, target in (("thumbnail", "thumbnail"), ("image", "image"), ("video", "video")):
+        if embed.get(source):
+            out[target] = _media(embed[source])
+    if embed.get("image"):                                        # the exporter writes the images as a list as well (a client can show several for one embed)
+        out["images"] = [_media(embed["image"])]
+    if embed.get("footer"):
+        out["footer"] = _with_icon({"text": embed["footer"]["text"]} if embed["footer"].get("text") else {}, embed["footer"])
+    if embed.get("fields"):
+        out["fields"] = [{"name": format_content(f["name"], names), "value": format_content(f["value"], names), "isInline": bool(f.get("inline"))}
+                         for f in embed["fields"]]
+    inline = tables.inline_emojis(embed.get("description") or "")
+    if inline:
+        out["inlineEmojis"] = inline
+    return out
+
+
+def _poll_entry(poll: dict, tables: _Tables) -> dict:
+    out: dict = {"question": (poll.get("question") or {}).get("text") or ""}
+    counts = {a["id"]: a.get("count", 0) for a in (poll.get("results") or {}).get("answer_counts", [])}
+    answers = []
+    for answer in poll.get("answers", []):
+        media = answer.get("poll_media") or {}
+        item: dict = {"id": answer["answer_id"]}
+        if media.get("text"):
+            item["text"] = media["text"]
+        if media.get("emoji"):
+            item["emoji"] = tables.emoji_of(media["emoji"])
+        if poll.get("results") is not None:
+            item["votes"] = counts.get(answer["answer_id"], 0)
+        answers.append(item)
+    out["answers"] = answers
+    if poll.get("expiry"):
+        out["expiresAt"] = format_time(parse_time(poll["expiry"]))
+    if poll.get("allow_multiselect"):
+        out["allowsMultipleAnswers"] = True
+    if (poll.get("results") or {}).get("is_finalized"):
+        out["isFinalized"] = True
+    return out
+
+
+def _attachments_of(message: dict) -> list[dict]:
+    return [{"id": str(a["id"]), "url": a["url"], "fileName": a["filename"], "fileSizeBytes": a["size"]} for a in message.get("attachments", [])]
+
+
+def _stickers_of(message: dict) -> list[dict]:
+    return [{"id": str(s["id"]), "name": s["name"], "format": STICKER_FORMATS[s["format_type"]][0],
+             "sourceUrl": f"{_CDN}/stickers/{s['id']}.{STICKER_FORMATS[s['format_type']][1]}"}
+            for s in message.get("sticker_items", []) if s.get("format_type") in STICKER_FORMATS]
+
+
+def _forwarded_entry(snapshot: dict, names: Names, tables: _Tables) -> dict:
+    out: dict = {"timestamp": format_time(parse_time(snapshot["timestamp"]))}
+    if snapshot.get("edited_timestamp"):
+        out["timestampEdited"] = format_time(parse_time(snapshot["edited_timestamp"]))
+    out["content"] = format_content(snapshot.get("content") or "", names)
+    if snapshot.get("attachments"):
+        out["attachments"] = _attachments_of(snapshot)
+    if snapshot.get("embeds"):
+        out["embeds"] = [_embed_entry(e, names, tables) for e in snapshot["embeds"]]
+    if _stickers_of(snapshot):
+        out["stickers"] = _stickers_of(snapshot)
+    return out
+
+
+def _reactions_entry(message: dict, tables: _Tables) -> list[dict]:
+    reactions = []
+    for reaction in message["reactions"]:
+        key = tables.emoji_of(reaction["emoji"])
+        item: dict = {"emoji": key, "count": reaction["count"]}
+        users = tables.reaction_users.get(str(message["id"]), {}).get(key)
+        if users:
+            item["userIds"] = [tables.user(u) for u in users]
+        reactions.append(item)
+    return reactions
+
+
+def _reference_entry(message: dict, reference: dict, tables: _Tables) -> dict:
+    """What the message answers to: the kind of reference, where it points, and, if Discord gave it, who and what was answered."""
+    ref: dict = {"type": REFERENCE_KINDS.get(reference.get("type", 0), str(reference.get("type")))}
+    for key, name in (("message_id", "messageId"), ("channel_id", "channelId"), ("guild_id", "guildId")):
+        if reference.get(key):
+            ref[name] = str(reference[key])
+    parent = message.get("referenced_message")
+    if parent:  # who and what was replied to, even if that message is not in the database
+        ref["authorId"] = tables.user(parent["author"])
+        text = message_text(parent, tables.guild)
+        if text:
+            ref["content"] = text
+    return ref
 
 
 def _message_entry(message: dict, tables: _Tables) -> dict:
@@ -325,29 +475,25 @@ def _message_entry(message: dict, tables: _Tables) -> dict:
         entry["isPinned"] = True
     entry["content"] = message_text(message, guild)
     entry["authorId"] = tables.user(message["author"], message.get("member"))
+    names = _names_of(message, guild)
     if message.get("attachments"):
-        entry["attachments"] = [{"id": str(a["id"]), "url": a["url"], "fileName": a["filename"], "fileSizeBytes": a["size"]}
-                                for a in message["attachments"]]
-    stickers = [{"id": str(s["id"]), "name": s["name"], "format": STICKER_FORMATS[s["format_type"]][0],
-                 "sourceUrl": f"{_CDN}/stickers/{s['id']}.{STICKER_FORMATS[s['format_type']][1]}"}
-                for s in message.get("sticker_items", []) if s.get("format_type") in STICKER_FORMATS]
-    if stickers:
-        entry["stickers"] = stickers
+        entry["attachments"] = _attachments_of(message)
+    if message.get("embeds"):
+        entry["embeds"] = [_embed_entry(e, names, tables) for e in message["embeds"]]
+    if _stickers_of(message):
+        entry["stickers"] = _stickers_of(message)
+    if message.get("poll"):
+        entry["poll"] = _poll_entry(message["poll"], tables)
+    if message.get("reactions"):
+        entry["reactions"] = _reactions_entry(message, tables)
     if message.get("mentions"):
         entry["mentionedUserIds"] = [tables.user(u, u.get("member")) for u in message["mentions"]]
     reference = message.get("message_reference")
     if reference:
-        ref: dict = {"type": REFERENCE_KINDS.get(reference.get("type", 0), str(reference.get("type")))}
-        for key, name in (("message_id", "messageId"), ("channel_id", "channelId"), ("guild_id", "guildId")):
-            if reference.get(key):
-                ref[name] = str(reference[key])
-        parent = message.get("referenced_message")
-        if parent:  # who and what was replied to, even if that message is not in the database
-            ref["authorId"] = tables.user(parent["author"])
-            text = message_text(parent, guild)
-            if text:
-                ref["content"] = text
-        entry["reference"] = ref
+        entry["reference"] = _reference_entry(message, reference, tables)
+    snapshots = message.get("message_snapshots") or []
+    if snapshots and (reference or {}).get("type") == 1:                 # a forwarded message: what it was, as it was
+        entry["forwardedMessage"] = _forwarded_entry(snapshots[0]["message"], names, tables)
     interaction = message.get("interaction")
     if interaction:
         entry["interaction"] = {"id": str(interaction["id"]), "name": interaction["name"], "userId": tables.user(interaction["user"])}
@@ -357,18 +503,23 @@ def _message_entry(message: dict, tables: _Tables) -> dict:
     return entry
 
 
-def build_document(directory: Directory, guild_id: str | int, channel_id: str | int, messages: list[dict]) -> dict | None:
+def build_document(directory: Directory, guild_id: str | int, channel_id: str | int, messages: list[dict], *, exported_at: datetime | None = None,
+                   date_range: dict[str, datetime] | None = None, reaction_users: dict[str, dict[str, list[dict]]] | None = None) -> dict | None:
     """One JSON v2 document for the new messages of one channel. None when the server or the channel is not known: nothing is
     invented, because a made-up name would overwrite the real one (the exporter or a later event brings it).
 
     The document does not depend on the moment it was made: `exportedAt` is the time of the newest message, so that the same
-    messages give the same document, and so that a message announced late can never look newer than a later export."""
+    messages give the same document, and so that a message announced late can never look newer than a later export.
+
+    The exporter (messages read from the REST API, at a given time) passes `exported_at` (the moment of the export, which is what the
+    ingestion compares to decide which version of a message is the newest), `date_range` (`after` and/or `before`, as datetimes) when the
+    request had limits, and `reaction_users` (message id -> emoji key -> the users who reacted) for the reactions that it fetched."""
     guild = directory.guild(guild_id)
     channel = directory.channel(guild_id, channel_id)
     if guild is None or channel is None or not messages:
         return None
     ordered = sorted(messages, key=lambda m: int(m["id"]))
-    tables = _Tables(guild)
+    tables = _Tables(guild, reaction_users)
     entries = [_message_entry(m, tables) for m in ordered]
 
     users = [_user_entry(user, member, guild) for user, member in tables.people.values()]
@@ -391,7 +542,8 @@ def build_document(directory: Directory, guild_id: str | int, channel_id: str | 
         "guild": {"id": guild.id, "name": guild.name,
                   "iconUrl": _asset(f"{_CDN}/icons/{guild.id}/{guild.icon}", guild.icon) if guild.icon else f"{_CDN}/embed/avatars/0.png"},
         "channel": channel_doc,
-        "exportedAt": max(e["timestamp"] for e in entries),
+        **({"dateRange": {k: format_time(v) for k, v in date_range.items() if v is not None}} if date_range and any(date_range.values()) else {}),
+        "exportedAt": format_time(exported_at) if exported_at else max(e["timestamp"] for e in entries),
         "schemaVersion": 2,
         "messageCount": len(entries),
         "messages": entries,

@@ -1,28 +1,458 @@
-/* Dark, calm, no external font: the system's own. Nothing here loads from outside. */
+/* The look of the Poulet dashboard (poulet/dashboard-next): the same tokens, the same font, the same shapes.
+   The tokens below are copied from its app/globals.css, the primitives from its components/ui/ui.module.css and
+   app/stats/Stats.module.css, under the same names, so that the two applications can be compared line by line.
+   Nothing here loads from outside: the font is served by the application itself (see fonts.css). */
 :root {
-  --bg: #0b0f14;
-  --panel: #121821;
-  --panel-2: #172030;
-  --line: #222e3d;
-  --text: #d8e0ea;
-  --muted: #8493a5;
-  --accent: #6aa3d8;
-  --flash: #ffe28a;
-  --warn: #e5a05a;
-  --ok: #6cc59a;
+  /* Backgrounds */
+  --bg-primary: #313338;
+  --bg-secondary: #2b2d31;
+  --bg-tertiary: #1e1f22;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(88, 101, 242, 0.15);
+  --bg-glass: rgba(43, 45, 49, 0.85);
+
+  /* Text */
+  --text-primary: #dcdee1;
+  --text-secondary: #b5bac1;
+  --text-muted: #80848e;
+  --text-link: #00a8fc;
+
+  /* Accent & status */
+  --accent: #5865f2;
+  --accent-rgb: 88, 101, 242;
+  --accent-hover: #4752c4;
+  --accent-glow: rgba(88, 101, 242, 0.3);
+  --success: #23a55a;
+  --danger: #ed4245;
+  --deleted-text: #f23f42;
+
+  /* Borders */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 0.1875rem rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 0.5rem 2rem rgba(0, 0, 0, 0.5);
+
+  /* Surfaces */
+  --surface-page: var(--bg-primary);
+  --surface-panel: linear-gradient(180deg, rgba(43, 45, 49, 0.96), rgba(36, 38, 43, 0.96));
+  --surface-panel-muted: rgba(43, 45, 49, 0.7);
+  --surface-control: rgba(255, 255, 255, 0.04);
+
+  /* Radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 624.9375rem;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 2rem;
+  --space-8: 2.5rem;
+
+  /* Transitions */
+  --transition-fast: 140ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+
   color-scheme: dark;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-  font-size: 15px;
 }
-* { box-sizing: border-box; }
-html, body, #app { height: 100%; margin: 0; }
-body { background: var(--bg); color: var(--text); overflow: hidden; }
-button, input, select { font: inherit; color: inherit; }
-button { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 11px; cursor: pointer; }
-button:hover { border-color: var(--accent); }
-button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-button[aria-pressed='true'] { background: #1d3550; border-color: var(--accent); }
-input, select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
-a { color: var(--accent); }
-.muted { color: var(--muted); }
-@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* The whole page is drawn at 80% of the browser's size: what was comfortable at a browser zoom of 80% is now 100%.
+   Every size is in rem, so this one line scales them all (the map reads it too: see UI in lib/mapgraph.js). */
+html {
+  font-size: 80%;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--surface-page);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  width: 100%;
+}
+
+html,
+body {
+  overflow: hidden;
+}
+
+main,
+section,
+article,
+aside,
+header,
+footer,
+div {
+  min-width: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+code {
+  font-size: 0.9em;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px 0.3125rem;
+}
+
+input,
+textarea,
+select,
+option {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 0.375rem;
+  height: 0.375rem;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  transition: background var(--transition-fast);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Focus visible */
+:focus-visible {
+  outline: 0.125rem solid var(--accent);
+  outline-offset: 0.125rem;
+  border-radius: var(--radius-sm);
+}
+
+/* Selection */
+::selection {
+  background: var(--accent-glow);
+  color: var(--text-primary);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(0.375rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50% { box-shadow: 0 0 0 0.375rem transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------------------------
+   Primitives (Poulet's ui.module.css and Stats.module.css)
+   --------------------------------------------------------------------------------------------------------------- */
+
+/* A panel: ui.module.css .panel */
+.panel {
+  position: relative;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-md);
+}
+
+/* Buttons: ui.module.css .buttonBase, .buttonPrimary */
+.btn {
+  min-height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-control);
+  color: var(--text-primary);
+  font-weight: 600;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, white));
+  border-color: transparent;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, white));
+  border-color: transparent;
+  transform: translateY(-1px);
+}
+
+.btn-danger {
+  color: #ffb3b8;
+  background: rgba(237, 66, 69, 0.08);
+  border-color: rgba(237, 66, 69, 0.25);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(237, 66, 69, 0.14);
+  border-color: rgba(237, 66, 69, 0.35);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* A small button on a toolbar: Stats.module.css .refreshBtn */
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  padding: 0.3125rem 0.625rem;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+}
+
+.tool-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+  transform: translateY(-1px);
+}
+
+.tool-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* A row of exclusive or toggled choices: Stats.module.css .presetButtons / .presetBtn */
+.segmented {
+  display: inline-flex;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.segmented button {
+  border-right: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  padding: 0.3125rem 0.75rem;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.segmented button:last-child {
+  border-right: none;
+}
+
+.segmented button:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Fields: Stats.module.css .select, FilterBar.module.css .searchInput */
+.field-input,
+.select {
+  width: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  padding: 0.3125rem 0.625rem;
+  outline: none;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.select {
+  width: auto;
+  cursor: pointer;
+}
+
+.field-input::placeholder {
+  color: var(--text-muted);
+}
+
+.field-input:focus,
+.select:focus {
+  border-color: var(--accent);
+}
+
+.select option {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+input[type='checkbox'] {
+  accent-color: var(--accent);
+  width: 0.875rem;
+  height: 0.875rem;
+  cursor: pointer;
+}
+
+input[type='date'] {
+  color-scheme: dark;
+}
+
+/* Status badge: ui.module.css .statusBadge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 1.75rem;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.badge.success {
+  color: #9de7b7;
+  background: rgba(35, 165, 90, 0.14);
+  border-color: rgba(35, 165, 90, 0.3);
+}
+
+.badge.danger {
+  color: #ffb3b8;
+  background: rgba(237, 66, 69, 0.12);
+  border-color: rgba(237, 66, 69, 0.3);
+}
+
+.badge.accent {
+  color: #c6cbff;
+  background: rgba(88, 101, 242, 0.18);
+  border-color: rgba(88, 101, 242, 0.34);
+}
+
+/* Banners: Stats.module.css .loadingBanner / .errorBanner */
+.banner {
+  border-radius: var(--radius-md);
+  padding: 0.625rem 0.75rem;
+  font-size: 0.8125rem;
+  background: rgba(237, 66, 69, 0.12);
+  border: 1px solid rgba(237, 66, 69, 0.28);
+  color: #ffb3b8;
+}
+
+.banner.info {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  color: var(--text-secondary);
+}
+
+.banner strong {
+  color: #fff;
+}
+
+/* Small uppercase titles: Stats.module.css .table th, Sidebar.module.css .sectionTitle */
+.eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+/* The row of search and filters at the top of a list (every page that has a list has one) */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.625rem;
+}
+.toolbar .field-input[type='search'] {
+  flex: 1 1 14rem;
+  max-width: 24rem;
+}
+.toolbar .select {
+  min-width: 9rem;
+}
+.toolbar .found {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.toolbar .reset {
+  font-size: 0.75rem;
+}

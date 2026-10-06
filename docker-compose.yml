@@ -34,14 +34,30 @@ services:
       DATABASE_URL: postgresql://dindon:${POSTGRES_PASSWORD}@db:5432/dindon
       DINDON_PASSWORD: ${DINDON_PASSWORD:?Choose a password in .env}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      DINDON_EMBED_MODEL: ${DINDON_EMBED_MODEL:-bge-m3}
+      DINDON_NAMING_MODEL: ${DINDON_NAMING_MODEL:-qwen3:14b}
       # Collection from Discord: only active with a token and a server ID (see README.md)
       DISCORD_TOKEN: ${DISCORD_TOKEN:-}
       DINDON_GUILD_IDS: ${DINDON_GUILD_IDS:-}
+      # The Activity (the map in a voice channel, docs/ACTIVITE.md): the identifiers of the Discord application
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
       DINDON_POLL_SECONDS: ${DINDON_POLL_SECONDS:-30}
       DINDON_THREADS: ${DINDON_THREADS:-active}
-      DINDON_EXPORTER: /opt/exporter/DiscordChatExporter.Cli
+      # Dindon's own exporter (docs/EXPORTATEUR.md): requests in parallel; who reacted is one request per reaction, so by default only for recent messages
+      DINDON_EXPORT_WORKERS: ${DINDON_EXPORT_WORKERS:-6}
+      DINDON_EXPORT_REACTIONS: ${DINDON_EXPORT_REACTIONS:-recent}
+      DINDON_EXPORT_REACTIONS_DAYS: ${DINDON_EXPORT_REACTIONS_DAYS:-30}
       # "off" switches the watcher off (to run the live bot alone, see COLLECTE.md)
       DINDON_COLLECTOR: ${DINDON_COLLECTOR:-on}
+      DINDON_RETENTION_DAYS: ${DINDON_RETENTION_DAYS:-0}
+      # What the page Débats says of the checks of the debates: the same settings as the bot's (which is the one that runs them, docs/DEBAT.md)
+      DINDON_DEBATE_CHECKS: ${DINDON_DEBATE_CHECKS:-off}
+      DINDON_DEBATE_PRECISION: ${DINDON_DEBATE_PRECISION:-}
+      DINDON_DEBATE_MIN_PRECISION: ${DINDON_DEBATE_MIN_PRECISION:-}
+      DINDON_DEBATE_MODEL: ${DINDON_DEBATE_MODEL:-qwen3:14b}
+      DINDON_FACTCHECK_API_KEY: ${DINDON_FACTCHECK_API_KEY:-}
+      DINDON_SEARXNG_URL: ${DINDON_SEARXNG_URL:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -49,8 +65,6 @@ services:
     volumes:
       - ${DINDON_INBOX_DIR:-./inbox}:/data/inbox
       - ${DINDON_ARCHIVE_DIR:-./archive}:/data/archive
-      # The exporter, built for the architecture of the container (exporter/README.md)
-      - ./exporter/bin:/opt/exporter:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
       interval: 10s
@@ -73,7 +87,45 @@ services:
     environment:
       DATABASE_URL: postgresql://dindon:${POSTGRES_PASSWORD}@db:5432/dindon
       DISCORD_TOKEN: ${DISCORD_TOKEN:-}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}      # set: the bot also registers the entry point of the Activity (docs/ACTIVITE.md)
       DINDON_GUILD_IDS: ${DINDON_GUILD_IDS:-}
+      DINDON_ERASE_ON_REMOVAL: ${DINDON_ERASE_ON_REMOVAL:-}
+      DINDON_INBOX: /data/inbox
+      DINDON_ARCHIVE: /data/archive
+      # The debates (docs/DEBAT.md). "off" (default): nothing is read and nothing leaves the machine. "observe": the claims of a debate are checked on the Internet and
+      # noted in the database, nothing is published. "answer": Dindon answers first, with its local model and without the Internet, and the participants judge (works without a
+      # search service). "live": answer + corrections by trusted sources. All of them need the local AI (OLLAMA_URL).
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      DINDON_DEBATE_CHECKS: ${DINDON_DEBATE_CHECKS:-off}
+      DINDON_DEBATE_PRECISION: ${DINDON_DEBATE_PRECISION:-}
+      DINDON_DEBATE_MIN_PRECISION: ${DINDON_DEBATE_MIN_PRECISION:-}
+      DINDON_DEBATE_MODEL: ${DINDON_DEBATE_MODEL:-qwen3:14b}
+      DINDON_FACTCHECK_API_KEY: ${DINDON_FACTCHECK_API_KEY:-}
+      DINDON_SEARXNG_URL: ${DINDON_SEARXNG_URL:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:                             # to erase a person from the files too (/dindon stop)
+      - ${DINDON_INBOX_DIR:-./inbox}:/data/inbox
+      - ${DINDON_ARCHIVE_DIR:-./archive}:/data/archive
+    healthcheck:                         # the bot has no web port: it is healthy when it gave a sign of life lately and is connected to Discord
+      test: ["CMD", "dindon", "bot-health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Optional: a search service for the debates, that you run yourself (docs/DEBAT.md). No account, no key, no port published: only the bot reaches it, at http://searxng:8080.
+  # It asks other search engines for you, and they may refuse a machine that asks too often: fine for a few claims an hour. Set SEARXNG_SECRET in .env (any long random text).
+  #   docker compose --profile search up -d searxng      then DINDON_SEARXNG_URL=http://searxng:8080 and DINDON_DEBATE_CHECKS=observe
+  # NOT TESTED: the configuration (docker/searxng/settings.yml) was never run.
+  searxng:
+    profiles: ["search"]
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-}
+    volumes:
+      - ./docker/searxng/settings.yml:/etc/searxng/settings.yml:ro
 
   # Optional: local AI inside Docker. Meant for a Linux server (with an NVIDIA GPU, add the
   # "deploy" section of the Ollama documentation). On a Mac, Docker cannot use the GPU:

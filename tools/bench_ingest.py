@@ -6,11 +6,9 @@ imports them into the database that DATABASE_URL points to, which must already h
 
     DATABASE_URL=postgresql://dindon:PASSWORD@127.0.0.1:5432/dindon_bench python tools/bench_ingest.py
 """
-import json
 import os
 import tempfile
-import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 
 import psycopg
@@ -30,7 +28,7 @@ with psycopg.connect(os.environ["DATABASE_URL"], autocommit=True) as conn, tempf
         before_last = int(channel.messages[-1]["id"])
         world._conversation(channel, members, size, channel_end := parse_iso(channel.messages[-1]["timestamp"]) + timedelta(minutes=5))
         path = Path(tmp) / f"increment-{size}.json"
-        path.write_text(world.export_document(channel, after_id=before_last, exported_at=datetime.now(timezone.utc)), encoding="utf-8")
+        path.write_text(world.export_document(channel, after_id=before_last, exported_at=datetime.now(UTC)), encoding="utf-8")
         result = ingest_file(conn, path)
         print(f"{size:>5} new messages in one channel (database of 500,000): {result.seconds * 1000:7.1f} ms  "
               f"({result.messages_new} new, {result.edges_changed} links changed)")

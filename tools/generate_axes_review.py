@@ -6,7 +6,8 @@ after changing the axes or the ideologies:
     pip install "psycopg[binary]"
     DATABASE_URL=postgresql://dindon:PASSWORD@127.0.0.1:5432/dindon python generate_axes_review.py
 """
-import os, pathlib
+import os
+import pathlib
 import psycopg
 
 SPECTRUM = {
@@ -57,8 +58,8 @@ w("Cette page est **générée à partir de la base** (`generate_axes_review.py`
 w("## Comment lire\n")
 w("- Chaque axe va de **−1 à +1**. −1 est le pôle de gauche du modèle [12 Axes](https://12axes.vercel.app), +1 son pôle de droite. Les pôles ne sont pas des jugements de valeur.")
 w("- Pour chaque axe : la question qu'il pose, ce qu'il couvre, **ce qu'il ne couvre pas** (pour qu'un sujet n'appartienne qu'à un seul axe), et ce que veulent dire −1, 0 et +1.")
-w("- Les **12 axes du modèle 12 Axes** (leurs noms et leurs pôles) sont actifs. Les axes **ajoutés** sont **inactifs** : ils ne sont pas calculés tant que vous ne les avez pas relus et activés.")
-w("- Pour activer un axe : `UPDATE axes SET is_active = true WHERE code = 'europe';`\n")
+w("- Les **12 axes du modèle 12 Axes** (leurs noms et leurs pôles) et les **9 axes ajoutés** sont tous **actifs** (décision du 4 octobre 2026 : mesuré sur 55 phrases, le modèle range bien moins de phrases sur un mauvais axe quand il voit l'Europe, l'écologie, le genre, la redistribution, les animaux : voir [VALIDATION-AXES.md](VALIDATION-AXES.md)). Un axe inactif n'est ni proposé à l'IA ni calculé.")
+w("- Pour éteindre un axe : `UPDATE axes SET is_active = false WHERE code = 'europe';`\n")
 w("## Les axes en un coup d'œil\n")
 w("| N° | Axe | −1 | +1 | Origine | État |")
 w("| ---: | --- | --- | --- | --- | --- |")
@@ -67,7 +68,7 @@ for a in axes:
 w("")
 
 def axis_section(a):
-    w(f"### {a[8]}. {a[2]} (`{a[1]}`), {'actif' if a[9] else 'inactif'}\n")
+    w(f"### {a[8]}. {a[2]} (`{a[1]}`){'' if a[9] else ', inactif'}\n")
     w(f"**Question :** {a[3]}\n")
     w(f"**Pôles :** −1 = {a[4]}, +1 = {a[5]}\n")
     w(f"**Ce que l'axe couvre :** {a[6]}\n")
@@ -79,10 +80,10 @@ def axis_section(a):
         w(f"- **{fmt(value)}** ({label}) : {an.get(value, '')}")
     w("")
 
-w("## Les 12 axes du modèle 12 Axes (actifs)\n")
+w("## Les 12 axes du modèle 12 Axes\n")
 for a in core:
     axis_section(a)
-w("## Les axes ajoutés (inactifs)\n")
+w("## Les axes ajoutés\n")
 w("Les trois premiers (Europe, écologie, rupture) couvrent ce que les 12 axes ne couvrent pas et que vos rôles de serveur expriment. Les six suivants portent sur des sujets importants du débat politique français.\n")
 for a in extra:
     axis_section(a)
@@ -112,7 +113,7 @@ w("- Une définition est floue ou partiale : corrigez le texte dans `seed-axes.s
 w("- Un pôle est dans le mauvais sens, ou un axe en recouvre un autre : dites-le, c'est ce qui compte le plus pour la qualité du classement.")
 w("- Une plage d'idéologie est trop étroite ou trop large : changez ses bornes.")
 w("- Il manque un axe ou une idéologie : ajoutez une ligne dans `seed-axes.sql`.")
-w("- Vous voulez activer un axe : `UPDATE axes SET is_active = true WHERE code = '...';`")
+w("- Vous voulez éteindre un axe : `UPDATE axes SET is_active = false WHERE code = '...';`")
 
 pathlib.Path(__file__).resolve().parents[1].joinpath("docs", "AXES.md").write_text("\n".join(out) + "\n", encoding="utf-8")
 print(f"AXES.md written: {len(axes)} axes, {len(ideologies)} ideologies, {sum(len(v) for v in ranges.values())} ranges")

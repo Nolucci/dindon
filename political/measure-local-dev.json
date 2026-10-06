@@ -1,0 +1,81 @@
+{
+ "kind": "local",
+ "split": "dev",
+ "prompt": "local-3",
+ "model": "qwen3:14b",
+ "seconds": 17,
+ "predictions": {
+  "c01": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c03": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c05": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c07": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c09": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c11": {
+   "verdict": "false",
+   "answer": "Le droit de vote des femmes en France a été instauré en 1945."
+  },
+  "c13": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c15": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c17": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c19": {
+   "verdict": "false",
+   "answer": "Le Royaume-Uni a quitté l'Union européenne le 31 janvier 2020."
+  },
+  "c21": {
+   "verdict": "false",
+   "answer": "Le mandat du président de la République française dure cinq ans."
+  },
+  "c23": {
+   "verdict": "false",
+   "answer": "La peine de mort a été abolie en France en 1981."
+  },
+  "c25": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c27": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c30": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c31": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c34": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c35": {
+   "verdict": "false",
+   "answer": "Les énergies renouvelables représentent environ 17 % de l'électricité produite en France."
+  }
+ }
+}

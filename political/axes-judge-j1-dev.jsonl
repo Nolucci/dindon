@@ -1,0 +1,237 @@
+{"sentence": "Le 49.3 est un passage en force et non démocratique", "axis": "representation", "place": "negatif"}
+{"sentence": "La société a déjà changé, la loi doit s'adapter", "axis": "pouvoir", "place": "aucun"}
+{"sentence": "La société a déjà changé, la loi doit s'adapter", "axis": "rupture", "place": "aucun"}
+{"sentence": "L'industrie d'armement crée de l'emploi et favorise l'indépendance", "axis": "diplomatie", "place": "negatif"}
+{"sentence": "L'industrie d'armement crée de l'emploi et favorise l'indépendance", "axis": "economie", "place": "aucun"}
+{"sentence": "La dissuasion nucléaire et une armée crédible protègent d'abord la France", "axis": "diplomatie", "place": "negatif"}
+{"sentence": "Certaines traditions doivent être préservées sans être conservatrices", "axis": "morale", "place": "aucun"}
+{"sentence": "Il faut des limites pour gérer les défis de logement, soins et formation", "axis": "immigration", "place": "aucun"}
+{"sentence": "Il faut des limites pour gérer les défis de logement, soins et formation", "axis": "redistribution", "place": "aucun"}
+{"sentence": "L'innovation est le moteur de la croissance et du progrès médical", "axis": "ecologie", "place": "aucun"}
+{"sentence": "L'innovation est le moteur de la croissance et du progrès médical", "axis": "technologie", "place": "negatif"}
+{"sentence": "La France s'est faite par vagues successives, et les Italiens et les Polonais ont eu les mêmes procès", "axis": "immigration", "place": "negatif"}
+{"sentence": "La France s'est faite par vagues successives, et les Italiens et les Polonais ont eu les mêmes procès", "axis": "rupture", "place": "aucun"}
+{"sentence": "La France s'est faite par vagues successives, et les Italiens et les Polonais ont eu les mêmes procès", "axis": "structure", "place": "aucun"}
+{"sentence": "Les chiffres réels sur certains sujets sont bien plus bas que ce que raconte la télévision", "axis": "confiance", "place": "positif"}
+{"sentence": "L'État doit rester neutre envers les croyances religieuses", "axis": "religion", "place": "negatif"}
+{"sentence": "La laïcité est une exception française qui unit le pays", "axis": "religion", "place": "negatif"}
+{"sentence": "Augmenter les moyens de la police peut entraîner plus d’abus, et les peines ne réduisent pas la délinquance.", "axis": "pouvoir", "place": "positif"}
+{"sentence": "Augmenter les moyens de la police peut entraîner plus d’abus, et les peines ne réduisent pas la délinquance.", "axis": "representation", "place": "aucun"}
+{"sentence": "Augmenter les moyens de la police peut entraîner plus d’abus, et les peines ne réduisent pas la délinquance.", "axis": "rupture", "place": "aucun"}
+{"sentence": "La formation des policiers est importante, mais il faut aussi plus de personnel pour faire face aux braquages.", "axis": "pouvoir", "place": "aucun"}
+{"sentence": "L’enjeu est de trouver un équilibre entre sécurité et libertés, et de mesurer les coûts.", "axis": "pouvoir", "place": "aucun"}
+{"sentence": "Des solutions comme des chambres de transit pourraient aider à éviter la surpopulation.", "axis": "immigration", "place": "aucun"}
+{"sentence": "Les réfugiés apportent un bénéfice économique et humain.", "axis": "immigration", "place": "aucun"}
+{"sentence": "Les réfugiés peuvent s’intégrer bien, comme dans le cas de sa copine.", "axis": "immigration", "place": "aucun"}
+{"sentence": "On ne peut pas accueillir tout le monde.", "axis": "immigration", "place": "aucun"}
+{"sentence": "Une politique plus ouverte envers les réfugiés est nécessaire.", "axis": "immigration", "place": "positif"}
+{"sentence": "L'IA doit être développée sans réglementation pour accélérer son avancement.", "axis": "technologie", "place": "negatif"}
+{"sentence": "La réglementation de l'IA est nécessaire pour assurer la véracité et l'éthique.", "axis": "technologie", "place": "positif"}
+{"sentence": "La réglementation peut être mise en place sans freiner l'innovation.", "axis": "controle", "place": "aucun"}
+{"sentence": "Les risques liés à l'IA peuvent être gérés par des filtres à la source.", "axis": "technologie", "place": "negatif"}
+{"sentence": "La laïcité exige l'harmonie sociale et le respect des valeurs républicaines", "axis": "religion", "place": "negatif"}
+{"sentence": "Les agents publics doivent être neutres et uniformes dans leur apparence", "axis": "religion", "place": "negatif"}
+{"sentence": "Les agents publics doivent être neutres et uniformes dans leur apparence", "axis": "representation", "place": "aucun"}
+{"sentence": "Les cas extrêmes sont souvent les seuls visibles dans le débat public", "axis": "confiance", "place": "aucun"}
+{"sentence": "Les cas extrêmes sont souvent les seuls visibles dans le débat public", "axis": "rupture", "place": "aucun"}
+{"sentence": "Continuer la croissance infinie sur une planète finie est mathématiquement impossible", "axis": "ecologie", "place": "positif"}
+{"sentence": "Continuer la croissance infinie sur une planète finie est mathématiquement impossible", "axis": "rupture", "place": "aucun"}
+{"sentence": "Le nucléaire est la vraie réponse au climat", "axis": "ecologie", "place": "negatif"}
+{"sentence": "Les scientifiques sont clairs, on n'a plus le temps de faire du business as usual", "axis": "ecologie", "place": "positif"}
+{"sentence": "Les scientifiques sont clairs, on n'a plus le temps de faire du business as usual", "axis": "rupture", "place": "positif"}
+{"sentence": "La laïcité protège les croyants et les non-croyants.", "axis": "religion", "place": "aucun"}
+{"sentence": "Laisser la religion dans l'espace public entraîne des pressions communautaires.", "axis": "religion", "place": "negatif"}
+{"sentence": "Les signes religieux ostensibles n'ont pas leur place chez les agents publics.", "axis": "religion", "place": "negatif"}
+{"sentence": "L'État a un rôle nécessaire pour rééquilibrer les inégalités", "axis": "redistribution", "place": "negatif"}
+{"sentence": "Le SMIC actuel est trop bas et conduit à des situations de précarité", "axis": "redistribution", "place": "negatif"}
+{"sentence": "Un salaire minimum plus élevé relance la consommation", "axis": "redistribution", "place": "positif"}
+{"sentence": "Les travailleurs étrangers sont essentiels dans de nombreux secteurs en tension.", "axis": "immigration", "place": "aucun"}
+{"sentence": "L'Union européenne est injuste envers les pays membres, car on paie plus qu'on ne reçoit.", "axis": "europe", "place": "negatif"}
+{"sentence": "L'euro a évité des dévaluations en chaîne entre les pays membres.", "axis": "europe", "place": "aucun"}
+{"sentence": "Le marché commun crée des emplois dans les pays membres.", "axis": "commerce", "place": "aucun"}
+{"sentence": "Une armée européenne renforcerait l'autonomie des pays membres par rapport aux États-Unis.", "axis": "alliances", "place": "negatif"}
+{"sentence": "Une armée européenne renforcerait l'autonomie des pays membres par rapport aux États-Unis.", "axis": "europe", "place": "positif"}
+{"sentence": "L'aide à mourir avec des garde-fous garantit la liberté de choisir sa fin de vie", "axis": "morale", "place": "aucun"}
+{"sentence": "L'aide à mourir avec des garde-fous garantit la liberté de choisir sa fin de vie", "axis": "pouvoir", "place": "positif"}
+{"sentence": "Les droits des uns ne doivent pas entraver les droits des autres", "axis": "morale", "place": "aucun"}
+{"sentence": "La France ne devrait pas être le seul pays à fermer les portes aux réfugiés.", "axis": "immigration", "place": "aucun"}
+{"sentence": "On doit réfléchir et agir, pas faire des discours vides.", "axis": "rupture", "place": "aucun"}
+{"sentence": "Les alliés nous respectent parce qu'on peut agir, pas parce qu'on parle", "axis": "alliances", "place": "positif"}
+{"sentence": "Les alliés nous respectent parce qu'on peut agir, pas parce qu'on parle", "axis": "diplomatie", "place": "negatif"}
+{"sentence": "Mieux vaut investir dans des hôpitaux que dans des missiles", "axis": "diplomatie", "place": "aucun"}
+{"sentence": "Mieux vaut investir dans des hôpitaux que dans des missiles", "axis": "redistribution", "place": "aucun"}
+{"sentence": "La décroissance est un luxe pour les gens qui ont déjà tout.", "axis": "ecologie", "place": "negatif"}
+{"sentence": "Enfermer plus ne réduit pas la récidive", "axis": "pouvoir", "place": "positif"}
+{"sentence": "La prévention et les éducateurs sont préférables aux caméras", "axis": "pouvoir", "place": "positif"}
+{"sentence": "Les lois sécuritaires dépassent souvent leur but initial", "axis": "pouvoir", "place": "aucun"}
+{"sentence": "La Ve République concentre trop de pouvoir dans les mains d'un seul homme", "axis": "representation", "place": "negatif"}
+{"sentence": "Un Parlement éclaté ne décide plus rien", "axis": "representation", "place": "aucun"}
+{"sentence": "Il faut une réglementation sérieuse avant les problèmes, pas des excuses après", "axis": "controle", "place": "negatif"}
+{"sentence": "Il faut une réglementation sérieuse avant les problèmes, pas des excuses après", "axis": "rupture", "place": "aucun"}
+{"sentence": "Protéger le vivant avant de lancer n'importe quelle innovation est du bon sens", "axis": "ecologie", "place": "positif"}
+{"sentence": "Protéger le vivant avant de lancer n'importe quelle innovation est du bon sens", "axis": "technologie", "place": "positif"}
+{"sentence": "Le SMIC doit être augmenté pour éviter que des gens dorment dans leur voiture", "axis": "redistribution", "place": "negatif"}
+{"sentence": "Les impôts sont déjà trop élevés et poussent les gens à quitter le pays", "axis": "redistribution", "place": "positif"}
+{"sentence": "Régulariser les travailleurs étrangers déjà employés est une mesure de bon sens, pas une charité", "axis": "immigration", "place": "aucun"}
+{"sentence": "La laïcité est devenue une arme contre une seule religion", "axis": "religion", "place": "negatif"}
+{"sentence": "Il faut être ferme sur les expulsions pour que la loi ait de l'effet", "axis": "pouvoir", "place": "negatif"}
+{"sentence": "Les services publics sont saturés dans de nombreuses villes", "axis": "economie", "place": "aucun"}
+{"sentence": "Les pays qui sortent de l'UE finissent par regretter leur décision", "axis": "europe", "place": "negatif"}
+{"sentence": "L'accueil des réfugiés est une obligation internationale.", "axis": "immigration", "place": "aucun"}
+{"sentence": "La vidéosurveillance a permis d'élucider des affaires", "axis": "pouvoir", "place": "aucun"}
+{"sentence": "Il est nécessaire de réarmer face à un monde plus dangereux", "axis": "diplomatie", "place": "negatif"}
+{"sentence": "Intervenir à l'étranger ne crée pas de stabilité durable", "axis": "intervention", "place": "negatif"}
+{"sentence": "L'égalité salariale exige des sanctions réelles pour être atteinte", "axis": "genre", "place": "negatif"}
+{"sentence": "L'égalité salariale exige des sanctions réelles pour être atteinte", "axis": "redistribution", "place": "negatif"}
+{"sentence": "Les familles ne suivent plus un seul modèle social", "axis": "morale", "place": "aucun"}
+{"sentence": "La coopération entre les pays européens est nécessaire pour agir sur le climat, la défense et le numérique", "axis": "diplomatie", "place": "aucun"}
+{"sentence": "La coopération entre les pays européens est nécessaire pour agir sur le climat, la défense et le numérique", "axis": "europe", "place": "positif"}
+{"sentence": "La vision selon laquelle les droits des uns ne retirent rien aux autres est simpliste", "axis": "confiance", "place": "aucun"}
+{"sentence": "La vision selon laquelle les droits des uns ne retirent rien aux autres est simpliste", "axis": "morale", "place": "aucun"}
+{"sentence": "La famille reste un REPÈRE important pour beaucoup", "axis": "morale", "place": "positif"}
+{"sentence": "La famille reste un REPÈRE important pour beaucoup", "axis": "rupture", "place": "aucun"}
+{"sentence": "La sécurité dépend de la capacité à agir, pas des discours", "axis": "pouvoir", "place": "aucun"}
+{"sentence": "Il faut un cadre clair pour l'évolution, sans changements brutaux.", "axis": "pouvoir", "place": "aucun"}
+{"sentence": "Il faut un cadre clair pour l'évolution, sans changements brutaux.", "axis": "rupture", "place": "negatif"}
+{"sentence": "L'évolution doit se faire par étapes, pas en un coup.", "axis": "rupture", "place": "negatif"}
+{"sentence": "La GPA doit être abordée avec prudence, en tenant compte des risques sociaux.", "axis": "morale", "place": "positif"}
+{"sentence": "La GPA doit être abordée avec prudence, en tenant compte des risques sociaux.", "axis": "rupture", "place": "aucun"}
+{"sentence": "Les lois doivent suivre la vérité et les besoins de tous, sans attendre la perfection.", "axis": "morale", "place": "negatif"}
+{"sentence": "Les lois doivent suivre la vérité et les besoins de tous, sans attendre la perfection.", "axis": "representation", "place": "aucun"}
+{"sentence": "L'État doit rester en contrôle des services publics comme les hôpitaux et les écoles", "axis": "economie", "place": "negatif"}
+{"sentence": "La paperasse étatique est un gaspillage", "axis": "controle", "place": "aucun"}
+{"sentence": "Réduire les normes et les charges permet de relancer l'industrie", "axis": "controle", "place": "positif"}
+{"sentence": "Réduire les normes et les charges permet de relancer l'industrie", "axis": "redistribution", "place": "positif"}
+{"sentence": "Il ne faut pas freiner l'IA, car cela pourrait nuire à l'innovation et à la compétitivité.", "axis": "technologie", "place": "negatif"}
+{"sentence": "La vidéosurveillance est une vision simpliste de la justice", "axis": "pouvoir", "place": "positif"}
+{"sentence": "Le 49.3 doit être utilisé avec prudence, en tenant compte de la stabilité du pays.", "axis": "representation", "place": "aucun"}
+{"sentence": "Le 49.3 est une menace pour la démocratie et doit être arrêté.", "axis": "representation", "place": "negatif"}
+{"sentence": "Les changements trop rapides peuvent nuire à la stabilité familiale", "axis": "morale", "place": "positif"}
+{"sentence": "Les changements trop rapides peuvent nuire à la stabilité familiale", "axis": "rupture", "place": "negatif"}
+{"sentence": "La laïcité doit exclure toute expression religieuse de l’espace public.", "axis": "religion", "place": "negatif"}
+{"sentence": "La laïcité permet à tous de vivre ensemble malgré les différences, sans dictature morale.", "axis": "religion", "place": "aucun"}
+{"sentence": "La fin de vie concerne aussi les proches et la solidarité sociale.", "axis": "morale", "place": "aucun"}
+{"sentence": "Le suicide assisté est déshumanisant et ne vise plus le bien-être du malade.", "axis": "morale", "place": "positif"}
+{"sentence": "Le président ne devrait pas avoir trop de pouvoir.", "axis": "representation", "place": "negatif"}
+{"sentence": "Les partis politiques devraient être réformés pour mieux représenter les citoyens.", "axis": "representation", "place": "aucun"}
+{"sentence": "Un référendum citoyen pourrait ne pas résoudre les problèmes actuels.", "axis": "rupture", "place": "aucun"}
+{"sentence": "Augmenter l’ouverture des frontières est utopique, comme en Espagne, où le chômage augmente.", "axis": "immigration", "place": "negatif"}
+{"sentence": "La régularisation actuelle est déjà à 68%, et augmenter le nombre de migrants poserait des problèmes logistiques.", "axis": "immigration", "place": "aucun"}
+{"sentence": "L'innovation technique résout plus de problèmes que les interdictions", "axis": "pouvoir", "place": "aucun"}
+{"sentence": "L'innovation technique résout plus de problèmes que les interdictions", "axis": "technologie", "place": "negatif"}
+{"sentence": "L'Union européenne impose des décisions sans consultation des citoyens", "axis": "europe", "place": "negatif"}
+{"sentence": "L'Union européenne impose des décisions sans consultation des citoyens", "axis": "representation", "place": "negatif"}
+{"sentence": "La liberté religieuse est garantie par la Déclaration de 1789", "axis": "religion", "place": "aucun"}
+{"sentence": "Les gens ont le droit de vivre leur foi en public", "axis": "religion", "place": "positif"}
+{"sentence": "La vision selon laquelle les normes européennes protègent mieux les consommateurs est simpliste.", "axis": "europe", "place": "negatif"}
+{"sentence": "La Chine pollue plus que l'Europe, donc nos efforts n'ont que peu d'impact", "axis": "ecologie", "place": "aucun"}
+{"sentence": "La France s'est formée par vagues successives, avec des procès équitablement appliqués à tous les migrants", "axis": "immigration", "place": "aucun"}
+{"sentence": "L'écologie punitive peut provoquer des mouvements sociaux violents", "axis": "ecologie", "place": "aucun"}
+{"sentence": "La France n’a pas d’ennemi hors de ses frontières, donc le budget militaire n’est pas utile", "axis": "diplomatie", "place": "negatif"}
+{"sentence": "La France n’a pas d’ennemi hors de ses frontières, donc le budget militaire n’est pas utile", "axis": "intervention", "place": "negatif"}
+{"sentence": "La priorité doit être de résoudre la crise économique plutôt que d’investir dans l’armée", "axis": "controle", "place": "aucun"}
+{"sentence": "La priorité doit être de résoudre la crise économique plutôt que d’investir dans l’armée", "axis": "diplomatie", "place": "aucun"}
+{"sentence": "La priorité doit être de résoudre la crise économique plutôt que d’investir dans l’armée", "axis": "economie", "place": "aucun"}
+{"sentence": "Le budget militaire doit être augmenté pour se protéger en Europe", "axis": "diplomatie", "place": "negatif"}
+{"sentence": "La fin de vie peut mener à des dérives, comme ailleurs", "axis": "morale", "place": "aucun"}
+{"sentence": "La fin de vie peut mener à des dérives, comme ailleurs", "axis": "rupture", "place": "aucun"}
+{"sentence": "L'argent public devrait être utilisé autrement que pour l'armée", "axis": "diplomatie", "place": "negatif"}
+{"sentence": "L'argent public devrait être utilisé autrement que pour l'armée", "axis": "intervention", "place": "negatif"}
+{"sentence": "L'Union européenne n'a pas de légitimité démocratique", "axis": "europe", "place": "negatif"}
+{"sentence": "L'Union européenne n'a pas de légitimité démocratique", "axis": "representation", "place": "negatif"}
+{"sentence": "L'Union européenne impose des conditions inéquitables aux pays membres", "axis": "europe", "place": "negatif"}
+{"sentence": "Les grandes entreprises ne respecteront pas les réglementations de l'IA tant que ça rapporte.", "axis": "controle", "place": "aucun"}
+{"sentence": "Les grandes entreprises ne respecteront pas les réglementations de l'IA tant que ça rapporte.", "axis": "technologie", "place": "aucun"}
+{"sentence": "Sans contrôle, la dérive de l'IA est rapide et l'équilibre est fragile.", "axis": "controle", "place": "negatif"}
+{"sentence": "Sans contrôle, la dérive de l'IA est rapide et l'équilibre est fragile.", "axis": "technologie", "place": "positif"}
+{"sentence": "Le RIC permettrait de débloquer des sujets évités par les partis", "axis": "participation", "place": "negatif"}
+{"sentence": "Sortir de l'OTAN et ne plus suivre Washington partout est sain", "axis": "alliances", "place": "negatif"}
+{"sentence": "L'UE nous fait payer plus qu'on ne reçoit et nous donne des leçons en prime", "axis": "europe", "place": "negatif"}
+{"sentence": "L'Union européenne impose des normes climatiques contraignantes", "axis": "ecologie", "place": "positif"}
+{"sentence": "L'Union européenne impose des normes climatiques contraignantes", "axis": "europe", "place": "negatif"}
+{"sentence": "La loi doit s'adapter aux divers modèles familiaux", "axis": "morale", "place": "negatif"}
+{"sentence": "La loi doit s'adapter aux divers modèles familiaux", "axis": "rupture", "place": "negatif"}
+{"sentence": "L'aide à mourir doit être encadrée par des garde-fous", "axis": "morale", "place": "aucun"}
+{"sentence": "La formation des policiers est plus importante que leur armement", "axis": "pouvoir", "place": "aucun"}
+{"sentence": "Interdire partout les signes religieux peut effacer les croyants.", "axis": "religion", "place": "positif"}
+{"sentence": "La question de la laïcité dépend des contextes et des cas.", "axis": "religion", "place": "aucun"}
+{"sentence": "La question de l'égalité salariale dépend des contextes", "axis": "genre", "place": "aucun"}
+{"sentence": "Il est nécessaire de se baser sur des articles sérieux pour débattre de ces sujets", "axis": "confiance", "place": "negatif"}
+{"sentence": "La vision de l'écologie punitive est trop simpliste", "axis": "ecologie", "place": "negatif"}
+{"sentence": "La police est sous-équipée et sous-payée, il faut plus d'investissements", "axis": "pouvoir", "place": "aucun"}
+{"sentence": "Trop de réglementation nuit aux startups", "axis": "controle", "place": "positif"}
+{"sentence": "Il faut réduire les dépenses publiques pour éviter que nos enfants paient la dette", "axis": "economie", "place": "negatif"}
+{"sentence": "Il faut réduire les dépenses publiques pour éviter que nos enfants paient la dette", "axis": "redistribution", "place": "positif"}
+{"sentence": "Une armée européenne réduit la dépendance envers Washington", "axis": "alliances", "place": "negatif"}
+{"sentence": "Une armée européenne réduit la dépendance envers Washington", "axis": "diplomatie", "place": "aucun"}
+{"sentence": "La France a historiquement été peuplée par des vagues migratoires successives", "axis": "immigration", "place": "aucun"}
+{"sentence": "Les peines non appliquées n'ont aucun effet dissuasif", "axis": "pouvoir", "place": "negatif"}
+{"sentence": "L'armement est nécessaire pour assurer la sécurité nationale", "axis": "diplomatie", "place": "negatif"}
+{"sentence": "Il n'est pas nécessaire d'ajouter des lois supplémentaires pour protéger la laïcité", "axis": "religion", "place": "negatif"}
+{"sentence": "Les racines chrétiennes ont leur place dans le paysage français", "axis": "religion", "place": "positif"}
+{"sentence": "Freiner la recherche en France permettrait aux États-Unis et à la Chine de décider seuls", "axis": "alliances", "place": "aucun"}
+{"sentence": "Freiner la recherche en France permettrait aux États-Unis et à la Chine de décider seuls", "axis": "rupture", "place": "aucun"}
+{"sentence": "L'État est un mauvais gestionnaire", "axis": "controle", "place": "positif"}
+{"sentence": "L'État est un mauvais gestionnaire", "axis": "economie", "place": "positif"}
+{"sentence": "Améliorer la qualité des infrastructures et la capacité technologique plutôt qu’augmenter massivement les budgets militaires", "axis": "diplomatie", "place": "positif"}
+{"sentence": "Améliorer la qualité des infrastructures et la capacité technologique plutôt qu’augmenter massivement les budgets militaires", "axis": "technologie", "place": "positif"}
+{"sentence": "Investir dans l’éducation et les soins plutôt que dans les armes", "axis": "diplomatie", "place": "positif"}
+{"sentence": "Investir dans l’éducation et les soins plutôt que dans les armes", "axis": "redistribution", "place": "aucun"}
+{"sentence": "La vision de l'euro comme un carcan est simpliste", "axis": "europe", "place": "negatif"}
+{"sentence": "Moins de réglementation favorise l'innovation", "axis": "controle", "place": "positif"}
+{"sentence": "Des peines planchers pour les violences répétées ou les agressions sexuelles pourraient aider à lutter contre l'impunité.", "axis": "pouvoir", "place": "negatif"}
+{"sentence": "Il faut mettre en place des programmes de réinsertion pour éviter la récidive et repenser le système pénal.", "axis": "pouvoir", "place": "positif"}
+{"sentence": "La police doit être mieux outillée pour identifier les récidivistes rapidement, notamment via des prises de sang.", "axis": "pouvoir", "place": "negatif"}
+{"sentence": "Le système actuel est trop laxiste pour les petits délits.", "axis": "pouvoir", "place": "negatif"}
+{"sentence": "Le Royaume-Uni paie plus qu'il ne reçoit de l'Union européenne", "axis": "europe", "place": "aucun"}
+{"sentence": "L'argument de la croissance infinie étant impossible est compréhensible", "axis": "ecologie", "place": "aucun"}
+{"sentence": "L'immigration en masse et les frontières sont des problèmes à considérer", "axis": "immigration", "place": "aucun"}
+{"sentence": "L'immigration en masse et les frontières sont des problèmes à considérer", "axis": "structure", "place": "aucun"}
+{"sentence": "La France ne doit pas être une terre d'accueil pour les illégaux", "axis": "immigration", "place": "negatif"}
+{"sentence": "Les politiques d'expulsion sont en partie responsables de la situation des migrants", "axis": "immigration", "place": "aucun"}
+{"sentence": "Augmenter le SMIC réduit la dette à long terme en diminuant la pauvreté.", "axis": "redistribution", "place": "negatif"}
+{"sentence": "Encourager les PME avec des subventions permet leur croissance sans ruiner l'État.", "axis": "economie", "place": "positif"}
+{"sentence": "Encourager les PME avec des subventions permet leur croissance sans ruiner l'État.", "axis": "redistribution", "place": "aucun"}
+{"sentence": "L'État doit réguler l'économie en augmentant le SMIC et en améliorant les services publics.", "axis": "controle", "place": "negatif"}
+{"sentence": "L'État doit réguler l'économie en augmentant le SMIC et en améliorant les services publics.", "axis": "economie", "place": "negatif"}
+{"sentence": "Les impôts progressifs touchent surtout les très riches, qui pourraient investir dans l'économie locale.", "axis": "economie", "place": "aucun"}
+{"sentence": "Les impôts progressifs touchent surtout les très riches, qui pourraient investir dans l'économie locale.", "axis": "redistribution", "place": "positif"}
+{"sentence": "La France a toujours été un mélange de cultures, le problème est le manque d’investissement dans l’apprentissage du français.", "axis": "immigration", "place": "positif"}
+{"sentence": "La France doit contrôler l'entrée des immigrés pour gérer les coûts sociaux.", "axis": "immigration", "place": "aucun"}
+{"sentence": "La France doit intégrer les compétents, mais craindre une dilution culturelle.", "axis": "immigration", "place": "negatif"}
+{"sentence": "La France doit intégrer les compétents, mais craindre une dilution culturelle.", "axis": "morale", "place": "aucun"}
+{"sentence": "La France doit s’ouvrir pour se réinventer et profiter d’opportunités économiques.", "axis": "alliances", "place": "aucun"}
+{"sentence": "La France doit s’ouvrir pour se réinventer et profiter d’opportunités économiques.", "axis": "economie", "place": "aucun"}
+{"sentence": "La France doit s’ouvrir pour se réinventer et profiter d’opportunités économiques.", "axis": "immigration", "place": "positif"}
+{"sentence": "Il faut des compromis pour changer les normes tout en maintenant le cadre social.", "axis": "morale", "place": "aucun"}
+{"sentence": "Il faut des compromis pour changer les normes tout en maintenant le cadre social.", "axis": "rupture", "place": "negatif"}
+{"sentence": "La société doit évoluer plus rapidement.", "axis": "rupture", "place": "positif"}
+{"sentence": "Les normes sociales doivent s'adapter plus rapidement pour réduire le stress chez les jeunes.", "axis": "morale", "place": "negatif"}
+{"sentence": "Les normes sociales doivent s'adapter plus rapidement pour réduire le stress chez les jeunes.", "axis": "rupture", "place": "aucun"}
+{"sentence": "La coopération européenne est nécessaire, mais doit rester limitée et respecter l’autonomie nationale", "axis": "europe", "place": "aucun"}
+{"sentence": "L’Europe doit être indépendante et non contrôlée par des institutions externes", "axis": "europe", "place": "negatif"}
+{"sentence": "Taxer les grosses fortunes est une vision simpliste", "axis": "redistribution", "place": "positif"}
+{"sentence": "Le marché seul ne résout pas les inégalités, l'État doit intervenir", "axis": "economie", "place": "negatif"}
+{"sentence": "Le marché seul ne résout pas les inégalités, l'État doit intervenir", "axis": "redistribution", "place": "negatif"}
+{"sentence": "Les visions simplistes ne sont pas utiles pour comprendre les enjeux", "axis": "confiance", "place": "aucun"}
+{"sentence": "Les visions simplistes ne sont pas utiles pour comprendre les enjeux", "axis": "rupture", "place": "aucun"}
+{"sentence": "La loi doit suivre les changements sociaux, notamment sur la fin de vie", "axis": "morale", "place": "negatif"}
+{"sentence": "La loi doit suivre les changements sociaux, notamment sur la fin de vie", "axis": "rupture", "place": "negatif"}
+{"sentence": "La croissance économique est liée à la pollution, et réduire la pollution peut nuire à la croissance", "axis": "ecologie", "place": "aucun"}
+{"sentence": "La sobriété énergétique est bénéfique pour l'environnement, notamment en réduisant les déplacements aériens", "axis": "ecologie", "place": "positif"}
+{"sentence": "La taxe kérosène doit être accompagnée d'investissements dans les transports alternatifs et les énergies renouvelables", "axis": "ecologie", "place": "positif"}
+{"sentence": "La taxe kérosène doit être accompagnée d'investissements dans les transports alternatifs et les énergies renouvelables", "axis": "redistribution", "place": "aucun"}
+{"sentence": "Les énergies renouvelables sont importantes, mais leur coût est un obstacle à leur développement", "axis": "ecologie", "place": "aucun"}
+{"sentence": "Les énergies renouvelables sont importantes, mais leur coût est un obstacle à leur développement", "axis": "economie", "place": "aucun"}
+{"sentence": "Il faut des preuves concrètes pour justifier les propositions politiques", "axis": "confiance", "place": "negatif"}
+{"sentence": "Les propositions politiques doivent être contextualisées géographiquement", "axis": "representation", "place": "aucun"}
+{"sentence": "Les propositions politiques doivent être contextualisées géographiquement", "axis": "structure", "place": "aucun"}
+{"sentence": "L'intégration des migrants dépend de la régularisation et de l'accès au travail", "axis": "immigration", "place": "aucun"}
+{"sentence": "Régulariser les travailleurs étrangers envoie un message clair que le travail légal est valorisé", "axis": "immigration", "place": "aucun"}
+{"sentence": "Il existe déjà des lois suffisantes, il n'est pas nécessaire d'en ajouter", "axis": "representation", "place": "aucun"}
+{"sentence": "Il existe déjà des lois suffisantes, il n'est pas nécessaire d'en ajouter", "axis": "rupture", "place": "negatif"}
+{"sentence": "Les problèmes sociaux ne se résolvent pas par des mesures pénales", "axis": "pouvoir", "place": "positif"}
+{"sentence": "Les problèmes sociaux ne se résolvent pas par des mesures pénales", "axis": "redistribution", "place": "aucun"}
+{"sentence": "Les droits des uns ne retirent rien aux autres, c'est le principe fondamental", "axis": "morale", "place": "aucun"}
+{"sentence": "On ne peut pas avoir d'avis tranché sur la question des signes religieux", "axis": "confiance", "place": "aucun"}
+{"sentence": "On ne peut pas avoir d'avis tranché sur la question des signes religieux", "axis": "religion", "place": "aucun"}

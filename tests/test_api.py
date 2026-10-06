@@ -2,7 +2,7 @@
 import dataclasses
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from pathlib import Path
 
 import pytest
@@ -12,7 +12,8 @@ from dindon.api.auth import COOKIE, Auth
 from dindon.api.main import create_app
 from dindon.bot.adapter import Directory, build_document, digest
 from dindon.ingest.loader import GATEWAY_SOURCE, ingest_document, ingest_file
-from gateway_fixtures import ALICE, BOB, BOT, CAROL, GENERAL, GUILD, OLD_DAVE, guild_create, member, message_create
+from gateway_fixtures import (ADMIN, ALICE, BOB, BOT, CAROL, CITIZEN, EUROPEAN, GENERAL, GUILD, OLD_DAVE, guild_create, member, message_create,
+                              role)
 from make_demo_server import AGE_ROLES, GENDER_ROLES, World, write_exports
 from synthetic import settings_for
 
@@ -23,7 +24,7 @@ PASSWORD = "correct horse"
 @pytest.fixture(scope="module")
 def world():
     w = World(seed=5, people=50)
-    w.generate(4000, days=60, end=datetime.now(timezone.utc) - timedelta(days=1))
+    w.generate(4000, days=60, end=datetime.now(UTC) - timedelta(days=1))
     return w
 
 
@@ -46,7 +47,7 @@ def me(api):
 # ---------------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("path", ["/api/guilds", "/api/graph", "/api/people?q=a", "/api/person/1", "/api/status", "/events"])
+@pytest.mark.parametrize("path", ["/api/guilds", "/api/graph", "/api/people?q=a", "/api/person/1", "/api/avatar/1", "/api/status", "/events"])
 def test_nothing_is_served_without_the_session(api, path):
     assert api.get(path).status_code == 401
 
@@ -145,8 +146,8 @@ def test_a_period_is_counted_again_from_the_messages_and_agrees_with_the_whole(m
 
 
 def test_a_narrow_period_shows_only_what_happened_in_it(me):
-    meta = me.get("/api/graph").json()["meta"]
-    now = datetime.now(timezone.utc)
+    me.get("/api/graph").json()["meta"]
+    now = datetime.now(UTC)
     week = me.get("/api/graph", params={"since": (now - timedelta(days=7)).isoformat(), "until": now.isoformat()}).json()
     allt = me.get("/api/graph").json()
     assert 0 < len(week["edges"]) < len(allt["edges"]) and week["meta"]["period"]["since"]
@@ -201,7 +202,7 @@ def test_age_and_gender_roles_never_come_out(me, world):
         assert not any(name in body for name in sensitive), p.name
         card = json.loads(body)
         assert set(card) <= {"id", "label", "is_bot", "names", "activity", "exchanges", "by_month", "top_channels", "top_links",
-                             "claimed_roles", "claimed_roles_note"}
+                             "claimed_roles", "claimed_roles_note", "color"}
     # and the roles that do come out say an ideology
     some = next(p for p in world.people if any(r["name"] in {"Eurosceptique", "Écologiste", "Communiste", "Socialiste", "Patriote"}
                                                 and int(r["id"]) in p.role_ids for r in world.roles.values()))
@@ -243,7 +244,7 @@ FRANK = {"id": "1000000000000000007", "username": "frank", "discriminator": "0",
 
 
 def _ago(**delta) -> str:
-    return (datetime.now(timezone.utc) - timedelta(**delta)).isoformat()
+    return (datetime.now(UTC) - timedelta(**delta)).isoformat()
 
 
 @pytest.fixture
@@ -341,10 +342,105 @@ def test_the_card_of_a_person_without_a_link_opens(me, small_server):
     assert card.status_code == 200 and card.json()["activity"]["messages"] == 2 and card.json()["top_links"] == []
 
 
+def _close(a, b, tolerance=1e-3) -> bool:
+    """Equal, but the numbers only need to agree to a thousandth: the weights of the links fade with the clock (half-life of 90 days),
+    and the two requests of a test are not made at the same millisecond, so the fourth decimal can differ."""
+    if isinstance(a, dict):
+        return a.keys() == b.keys() and all(_close(a[k], b[k], tolerance) for k in a)
+    if isinstance(a, list):
+        return len(a) == len(b) and all(_close(x, y, tolerance) for x, y in zip(a, b, strict=False))
+    if isinstance(a, float):
+        return abs(a - b) <= tolerance
+    return a == b
+
+
 def test_without_the_option_the_big_server_is_unchanged_and_with_it_only_points_are_added(me, world):
     plain = me.get("/api/graph").json()
     asked = me.get("/api/graph?isolated=true").json()
-    assert asked["edges"] == plain["edges"]
+    assert _close(asked["edges"], plain["edges"])
     linked = [n for n in asked["nodes"] if not n.get("isolated")]
-    assert linked == plain["nodes"]
+    assert _close(linked, plain["nodes"])
     assert asked["meta"]["nodes_shown"] == len(asked["nodes"]) == len(plain["nodes"]) + asked["meta"]["isolated_shown"]
+
+
+# ---------------------------------------------------------------------------------------------
+# The color of a person
+# ---------------------------------------------------------------------------------------------
+
+AGE_ROLE = "303"  # "Entre 21 et 30 ans", position 6: above all the others, and blue
+
+
+@pytest.fixture
+def colored_server(ingest_db):
+    """Bob has the red and the green roles; Carol only the green one; Alice none; Erin has the green role and, above it, a blue
+    age role; Frank only the blue age role. Discord shows each person's name in the color of their highest colored role."""
+    directory = Directory([GUILD])
+    created = guild_create()
+    created["roles"].append(role(AGE_ROLE, "Entre 21 et 30 ans", 6, 0x0000FF))
+    directory.apply("GUILD_CREATE", created)
+    counter = iter(range(9_100_000_000_000_000_000 - 100, 9_100_000_000_000_000_000))
+    def msg(author, nick, roles, **kw):
+        return message_create(next(counter), "salut", author, timestamp=_ago(hours=1), member_data=member(nick, roles=roles), **kw)
+    messages = [msg(BOB, "Bob", (CITIZEN, EUROPEAN, ADMIN)), msg(CAROL, "Carol", (CITIZEN, EUROPEAN)), msg(ALICE, "Ali", ()),
+                msg(ERIN, "Erin", (EUROPEAN, AGE_ROLE)), msg(FRANK, "Frank", (AGE_ROLE,))]
+    document = build_document(directory, GUILD, GENERAL, messages)
+    ingest_document(ingest_db, document, GATEWAY_SOURCE, digest(document), only_new=True)
+    return {name: person["id"] for name, person in dict(alice=ALICE, bob=BOB, carol=CAROL, erin=ERIN, frank=FRANK).items()}
+
+
+def test_each_point_has_the_color_that_the_person_has_in_discord(me, colored_server):
+    ids = colored_server
+    nodes = {n["id"]: n for n in _graph(me, isolated="true")["nodes"]}
+    assert nodes[ids["bob"]]["color"] == "#FF0000"       # the highest role that has a color
+    assert nodes[ids["carol"]]["color"] == "#00FF00"
+    assert nodes[ids["alice"]]["color"] is None          # no colored role: no color, the page uses Discord's default
+
+
+def test_the_color_never_comes_from_a_role_of_age_or_gender(me, colored_server):
+    """The blue role says an age bracket: a blue point would say it too. The next colored role counts, or none."""
+    ids = colored_server
+    nodes = {n["id"]: n for n in _graph(me, isolated="true")["nodes"]}
+    assert nodes[ids["erin"]]["color"] == "#00FF00"
+    assert nodes[ids["frank"]]["color"] is None
+    assert "#0000FF" not in json.dumps(_graph(me, isolated="true"))
+
+
+def test_a_color_that_is_not_a_color_is_not_sent(me, ingest_db):
+    """The text comes from an export file: only #RRGGBB goes to the page (black is Discord's 'no color')."""
+    directory = Directory([GUILD])
+    directory.apply("GUILD_CREATE", guild_create())
+    messages = [message_create(9_200_000_000_000_000_000 + i, "x", author, timestamp=_ago(hours=1), member_data=member(roles=(ADMIN,)))
+                for i, author in enumerate((BOB, CAROL))]
+    document = build_document(directory, GUILD, GENERAL, messages)
+    document["roles"] = [dict(r, color={"301": "url(http://elsewhere/)", "302": "#000000"}.get(r["id"], r.get("color"))) for r in document["roles"]]
+    ingest_document(ingest_db, document, GATEWAY_SOURCE, digest(document), only_new=True)
+    assert all(n["color"] is None for n in _graph(me, isolated="true")["nodes"])
+
+
+def test_a_black_role_is_no_color_and_the_next_colored_role_counts(me, ingest_db):
+    """Discord shows no color for a black role; a black role that outranks a colored one must not hide it."""
+    directory = Directory([GUILD])
+    created = guild_create()
+    created["roles"] = [role(GUILD, "@everyone", 0), role(EUROPEAN, "Européiste", 3, 0x00FF00), role(ADMIN, "Admin", 5, 0x000001)]
+    directory.apply("GUILD_CREATE", created)
+    messages = [message_create(8_300_000_000_000_000_000 + i, "salut", author, timestamp=_ago(hours=1), member_data=member(roles=(EUROPEAN, ADMIN)))
+                for i, author in enumerate((BOB, CAROL))]
+    document = build_document(directory, GUILD, GENERAL, messages)
+    document["roles"] = [dict(r, color="#000000") if r["id"] == ADMIN else r for r in document["roles"]]
+    ingest_document(ingest_db, document, GATEWAY_SOURCE, digest(document), only_new=True)
+    colors = {n["id"]: n["color"] for n in _graph(me, isolated="true")["nodes"]}
+    assert set(colors.values()) == {"#00FF00"}
+
+
+def test_the_color_that_an_export_gives_is_not_used_when_the_roles_are_not_known(me, ingest_db):
+    """An export gives the color of the highest colored role, whatever it is (an age role too): without the roles to check it, it is
+    not sent."""
+    directory = Directory([GUILD])
+    directory.apply("GUILD_CREATE", guild_create())
+    messages = [message_create(8_400_000_000_000_000_000, "salut", BOB, timestamp=_ago(hours=1), member_data=member())]
+    document = build_document(directory, GUILD, GENERAL, messages)
+    for user in document["users"]:
+        user["color"] = "#0000FF"                                                     # the color of some role that nothing here describes
+    ingest_document(ingest_db, document, GATEWAY_SOURCE, digest(document), only_new=True)
+    assert [n["color"] for n in _graph(me, isolated="true")["nodes"]] == [None]
+

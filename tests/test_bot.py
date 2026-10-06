@@ -228,20 +228,90 @@ def test_a_channel_that_is_not_known_is_skipped_and_nothing_is_invented(ingest_d
     assert ingest_db.execute("SELECT count(*) FROM channels WHERE id = 424242").fetchone()[0] == 0
 
 
-def test_edits_deletions_and_reactions_are_counted_and_not_applied_yet(ingest_db, ingest_url):
+def edited(payload: dict, text: str) -> dict:
+    return {**payload, "content": text, "edited_timestamp": "2026-10-02T19:05:00.000000+00:00"}
+
+
+def test_an_edit_replaces_the_text_of_a_message_that_is_already_stored(ingest_db, ingest_url):
+    runner = runner_for(ingest_url)
+    alice_says, _ = exchange()
+    runner.handle(create(alice_says))
+    flush(runner)
+    runner.handle(event("MESSAGE_UPDATE", edited(alice_says, "Vous avez vu ça ?")))
+    flush(runner)
+    assert messages(ingest_db) == {100: "Vous avez vu ça ?"}
+    assert runner.status()["edited"] == 1
+
+
+def test_an_edit_of_a_message_that_is_not_written_yet_just_changes_what_is_written(ingest_db, ingest_url):
+    runner = runner_for(ingest_url)
+    alice_says, _ = exchange()
+    runner.handle(create(alice_says))
+    runner.handle(event("MESSAGE_UPDATE", edited(alice_says, "corrigé avant d'être enregistré")))
+    flush(runner)
+    assert messages(ingest_db) == {100: "corrigé avant d'être enregistré"}
+
+
+def test_the_preview_of_a_link_is_not_an_edit(ingest_db, ingest_url):
+    runner = runner_for(ingest_url)
+    alice_says, _ = exchange()
+    runner.handle(create(alice_says))
+    flush(runner)
+    runner.handle(event("MESSAGE_UPDATE", {"id": "100", "channel_id": GENERAL, "guild_id": GUILD, "embeds": [{"url": "https://exemple.org"}]}))   # no author, no text
+    flush(runner)
+    assert messages(ingest_db) == {100: "Vous avez vu ?"} and runner.status()["edits_ignored"] == 1 and runner.status()["edited"] == 0
+
+
+def test_a_deletion_removes_the_message_its_link_and_what_was_derived_from_it(ingest_db, ingest_url):
+    runner = runner_for(ingest_url)
+    alice_says, bob_replies = exchange()
+    runner.handle(create(alice_says))
+    runner.handle(create(bob_replies))
+    flush(runner)
+    assert edges(ingest_db)
+    runner.handle(event("MESSAGE_DELETE", {"id": "101", "channel_id": GENERAL, "guild_id": GUILD}))
+    flush(runner)
+    assert set(messages(ingest_db)) == {100} and not edges(ingest_db)                      # Bob's reply is gone, and the link that it made
+    runner.handle(event("MESSAGE_DELETE_BULK", {"ids": ["100", "555"], "channel_id": GENERAL, "guild_id": GUILD}))   # (555 was never stored)
+    flush(runner)
+    assert messages(ingest_db) == {} and runner.status()["deleted"] == 3
+
+
+def test_a_message_deleted_before_it_is_written_never_is(ingest_db, ingest_url):
+    runner = runner_for(ingest_url)
+    alice_says, _ = exchange()
+    runner.handle(create(alice_says))
+    runner.handle(event("MESSAGE_DELETE", {"id": "100", "channel_id": GENERAL, "guild_id": GUILD}))
+    assert runner.status()["waiting"] == 0
+    flush(runner)
+    assert messages(ingest_db) == {}
+
+
+def test_edits_and_deletions_wait_for_the_database_and_are_not_lost(ingest_db, ingest_url):
+    runner = runner_for(ingest_url)
+    alice_says, bob_replies = exchange()
+    runner.handle(create(alice_says))
+    runner.handle(create(bob_replies))
+    flush(runner)
+    good_writer = runner._ingest
+    runner._ingest = Writer("postgresql://dindon:wrong@127.0.0.1:9/dindon")                  # the database is away
+    runner.handle(event("MESSAGE_UPDATE", edited(alice_says, "modifié")))
+    runner.handle(event("MESSAGE_DELETE", {"id": "101", "channel_id": GENERAL, "guild_id": GUILD}))
+    assert flush(runner) is False and runner.edits and runner.deleted                         # they wait
+    runner._ingest, runner._retry_at = good_writer, 0.0                                       # it is back
+    assert flush(runner) is True and not runner.edits and not runner.deleted
+    assert messages(ingest_db) == {100: "modifié"}
+
+
+def test_reactions_are_not_received_and_not_applied(ingest_db, ingest_url):
     runner = runner_for(ingest_url)
     alice_says, _ = exchange()
     runner.handle(create(alice_says))
     flush(runner)
     state = (messages(ingest_db), edges(ingest_db), runs(ingest_db))
-    runner.handle(event("MESSAGE_UPDATE", {**alice_says, "content": "modifié", "guild_id": GUILD}))
-    runner.handle(event("MESSAGE_DELETE", {"id": "100", "channel_id": GENERAL, "guild_id": GUILD}))
-    runner.handle(event("MESSAGE_DELETE_BULK", {"ids": ["100"], "channel_id": GENERAL, "guild_id": GUILD}))
     runner.handle(event("MESSAGE_REACTION_ADD", {"message_id": "100", "channel_id": GENERAL, "guild_id": GUILD, "user_id": str(BOB_ID)}))
     flush(runner)
     assert (messages(ingest_db), edges(ingest_db), runs(ingest_db)) == state
-    status = runner.status()
-    assert (status["not_applied_message_update"], status["not_applied_message_delete"], status["not_applied_message_delete_bulk"]) == (1, 1, 1)
 
 
 def test_one_strange_message_does_not_hold_up_the_others(ingest_db, ingest_url):
@@ -505,3 +575,65 @@ def test_an_error_in_the_middle_of_a_transaction_costs_one_message_and_leaves_th
     assert set(messages(ingest_db)) == {1, 3} and runner.status()["rejected"] == 1 and runner.status()["waiting"] == 0
     runner.handle(create(message_create(4, "après")))
     assert flush(runner) and set(messages(ingest_db)) == {1, 3, 4}             # the same connection, still good
+
+
+def test_the_bot_says_that_it_is_alive_with_counts_only(ingest_db, ingest_url, monkeypatch):
+    """Every half minute the bot writes service_status: what the page Système shows. Counts and ids of servers, never a message."""
+    monkeypatch.setattr("dindon.bot.runner.HEARTBEAT_SECONDS", 0.1)
+
+    async def scenario():
+        events: asyncio.Queue = asyncio.Queue()
+        stop = asyncio.Event()
+        runner = BotRunner([GUILD], Writer(ingest_url), batch_seconds=0.05)
+        task = asyncio.create_task(runner.run(events, stop))
+        events.put_nowait(GatewayEvent("connected"))
+        events.put_nowait(event("GUILD_CREATE", guild_create()))
+        events.put_nowait(create(message_create(1, "un message secret")))
+        for _ in range(100):
+            row = ingest_db.execute("SELECT data FROM service_status WHERE name = 'bot'").fetchone()
+            if row and row[0]["connected"] and row[0]["new"]:
+                break
+            await asyncio.sleep(0.05)
+        stop.set()
+        await asyncio.wait_for(task, 10)
+
+    asyncio.run(scenario())
+    updated, data = ingest_db.execute("SELECT updated_at, data FROM service_status WHERE name = 'bot'").fetchone()
+    assert data["connected"] is True and data["sessions"] == 1 and data["new"] == 1 and data["followed"] == [GUILD] and data["ready"] == [GUILD]
+    assert data["started_at"] and data["last_new_at"]
+    assert "secret" not in json.dumps(data)                                           # no content of any message
+
+
+def test_a_database_that_is_away_does_not_stop_the_heartbeat_loop(ingest_url, monkeypatch):
+    monkeypatch.setattr("dindon.bot.runner.HEARTBEAT_SECONDS", 0.05)
+
+    async def scenario():
+        events: asyncio.Queue = asyncio.Queue()
+        stop = asyncio.Event()
+        runner = BotRunner([GUILD], Writer("postgresql://nobody:x@127.0.0.1:9/none"), batch_seconds=0.05)
+        task = asyncio.create_task(runner.run(events, stop))
+        await asyncio.sleep(0.4)                                                      # several beats, all refused
+        assert not task.done()
+        stop.set()
+        await asyncio.wait_for(task, 10)
+
+    asyncio.run(scenario())
+
+
+def test_a_sign_of_life_that_cannot_be_written_is_said_once_not_every_half_minute(caplog, monkeypatch):
+    monkeypatch.setattr("dindon.bot.runner.HEARTBEAT_SECONDS", 0.05)
+    caplog.set_level(logging.INFO, logger="dindon.bot")
+
+    async def scenario():
+        events: asyncio.Queue = asyncio.Queue()
+        stop = asyncio.Event()
+        runner = BotRunner([GUILD], Writer("postgresql://nobody:x@127.0.0.1:9/none"), batch_seconds=0.05)
+        task = asyncio.create_task(runner.run(events, stop))
+        await asyncio.sleep(0.5)
+        stop.set()
+        await asyncio.wait_for(task, 10)
+
+    asyncio.run(scenario())
+    said = [r for r in caplog.records if "sign of life could not be written" in r.getMessage()]
+    assert len(said) == 1 and said[0].levelno == logging.WARNING
+

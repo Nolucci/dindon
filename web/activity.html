@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="color-scheme" content="dark" />
+    <title>Dindon</title>
+  </head>
+  <body>
+    <div id="bar" class="panel">
+      <strong>Dindon</strong>
+      <div id="search">
+        <input id="q" type="search" placeholder="Rechercher une personne…  ( / )" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="suggest" aria-label="Rechercher une personne" />
+        <ul id="suggest" role="listbox" hidden></ul>
+      </div>
+      <select id="period" aria-label="Période"></select>
+      <div id="kinds" role="group" aria-label="Types d’échanges"></div>
+      <span id="note" role="status"></span>
+    </div>
+    <div id="main">
+      <div id="canvas" class="panel" aria-label="Carte des échanges"></div>
+      <aside id="card" class="panel" aria-label="Fiche de la personne" hidden></aside>
+    </div>
+    <script type="module" src="/src/activity.js"></script>
+  </body>
+</html>

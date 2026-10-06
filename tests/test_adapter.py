@@ -15,6 +15,7 @@ from dindon.bot.adapter import Directory, build_document, digest, format_time, p
 from dindon.ingest.loader import ingest_document
 from gateway_fixtures import (ADMIN, ALICE, BOB, BOT, CAROL, CATEGORY, CITIZEN, EUROPEAN, GENERAL, GUILD, OLD_DAVE, THREAD, VOICE,
                               channel, guild_create, member, message_create, role)
+from datetime import UTC
 
 SCHEMA = json.loads((Path(__file__).resolve().parents[1] / "contracts" / "JSON-format.schema.json").read_text(encoding="utf-8"))
 
@@ -83,11 +84,77 @@ def test_edited_pinned_attachments_and_stickers(directory):
     assert message["stickers"] == [{"id": "88", "name": "wave", "format": "Gif", "sourceUrl": "https://cdn.discordapp.com/stickers/88.gif"}]
 
 
-def test_what_is_not_covered_yet_is_left_out_not_invented(directory):
-    doc = document(directory, message_create(1, "x", embeds=[{"type": "link", "url": "https://example.org"}],
-                                             poll={"question": {"text": "?"}}, message_snapshots=[{"message": {}}]))
+def test_nothing_is_invented_for_what_a_message_does_not_have(directory):
+    doc = document(directory, message_create(1, "x", embeds=[], poll=None, message_snapshots=[{"message": {"content": "y", "timestamp": "2026-10-02T19:00:00.000000+00:00"}}]))
     message = doc["messages"][0]
-    assert not {"embeds", "poll", "forwardedMessage", "reactions", "inlineEmojis"} & message.keys()
+    assert not {"embeds", "poll", "forwardedMessage", "reactions", "inlineEmojis"} & message.keys()        # (a snapshot without a forward reference is nothing)
+
+
+def test_embeds_are_written_as_the_exporter_writes_them(directory):
+    embed = {"type": "rich", "title": "Un <@{}>".format(BOB["id"]), "url": "https://example.org/a", "description": f"Du texte <:kekw:555> et <#{GENERAL}>", "color": 0xFF0000,
+             "timestamp": "2026-10-02T18:00:00.000000+00:00",
+             "author": {"name": "Auteur", "url": "https://example.org/u", "icon_url": "https://x/i.png", "proxy_icon_url": "https://p/i.png"},
+             "thumbnail": {"url": "https://x/t.png", "proxy_url": "https://p/t.png", "width": 10, "height": 20}, "image": {"url": "https://x/m.png"},
+             "video": {"url": "https://x/v.mp4", "width": 640}, "footer": {"text": "pied", "icon_url": "https://x/f.png"},
+             "fields": [{"name": "n", "value": "v", "inline": True}, {"name": "n2", "value": "v2"}]}
+    doc = document(directory, message_create(1, "x", embeds=[embed], member_data=member()))
+    assert doc["messages"][0]["embeds"] == [{
+        "title": "Un @Unknown", "url": "https://example.org/a", "timestamp": "2026-10-02T18:00:00.000Z", "description": "Du texte :kekw: et #general",
+        "color": "#FF0000", "author": {"name": "Auteur", "url": "https://example.org/u", "iconUrl": "https://p/i.png", "iconCanonicalUrl": "https://x/i.png"},
+        "thumbnail": {"url": "https://p/t.png", "canonicalUrl": "https://x/t.png", "width": 10, "height": 20},
+        "image": {"url": "https://x/m.png", "canonicalUrl": "https://x/m.png"}, "images": [{"url": "https://x/m.png", "canonicalUrl": "https://x/m.png"}], "video": {"url": "https://x/v.mp4", "canonicalUrl": "https://x/v.mp4", "width": 640},
+        "footer": {"text": "pied", "iconUrl": "https://x/f.png", "iconCanonicalUrl": "https://x/f.png"},
+        "fields": [{"name": "n", "value": "v", "isInline": True}, {"name": "n2", "value": "v2", "isInline": False}], "inlineEmojis": ["555"]}]
+    assert any(e["id"] == "555" for e in doc["emojis"])
+
+
+def test_a_poll_is_written_with_its_votes_when_it_has_results(directory):
+    poll = {"question": {"text": "On y va ?"}, "answers": [{"answer_id": 1, "poll_media": {"text": "Oui", "emoji": {"id": None, "name": "👍"}}},
+                                                          {"answer_id": 2, "poll_media": {"text": "Non"}}],
+            "expiry": "2026-10-03T19:00:00.000000+00:00", "allow_multiselect": True, "results": {"is_finalized": True, "answer_counts": [{"id": 1, "count": 5}]}}
+    doc = document(directory, message_create(1, "", poll=poll))
+    assert doc["messages"][0]["poll"] == {"question": "On y va ?", "answers": [{"id": 1, "text": "Oui", "emoji": "👍", "votes": 5}, {"id": 2, "text": "Non", "votes": 0}],
+                                          "expiresAt": "2026-10-03T19:00:00.000Z", "allowsMultipleAnswers": True, "isFinalized": True}
+    assert {"name": "👍", "isAnimated": False, "imageUrl": "https://twemoji.maxcdn.com/v/latest/svg/1f44d.svg"} in doc["emojis"]
+    open_poll = document(directory, message_create(2, "", poll={"question": {"text": "?"}, "answers": [{"answer_id": 1, "poll_media": {"text": "a"}}]}))
+    assert open_poll["messages"][0]["poll"] == {"question": "?", "answers": [{"id": 1, "text": "a"}]}          # no results yet: no votes
+
+
+def test_a_forwarded_message_keeps_what_it_was(directory):
+    snapshot = {"message": {"content": "Salut <@{}>".format(BOB["id"]), "timestamp": "2026-10-01T10:00:00.000000+00:00", "edited_timestamp": "2026-10-01T10:05:00.000000+00:00",
+                            "attachments": [{"id": "9", "url": "https://x/a.png", "filename": "a.png", "size": 3}], "embeds": [{"title": "t"}],
+                            "sticker_items": [{"id": "8", "name": "w", "format_type": 1}]}}
+    doc = document(directory, message_create(1, "", message_snapshots=[snapshot], message_reference={"type": 1, "message_id": "5", "channel_id": GENERAL, "guild_id": GUILD}))
+    message = doc["messages"][0]
+    assert message["reference"]["type"] == "Forward"
+    assert message["forwardedMessage"] == {"timestamp": "2026-10-01T10:00:00.000Z", "timestampEdited": "2026-10-01T10:05:00.000Z", "content": "Salut @Unknown",
+                                           "attachments": [{"id": "9", "url": "https://x/a.png", "fileName": "a.png", "fileSizeBytes": 3}], "embeds": [{"title": "t"}],
+                                           "stickers": [{"id": "8", "name": "w", "format": "Png", "sourceUrl": "https://cdn.discordapp.com/stickers/8.png"}]}
+
+
+def test_reactions_are_counted_and_name_the_people_who_reacted_when_they_were_fetched(directory):
+    reactions = [{"emoji": {"id": None, "name": "👍"}, "count": 2}, {"emoji": {"id": "555", "name": "kekw", "animated": True}, "count": 1}, {"emoji": {"id": None, "name": "❤️"}, "count": 1}]
+    message = message_create(1, "x", reactions=reactions)
+    plain = document(directory, message)["messages"][0]["reactions"]
+    assert plain == [{"emoji": "👍", "count": 2}, {"emoji": "555", "count": 1}, {"emoji": "❤️", "count": 1}]          # counted, nobody named
+    doc = build_document(directory, GUILD, GENERAL, [message], reaction_users={"1": {"👍": [BOB, CAROL], "555": [BOB]}})
+    jsonschema.validate(doc, SCHEMA)
+    assert doc["messages"][0]["reactions"] == [{"emoji": "👍", "count": 2, "userIds": [BOB["id"], CAROL["id"]]}, {"emoji": "555", "count": 1, "userIds": [BOB["id"]]},
+                                              {"emoji": "❤️", "count": 1}]
+    assert {u["id"] for u in doc["users"]} == {ALICE["id"], BOB["id"], CAROL["id"]}                                  # the people who reacted are in `users`
+    assert {"id": "555", "name": "kekw", "isAnimated": True, "imageUrl": "https://cdn.discordapp.com/emojis/555.gif"} in doc["emojis"]
+    assert {"name": "❤️", "isAnimated": False, "imageUrl": "https://twemoji.maxcdn.com/v/latest/svg/2764.svg"} in doc["emojis"]    # the variation selector is left out
+
+
+def test_an_export_says_when_it_was_made_and_which_period_it_covers(directory):
+    from datetime import datetime, timezone
+    when = datetime(2026, 10, 3, 8, 0, tzinfo=UTC)
+    doc = build_document(directory, GUILD, GENERAL, [message_create(1, "x")], exported_at=when,
+                         date_range={"after": datetime(2026, 10, 1, tzinfo=UTC), "before": None})
+    jsonschema.validate(doc, SCHEMA)
+    assert doc["exportedAt"] == "2026-10-03T08:00:00.000Z" and doc["dateRange"] == {"after": "2026-10-01T00:00:00.000Z"}
+    assert list(doc).index("dateRange") == list(doc).index("channel") + 1                                           # in the place of the layout
+    assert "dateRange" not in build_document(directory, GUILD, GENERAL, [message_create(1, "x")], date_range={"after": None, "before": None})
 
 
 def test_the_messages_are_in_chronological_order_and_exportedAt_is_the_newest_one(directory):

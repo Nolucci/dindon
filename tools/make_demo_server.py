@@ -13,10 +13,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 
 DISCORD_EPOCH_MS = 1_420_070_400_000
@@ -193,6 +192,8 @@ ROLE_TENDENCY = {
     ("ecologie", 1): ["Écologiste", "Écosocialiste", "Animaliste"],
     ("societe", 1): ["Progressiste", "Féministe"],
 }
+# Discord's own palette for role colors
+ROLE_COLORS = ["#1ABC9C", "#2ECC71", "#3498DB", "#9B59B6", "#E91E63", "#F1C40F", "#E67E22", "#95A5A6", "#11806A", "#206694", "#C27C0E", "#AD1457"]
 STAFF_ROLES = ["Gardien de la démocratie", "Médiateur", "Animateur"]
 NOTIF_ROLES = ["Ping Annonces", "Ping Débats", "Ping Vocal"]
 AGE_ROLES = ["Entre 13 et 15 ans", "Entre 16 et 20 ans", "Entre 21 et 30 ans", "Entre 31 et 50 ans"]
@@ -222,7 +223,7 @@ def fancy(text: str) -> str:
 
 
 def iso(dt: datetime) -> str:
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
 
 
 def parse_iso(s: str) -> datetime:
@@ -230,7 +231,7 @@ def parse_iso(s: str) -> datetime:
 
 
 def snowflake_time(snowflake: int) -> datetime:
-    return datetime.fromtimestamp(((snowflake >> 22) + DISCORD_EPOCH_MS) / 1000, tz=timezone.utc)
+    return datetime.fromtimestamp(((snowflake >> 22) + DISCORD_EPOCH_MS) / 1000, tz=UTC)
 
 
 @dataclass
@@ -273,10 +274,10 @@ class World:
     def __init__(self, seed: int = 1, people: int = 60, channels: int | None = None):
         self.rng = random.Random(seed)
         self._counter = 0
-        self.guild_id = self._flake(datetime(2023, 1, 1, tzinfo=timezone.utc))
+        self.guild_id = self._flake(datetime(2023, 1, 1, tzinfo=UTC))
         self.name = "Serveur de démonstration"
         self.roles: dict[str, dict] = {}
-        self.custom_emoji = {"id": str(self._flake(datetime(2023, 1, 2, 9, tzinfo=timezone.utc))), "name": "kekw"}
+        self.custom_emoji = {"id": str(self._flake(datetime(2023, 1, 2, 9, tzinfo=UTC))), "name": "kekw"}
         self.people: list[Person] = []
         self.channels: list[Channel] = []
         self.msg_index: dict[str, tuple[Channel, dict]] = {}
@@ -293,13 +294,15 @@ class World:
     # --- setting the scene ---------------------------------------------------------------------
 
     def _make_roles(self) -> None:
-        created = datetime(2023, 1, 2, tzinfo=timezone.utc)
+        created = datetime(2023, 1, 2, tzinfo=UTC)
         names = (STAFF_ROLES + ["━━━━━━━━━"] + IDEOLOGY_ROLES + ["─────────"] + AGE_ROLES + GENDER_ROLES
                  + NOTIF_ROLES + OTHER_ROLES + ["Membre"])
         for position, name in enumerate(reversed(names)):
             self.roles[name] = {"id": str(self._flake(created)), "name": name, "position": position + 1}
             if name in STAFF_ROLES:
                 self.roles[name]["color"] = "#E74C3C"
+            elif name in IDEOLOGY_ROLES:                    # a color for each ideology, as servers do
+                self.roles[name]["color"] = ROLE_COLORS[IDEOLOGY_ROLES.index(name) % len(ROLE_COLORS)]
 
     def _make_people(self, count: int) -> None:
         rng = self.rng
@@ -336,17 +339,17 @@ class World:
                 role_names.append(rng.choice(STAFF_ROLES))
             role_names = sorted(set(role_names), key=lambda n: -self.roles[n]["position"])
             self.people.append(Person(
-                id=self._flake(datetime(2023, 1, 3, tzinfo=timezone.utc) + timedelta(minutes=i)),
+                id=self._flake(datetime(2023, 1, 3, tzinfo=UTC) + timedelta(minutes=i)),
                 name=name, global_name=global_name, nickname=nickname, is_bot=False,
                 role_ids=[int(self.roles[n]["id"]) for n in role_names], community=community,
                 activity=1.0 / (i + 1) ** 0.9, stance=stance,
-                color="#E74C3C" if any(n in STAFF_ROLES for n in role_names) else None))
+                color=next((self.roles[n]["color"] for n in role_names if "color" in self.roles[n]), None)))  # the highest role with a color
         self.rng.shuffle(self.people)  # the activity ranking must not follow the creation order
-        self.bot = Person(id=self._flake(datetime(2023, 1, 2, 12, tzinfo=timezone.utc)), name="modbot", global_name=None,
+        self.bot = Person(id=self._flake(datetime(2023, 1, 2, 12, tzinfo=UTC)), name="modbot", global_name=None,
                           nickname=None, is_bot=True, role_ids=[], community=-1, activity=0.0, stance={})
 
     def _make_channels(self, wanted: int | None) -> None:
-        base = datetime(2023, 1, 2, 8, tzinfo=timezone.utc)
+        base = datetime(2023, 1, 2, 8, tzinfo=UTC)
         pairs = [(cat, ch) for cat, chans in CATEGORIES.items() for ch in chans]
         category_ids = {cat: self._flake(base) for cat in CATEGORIES}
         for cat, ch in pairs:
@@ -413,7 +416,7 @@ class World:
     def generate(self, messages: int, days: int = 120, end: datetime | None = None) -> None:
         """Fills the server with discussions: bursts of messages between a few people, with replies, mentions, reactions."""
         rng = self.rng
-        end = end or datetime(2026, 9, 30, tzinfo=timezone.utc)
+        end = end or datetime(2026, 9, 30, tzinfo=UTC)
         start = end - timedelta(days=days)
         span = (end - start).total_seconds()
         weights = [p.activity for p in self.people]
@@ -478,7 +481,7 @@ class World:
     def export_document(self, channel: Channel, after_id: int | None = None, before_id: int | None = None,
                         exported_at: datetime | None = None, with_reaction_users: bool = True) -> str:
         """The text of a JSON v2 file for one channel, laid out as the exporter does (one entry per line)."""
-        exported_at = exported_at or datetime.now(timezone.utc)
+        exported_at = exported_at or datetime.now(UTC)
         messages = [m for m in channel.messages
                     if (after_id is None or int(m["id"]) > after_id) and (before_id is None or int(m["id"]) < before_id)]
         user_ids: dict[int, None] = {}
@@ -527,7 +530,8 @@ class World:
             out_messages.append(m)
         channel_obj = {"id": str(channel.id), "type": channel.type, "categoryId": str(channel.category_id),
                        "category": channel.category, "name": channel.name}
-        dumps = lambda o: json.dumps(o, ensure_ascii=False, separators=(",", ":"))
+        def dumps(o):
+            return json.dumps(o, ensure_ascii=False, separators=(",", ":"))
         parts = [
             '{\n"users":[\n' + ",\n".join(dumps(u) for u in users) + "\n],",
             '"roles":[\n' + ",\n".join(dumps(r) for r in roles) + "\n],",

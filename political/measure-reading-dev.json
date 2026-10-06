@@ -1,0 +1,58 @@
+{
+ "kind": "reading",
+ "split": "dev",
+ "prompt": "claims-3",
+ "model": "qwen3:14b",
+ "seconds": 70,
+ "predictions": {
+  "m01": [
+   "La France compte 101 départements si on compte l'outre-mer."
+  ],
+  "m03": [
+   "Le taux de chômage en France est de 12 %"
+  ],
+  "m05": [
+   "La dette publique dépasse les 3 000 milliards d'euros"
+  ],
+  "m07": [
+   "La loi Veil sur l'IVG date de 1975"
+  ],
+  "m09": [
+   "L'Union européenne compte 27 États membres depuis le Brexit",
+   "L'Union européenne comptait 28 États membres avant le Brexit"
+  ],
+  "m11": [
+   "Macron a promis en 2017 de faire passer le chômage sous les 7 %",
+   "Le chômage est mentionné dans le programme de Macron en 2017"
+  ],
+  "m13": [
+   "Le taux de TVA normal est de 20 % en France depuis 2014"
+  ],
+  "m15": [
+   "Plus de 9 millions de personnes vivent sous le seuil de pauvreté en France aujourd'hui."
+  ],
+  "m17": [
+   "Le Conseil constitutionnel a censuré une partie de la loi immigration en janvier 2024"
+  ],
+  "m19": [
+   "Les émissions de gaz à effet de serre de la France ont baissé d'environ 30 % depuis 1990."
+  ],
+  "m21": [
+   "Le Parlement européen se réunit à Strasbourg"
+  ],
+  "m23": [
+   "L'Assemblée nationale compte 577 députés",
+   "Le Sénat compte 348 sénateurs"
+  ],
+  "m25": [],
+  "m27": [],
+  "m29": [],
+  "m31": [],
+  "m33": [],
+  "m35": [],
+  "m37": [],
+  "m39": [],
+  "m41": [],
+  "m43": []
+ }
+}

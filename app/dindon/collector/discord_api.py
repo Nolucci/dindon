@@ -59,16 +59,16 @@ class DiscordAPI:
             elif self._get("/users/@me", f"Bot {self.token}")[0] != 401:
                 self.token_kind = "bot"
             else:
-                raise DiscordError("the token is not valid")
+                raise DiscordError("Le jeton Discord n'est pas valide (jeton absent, périmé ou mal recopié dans .env).")
         return self.token_kind
 
     def _json(self, path: str) -> object:
         authorization = f"Bot {self.token}" if self.resolve_kind() == "bot" else self.token
         status, body = self._get(path, authorization)
         if status in (401, 403):
-            raise DiscordError(f"access refused ({status}) for {path.split('?')[0]}")
+            raise DiscordError(f"Discord refuse l'accès ({status}) à {path.split('?')[0]} : le bot est-il bien sur ce serveur, avec le droit de voir ce salon ?")
         if status != 200:
-            raise DiscordError(f"unexpected answer {status} for {path.split('?')[0]}")
+            raise DiscordError(f"Réponse inattendue de Discord ({status}) pour {path.split('?')[0]}.")
         return body
 
     @staticmethod
@@ -80,6 +80,64 @@ class DiscordAPI:
         last = raw.get("last_message_id")
         return Watched(int(raw["id"]), raw.get("name", ""), kind, int(raw["parent_id"]) if raw.get("parent_id") else None,
                        int(last) if last else None)
+
+    def application(self) -> dict | None:
+        """The application that the bot token belongs to: its id (what an invitation link needs), its name, and whether other people
+        may add it to their servers. None for an account: an account cannot be invited anywhere."""
+        if self.resolve_kind() != "bot":
+            return None
+        raw = self._json("/oauth2/applications/@me")
+        return {"id": str(raw["id"]), "name": raw.get("name") or "", "public": bool(raw.get("bot_public"))}  # type: ignore[index]
+
+    def application_raw(self) -> dict:
+        """What Discord says about the application of the bot (flags, whether it is public, its id): for the pre-production check."""
+        return self._json("/oauth2/applications/@me")  # type: ignore[return-value]
+
+    def server_details(self) -> list[dict]:
+        """The servers of the bot with the permissions that it has in each (the bit field of Discord), 200 at a time."""
+        found: list[dict] = []
+        after = ""
+        for _ in range(25):
+            page = self._json(f"/users/@me/guilds?limit=200{after}")
+            found += [{"id": str(g["id"]), "name": g.get("name") or "", "permissions": int(g.get("permissions") or 0), "has_permissions": "permissions" in g}  # type: ignore[union-attr]
+                      for g in page]  # type: ignore[union-attr]
+            if len(page) < 200:                               # type: ignore[arg-type]
+                break
+            after = f"&after={page[-1]['id']}"                # type: ignore[index]
+        return found
+
+    def server_counts(self, guild_id: int) -> dict:
+        """How big a server is: its approximate number of members and of people online (Discord rounds them)."""
+        raw = self._json(f"/guilds/{guild_id}?with_counts=true")
+        return {"members": raw.get("approximate_member_count"), "online": raw.get("approximate_presence_count")}  # type: ignore[union-attr]
+
+    def commands(self, application_id: str) -> list[str]:
+        """The names of the global slash commands of the application."""
+        return [c["name"] for c in self._json(f"/applications/{application_id}/commands")]  # type: ignore[union-attr]
+
+    def clock_offset(self) -> float | None:
+        """Seconds that the clock of this machine is ahead of Discord's (from the `Date` header of an answer); None when it cannot be read."""
+        import time
+        from email.utils import parsedate_to_datetime
+
+        request = urllib.request.Request(f"{self.base_url}/gateway", headers={"User-Agent": "dindon"})
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                return time.time() - parsedate_to_datetime(response.headers["Date"]).timestamp()
+        except Exception:
+            return None
+
+    def servers(self) -> list[dict]:
+        """The servers that the token is in, as {id, name}. Discord gives them 200 at a time."""
+        found: list[dict] = []
+        after = ""
+        for _ in range(25):                                   # 5000 servers at most: far more than a bot of this kind is ever in
+            page = self._json(f"/users/@me/guilds?limit=200{after}")
+            found += [{"id": str(g["id"]), "name": g.get("name") or ""} for g in page]  # type: ignore[union-attr]
+            if len(page) < 200:                               # type: ignore[arg-type]
+                break
+            after = f"&after={page[-1]['id']}"                # type: ignore[index]
+        return found
 
     def channels(self, guild_id: int) -> list[Watched]:
         return [w for raw in self._json(f"/guilds/{guild_id}/channels") if (w := self._watched(raw))]  # type: ignore[union-attr]

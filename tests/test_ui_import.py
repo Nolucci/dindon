@@ -71,7 +71,7 @@ def test_the_window_imports_a_part_of_the_server_shows_errors_and_can_stop(base,
         page.click("button[type=submit]")
         page.wait_for_selector("text=Aucun serveur importé", timeout=20000)             # nothing imported yet: the window is how to start
 
-        page.click("text=Importer…")
+        page.get_by_role("button", name="Importer").click()
         dialog = page.locator("[role=dialog]")
         dialog.wait_for()
         page.wait_for_selector(".channels li")
@@ -79,7 +79,7 @@ def test_the_window_imports_a_part_of_the_server_shows_errors_and_can_stop(base,
         start = page.get_by_role("button", name="Lancer l’import")
         assert start.is_disabled() and "Choisissez au moins un salon" in dialog.inner_text()
 
-        page.locator(".channels li >> nth=%d" % names.index(channel.name)).locator("input").check()   # one channel, one person
+        page.locator(f".channels li >> nth={names.index(channel.name)}").locator("input").check()   # one channel, one person
         assert start.is_enabled()
         assert "Import partiel" not in dialog.inner_text()
         dialog.get_by_label("Auteurs").fill(author)
@@ -100,10 +100,10 @@ def test_the_window_imports_a_part_of_the_server_shows_errors_and_can_stop(base,
 
         page.keyboard.press("Escape")                                                    # closing: the map shows what was imported
         dialog.wait_for(state="detached")
-        page.wait_for_selector("footer span:has-text('personnes')", timeout=15000)
+        page.wait_for_selector("footer span:has-text('personne')", timeout=15000)
 
-        monkeypatch.setenv("FAKE_EXPORTER_DELAY", "4")                                   # a slow import, to stop it
-        page.click("text=Importer…")
+        fake.latency = 0.6                                                               # a slow import, to stop it
+        page.get_by_role("button", name="Importer").click()
         page.wait_for_selector(".channels li")
         dialog.get_by_role("button", name="Tous").click()
         dialog.get_by_label("Auteurs").fill("")
@@ -117,3 +117,25 @@ def test_the_window_imports_a_part_of_the_server_shows_errors_and_can_stop(base,
         browser.close()
     assert not outside, f"the page asked for things outside the application: {sorted(set(outside))[:3]}"
     assert not errors, f"errors in the page: {errors[:2]}"
+
+
+def test_the_channels_of_a_big_server_can_be_searched(base, fake, world):
+    with sync_api.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
+        page = browser.new_page(viewport={"width": 1440, "height": 1000})
+        page.goto(base)
+        page.fill("#password", PASSWORD)
+        page.click("button[type=submit]")
+        page.wait_for_selector("text=Aucun serveur importé", timeout=20000)
+        page.get_by_role("button", name="Importer").click()
+        page.wait_for_selector(".channels li")
+        total = page.locator(".channels li").count()
+        word = next(c.name for c in world.channels if not c.parent_id and "é" in c.name)           # an accent: the search ignores them
+        page.get_by_label("Chercher un salon").fill(word.replace("é", "e")[:4])
+        shown = page.locator(".channels li").count()
+        assert 0 < shown < total and all(word.replace("é", "e")[:4] in n.lower().replace("é", "e").replace("è", "e") for n in page.locator(".channelName").all_inner_texts())
+        page.get_by_role("button", name="Tous ceux affichés").click()                              # only the ones that are shown
+        assert page.locator(".channels li input:checked").count() == shown
+        page.get_by_label("Chercher un salon").fill("zzzz")
+        page.get_by_text("Aucun salon ne correspond").wait_for()
+        browser.close()

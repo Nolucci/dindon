@@ -212,9 +212,11 @@ Vous annotez une petite série d'affirmations ; on mesure l'accord avec le syst�
 
 ## 8. L'application et la carte
 
-**Serveur** : une application Python (FastAPI) qui sert l'interface, expose une API, envoie les événements en direct (SSE, alimenté par `NOTIFY`) et fait tourner les ouvriers d'analyse. Python parce que l'analyse de texte et de graphes y est la mieux outillée ; l'exportateur reste en C#, séparé.
+**Serveur** : une application Python (FastAPI) qui sert l'interface, expose une API, envoie les événements en direct (SSE, alimenté par `NOTIFY`) et fait tourner les ouvriers d'analyse. Python parce que l'analyse de texte et de graphes y est la mieux outillée ; l'exportateur (qui était en C#) est depuis le 4 octobre 2026 écrit en Python dans `app/dindon/export/` (voir [EXPORTATEUR.md](EXPORTATEUR.md)).
 
 **Interface** : une page web (Svelte et Vite) servie par la même application. Le graphe est dessiné avec Sigma.js (WebGL) et graphology, avec le placement des nœuds calculé dans un thread à part. Cela reste fluide à plusieurs milliers de personnes ; au-delà, on n'affiche que les plus actives et on agrège le reste.
+
+L'habillage reprend celui du tableau de bord de Poulet (mêmes couleurs, même police, même barre de gauche) : voir « Habillage de l'interface » dans [DECISIONS.md](DECISIONS.md).
 
 **Ce que vous voyez**
 
@@ -237,7 +239,7 @@ Trois conteneurs et un programme :
 | `db` : PostgreSQL 17 + pgvector | toute la donnée (existe déjà, [db/](../db/)) |
 | `ollama` : modèles de langue et de vecteurs | l'IA locale |
 | `app` : application Python | ingestion, ouvriers d'analyse, API, flux en direct, interface web |
-| exportateur (programme C#) | collecte manuelle et surveillance, lancé par `app` ou à la main |
+| exportateur (`app/dindon/export/`, Python, dans le processus `app`) | collecte manuelle et surveillance (remplace le programme C# d'origine) |
 
 Un seul `docker compose up`. Le serveur doit avoir de quoi faire tourner le modèle : plus que tout autre élément, c'est la mémoire (et idéalement une carte graphique) qui décide de la taille du modèle et du temps d'analyse. La base et l'application, elles, tiennent sur une petite machine.
 
@@ -252,6 +254,7 @@ Garde-fous prévus dans la conception :
 - **Âge et genre écartés.** Les rôles de ce type sont reconnus pour être ignorés. Les rôles d'âge du serveur (par exemple « Entre 16 et 20 ans ») montrent que des mineurs en font partie : raison de plus pour ne pas diffuser les fiches.
 - **Des étiquettes honnêtes.** Un classement s'affiche toujours avec son nombre de preuves et son incertitude, jamais comme un fait. « Discordant » est une alerte, pas une accusation.
 - **Pseudonymisation à la demande** : un mode d'affichage qui remplace les noms par des pseudonymes, utile le jour où vous voudrez montrer la carte.
+- **Débats et vérification sur Internet** ([DEBAT.md](DEBAT.md)) : la seule chose qui sort de la machine, pour vérifier une affirmation, est une phrase de recherche neutre (budget de 2 recherches et 3 pages par affirmation, pages de sources de confiance seulement, citations vérifiées sur la page) ; un test de structure interdit tout autre chemin vers l'extérieur ; lecture des messages à l'aveugle ; corrections publiques verrouillées par une précision mesurée.
 - **Effacement** : `forget_user()` supprime une personne et tout ce qui la concerne (déjà dans le schéma), y compris ses positions et ses cartes.
 
 ## 11. Feuille de route

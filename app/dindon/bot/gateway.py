@@ -41,14 +41,24 @@ class _NoFrames(logging.Filter):
         return record.levelno > logging.DEBUG
 
 
+class _NoVoiceWarning(logging.Filter):
+    """discord.py warns at every start that voice is not supported. Dindon reads text: the warning only worries."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "voice will NOT be supported" not in record.getMessage()
+
+
 def protect_logs() -> None:
     gateway_log = logging.getLogger("discord.gateway")
     if not any(isinstance(f, _NoFrames) for f in gateway_log.filters):
         gateway_log.addFilter(_NoFrames())
+    client_log = logging.getLogger("discord.client")
+    if not any(isinstance(f, _NoVoiceWarning) for f in client_log.filters):
+        client_log.addFilter(_NoVoiceWarning())
 
 
 class _Client(discord.Client):
-    def __init__(self, source: "GatewaySource"):
+    def __init__(self, source: GatewaySource):
         super().__init__(
             intents=INTENTS,
             max_messages=None,                                          # no cache of messages
@@ -136,7 +146,7 @@ class GatewaySource:
                 if error.code in (4004, 4010, 4011, 4012, 4013, 4014):  # authentication failed, invalid shard/API/intents
                     raise FatalGatewayError(f"Discord closed the connection with code {error.code}: check the token and the intents of the bot.") from None
                 reason = f"closed ({error.code})"
-            except (OSError, aiohttp.ClientError, asyncio.TimeoutError, discord.HTTPException, discord.GatewayNotFound) as error:
+            except (TimeoutError, OSError, aiohttp.ClientError, discord.HTTPException, discord.GatewayNotFound) as error:
                 reason = f"{type(error).__name__}: {self.scrub(error)}"[:200]
             except Exception as error:  # e.g. discord.py cannot read an event of a shape it does not know: start a new session
                 reason = f"unexpected {type(error).__name__}: {self.scrub(error)}"[:200]

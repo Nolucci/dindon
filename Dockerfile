@@ -9,17 +9,19 @@ RUN npm run build
 # Stage 2: the application (Python) and the built interface
 FROM python:3.13-slim
 
-# The exporter is a .NET program (mounted from exporter/bin): it needs the ICU libraries
-RUN apt-get update \
- && apt-get install -y --no-install-recommends "$(apt-cache search --names-only '^libicu[0-9]+$' | cut -d' ' -f1 | sort | tail -1)" \
- && rm -rf /var/lib/apt/lists/*
+# (No second runtime: the exporter is Python code of Dindon, export/)
 
 WORKDIR /srv/dindon
 COPY pyproject.toml ./
 COPY app ./app
 COPY db ./db
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir .
 COPY --from=web /web/dist ./web/dist
+
+# The application does not run as root: a user of its own, and an entrypoint that makes /data (inbox, archive) writable by it and then drops its privileges
+RUN useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin dindon \
+    && mkdir -p /data/inbox /data/archive && chown -R dindon:dindon /data
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 ENV DINDON_DB_DIR=/srv/dindon/db \
     DINDON_WEB_DIR=/srv/dindon/web/dist \
@@ -29,4 +31,5 @@ ENV DINDON_DB_DIR=/srv/dindon/db \
 
 # The port is published on 127.0.0.1 only (see docker-compose.yml)
 EXPOSE 8000
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["dindon", "serve"]

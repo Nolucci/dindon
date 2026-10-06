@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import threading
 from collections import deque
-from datetime import datetime, timezone
+from datetime import datetime
 
+from dindon.clock import utc_iso
 from dindon.collector.discord_api import DiscordError, RateLimited
 from dindon.collector.selection import ImportSelection, SelectionError, resolve_channels
 from dindon.collector.watch import Collector
@@ -22,10 +23,6 @@ class ImportBusy(Exception):
 
 class NotConfigured(Exception):
     """No token, or no server to follow: there is nothing to import from."""
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 class ImportJobs:
@@ -44,7 +41,7 @@ class ImportJobs:
                 "done": 0, "failed": 0, "cancelled": 0, "messages": 0, "error": None}
 
     def configured(self) -> bool:
-        return bool(self._settings.discord_token and self._settings.guild_ids)
+        return bool(self._settings.discord_token and (self._settings.guild_ids or self._settings.follow_all))
 
     def status(self) -> dict:
         with self._lock:
@@ -67,7 +64,7 @@ class ImportJobs:
                 raise ImportBusy()
             self._cancel = threading.Event()
             self._lines.clear()
-            self._state = {**self._idle(), "state": "running", "guild": str(guild_id), "selection": selection.describe(), "started_at": _now()}
+            self._state = {**self._idle(), "state": "running", "guild": str(guild_id), "selection": selection.describe(), "started_at": utc_iso()}
             self._thread = threading.Thread(target=self._run, args=(collector, guild_id, selection, self._cancel), daemon=True, name="import")
             self._thread.start()
 
@@ -114,6 +111,6 @@ class ImportJobs:
         except Exception as problem:                            # anything else: its kind only (never its text, which could say too much)
             error = f"erreur inattendue ({type(problem).__name__})"
         with self._lock:
-            self._state["finished_at"] = _now()
+            self._state["finished_at"] = utc_iso()
             self._state["error"] = error
             self._state["state"] = "failed" if error else "cancelled" if cancel.is_set() else "done"

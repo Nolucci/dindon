@@ -1,0 +1,73 @@
+"""The page Positions, in a real browser: the propositions with their bars, the people and their quotes, the reading from the button.
+Optional: skipped when Playwright or the built interface (make web) is missing. The Content-Security-Policy stays on."""
+import dataclasses
+import socket
+import threading
+import time
+from pathlib import Path
+
+import pytest
+
+sync_api = pytest.importorskip("playwright.sync_api")
+
+from dindon.analysis.conversations import build_conversations  # noqa: E402
+from dindon.analysis.extraction import extract_claims  # noqa: E402
+from dindon.analysis.ollama import Ollama  # noqa: E402
+from dindon.api.main import create_app  # noqa: E402
+from fake_ollama import FakeOllama  # noqa: E402
+from synthetic import settings_for  # noqa: E402
+from test_extraction import GOOD, GUILD_ID, SAYS_A, debate  # noqa: E402
+
+WEB = Path(__file__).resolve().parents[1] / "web" / "dist"
+PASSWORD = "correct horse"
+pytestmark = pytest.mark.skipif(not (WEB / "index.html").exists(), reason="the interface is not built (make web)")
+
+
+@pytest.fixture
+def base(ingest_url, ingest_db, tmp_path):
+    import uvicorn
+
+    ollama = FakeOllama().start()
+    ollama.chat_handler = lambda body: {"claims": GOOD}
+    debate(ingest_db)
+    settings = dataclasses.replace(settings_for(ingest_url, tmp_path, PASSWORD), web_dir=WEB, ollama_url=ollama.url)
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    server = uvicorn.Server(uvicorn.Config(create_app(settings, background=False), host="127.0.0.1", port=port, log_level="warning"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 15
+    while not server.started and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert server.started
+    yield f"http://127.0.0.1:{port}"
+    server.should_exit = True
+    thread.join(timeout=10)
+    ollama.stop()
+
+
+def test_the_person_reads_the_positions_then_sees_who_says_what_with_the_quote(base, ingest_db):
+    errors = []
+    with sync_api.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
+        page = browser.new_page(viewport={"width": 1440, "height": 1000})
+        page.on("pageerror", lambda e: errors.append(str(e)[:200]))
+        page.goto(base)
+        page.fill("#password", PASSWORD)
+        page.click("button[type=submit]")
+        page.wait_for_selector("nav", timeout=20000)
+        page.get_by_role("button", name="Positions", exact=True).click()
+        page.get_by_role("heading", name="Positions", exact=True).wait_for()
+        page.get_by_text("Aucune position lue pour l’instant").wait_for()
+        page.get_by_role("button", name="Lire les positions").click()
+        page.get_by_text("Terminée").wait_for(timeout=30000)
+        row = page.get_by_role("button", name="L'État doit augmenter le salaire minimum")
+        row.wait_for()
+        assert "1 pour · 0 nuancés · 1 contre" in row.inner_text()
+        row.click()
+        page.get_by_text(SAYS_A, exact=False).wait_for()
+        assert page.get_by_text("Contre", exact=True).is_visible() and page.get_by_text("Pour", exact=True).is_visible()
+        assert ingest_db.execute("SELECT count(*) FROM claims").fetchone() == (2,)
+        browser.close()
+    assert errors == []

@@ -12,8 +12,9 @@ from pathlib import Path
 
 import psycopg
 
+from dindon import locks
+
 BASELINE = ("schema.sql", "schema-analysis.sql", "seed-axes.sql", "schema-vector.sql")
-LOCK_KEY = 7_262_024  # advisory lock, so that two processes never migrate at the same time
 
 BOOKKEEPING = """
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -41,6 +42,16 @@ def _files(db_dir: Path) -> list[tuple[str, str, Path]]:
     return files
 
 
+def pending(conn: psycopg.Connection, db_dir: Path) -> list[str]:
+    """The files that `migrate` would apply, without applying anything (a file never applied, or a baseline file whose content changed)."""
+    try:
+        known = dict(conn.execute("SELECT name, sha256 FROM schema_migrations").fetchall())
+    except psycopg.errors.UndefinedTable:
+        known = {}
+    conn.rollback()
+    return [name for name, _kind, path in _files(db_dir) if known.get(name) != hashlib.sha256(path.read_bytes()).hexdigest()]
+
+
 def migrate(conn: psycopg.Connection, db_dir: Path) -> list[str]:
     """Brings the database up to date. Returns the names of the files that were applied."""
     applied = []
@@ -48,7 +59,7 @@ def migrate(conn: psycopg.Connection, db_dir: Path) -> list[str]:
     conn.commit()
     previous_autocommit = conn.autocommit
     conn.autocommit = True
-    conn.execute("SELECT pg_advisory_lock(%s)", (LOCK_KEY,))
+    conn.execute("SELECT pg_advisory_lock(%s)", (locks.MIGRATION,))
     try:
         conn.execute(BOOKKEEPING)
         known = dict(conn.execute("SELECT name, sha256 FROM schema_migrations").fetchall())
@@ -70,6 +81,6 @@ def migrate(conn: psycopg.Connection, db_dir: Path) -> list[str]:
                 )
             applied.append(name)
     finally:
-        conn.execute("SELECT pg_advisory_unlock(%s)", (LOCK_KEY,))
+        conn.execute("SELECT pg_advisory_unlock(%s)", (locks.MIGRATION,))
         conn.autocommit = previous_autocommit
     return applied

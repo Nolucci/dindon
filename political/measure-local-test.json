@@ -1,0 +1,85 @@
+{
+ "kind": "local",
+ "split": "test",
+ "prompt": "local-3",
+ "model": "qwen3:14b",
+ "seconds": 15,
+ "predictions": {
+  "c02": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c04": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c06": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c08": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c10": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c12": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c14": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c16": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c18": {
+   "verdict": "false",
+   "answer": "L'âge légal de départ à la retraite en France est de 62 ans."
+  },
+  "c20": {
+   "verdict": "false",
+   "answer": "Le Parlement français compte deux chambres."
+  },
+  "c22": {
+   "verdict": "false",
+   "answer": "Le Sénat compte 348 sénateurs."
+  },
+  "c24": {
+   "verdict": "false",
+   "answer": "La Banque centrale européenne a son siège à Francfort-sur-le-Main."
+  },
+  "c26": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c28": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c29": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c32": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c33": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c36": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c37": {
+   "verdict": "unsure",
+   "answer": null
+  }
+ }
+}

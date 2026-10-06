@@ -1,0 +1,157 @@
+{
+ "kind": "local",
+ "split": "all",
+ "prompt": "local-3",
+ "model": "qwen3:14b",
+ "seconds": 32,
+ "predictions": {
+  "c01": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c02": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c03": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c04": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c05": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c06": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c07": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c08": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c09": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c10": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c11": {
+   "verdict": "false",
+   "answer": "Le droit de vote des femmes en France a été instauré en 1945."
+  },
+  "c12": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c13": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c14": {
+   "verdict": "true",
+   "answer": null
+  },
+  "c15": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c16": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c17": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c18": {
+   "verdict": "false",
+   "answer": "L'âge légal de départ à la retraite en France est de 62 ans."
+  },
+  "c19": {
+   "verdict": "false",
+   "answer": "Le Royaume-Uni a quitté l'Union européenne le 31 janvier 2020."
+  },
+  "c20": {
+   "verdict": "false",
+   "answer": "Le Parlement français compte deux chambres."
+  },
+  "c21": {
+   "verdict": "false",
+   "answer": "Le mandat du président de la République française dure cinq ans."
+  },
+  "c22": {
+   "verdict": "false",
+   "answer": "Le Sénat compte 348 sénateurs."
+  },
+  "c23": {
+   "verdict": "false",
+   "answer": "La peine de mort a été abolie en France en 1981."
+  },
+  "c24": {
+   "verdict": "false",
+   "answer": "La Banque centrale européenne a son siège à Francfort-sur-le-Main."
+  },
+  "c25": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c26": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c27": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c28": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c29": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c30": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c31": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c32": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c33": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c34": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c35": {
+   "verdict": "false",
+   "answer": "Les énergies renouvelables représentent environ 17 % de l'électricité produite en France."
+  },
+  "c36": {
+   "verdict": "unsure",
+   "answer": null
+  },
+  "c37": {
+   "verdict": "unsure",
+   "answer": null
+  }
+ }
+}

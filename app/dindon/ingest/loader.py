@@ -25,7 +25,8 @@ from pathlib import Path
 
 import psycopg
 
-INGEST_LOCK = 7_262_025  # one import at a time: they all touch the same people and the same links
+from dindon import locks
+
 GATEWAY_SOURCE = "gateway"  # the name, in the ledger of imports, of what the live bot writes: it is not an import of a history
 NOTIFY_CHANNEL = "dindon"
 MAX_EDGE_EVENTS = 200  # beyond this, the interface is told to reload instead of one event per link
@@ -52,6 +53,7 @@ class IngestResult:
     messages_removed: int = 0
     prune_skipped: int = 0  # messages that seemed deleted but were kept, see PRUNE_MAX_SHARE
     edges_changed: int = 0
+    privacy_dropped: int = 0  # messages left out because their author asked not to be recorded
     seconds: float = 0.0
 
 
@@ -254,6 +256,65 @@ GROUP BY k.f, k.t, k.kind, k.tt, k.w0, k.n0, k.l0, hl.s
 """
 
 
+def _drop_derived(cur: psycopg.Cursor, table: str, guild_id: int) -> int:
+    """What was **derived from messages** that are deleted, or whose text changed, goes with them: their conversations, and so the vectors, the positions (with
+    their quotes) and the topics that were made from those conversations. A person who deletes a message, or edits it, expects what it said to disappear; the
+    conversation is made again, without it, by the next analysis. `table` is a temporary table of message ids. Returns how many conversations were removed."""
+    cur.execute(f"DELETE FROM conversations WHERE id IN (SELECT conversation_id FROM conversation_messages WHERE message_id IN (SELECT id FROM {table}))")
+    removed = cur.rowcount
+    # The claims that a debate read in these messages (and the sources behind them) are gone, and an edited message is to be read again (docs/DEBAT.md)
+    cur.execute(f"DELETE FROM debate_claims WHERE message_id IN (SELECT id FROM {table})")
+    cur.execute(f"DELETE FROM debate_answers WHERE message_id IN (SELECT id FROM {table})")                  # and what Dindon answered itself (its message on Discord is taken back)
+    cur.execute(f"UPDATE debate_messages SET read_at = NULL WHERE message_id IN (SELECT id FROM {table})")
+    if removed:                                                           # the positions are gone: so are the scores that they made
+        cur.execute("SELECT refresh_person_axis_scores(%s)", (guild_id,))
+    return removed
+
+
+def _write_edges(cur: psycopg.Cursor, params: dict) -> int:
+    """Writes the links computed by the delta (`edge_merged`): the ones that changed, and removes the ones with no exchange left. Returns how many changed."""
+    cur.execute("""INSERT INTO edges (guild_id, from_user_id, to_user_id, kind, weight, n, last_at)
+                   SELECT %(guild)s, f, t, kind, GREATEST(w1, 0), n1, tt FROM edge_merged WHERE n1 > 0
+                   ON CONFLICT (guild_id, from_user_id, to_user_id, kind) DO UPDATE
+                       SET weight = excluded.weight, n = excluded.n, last_at = excluded.last_at""", params)
+    changed = cur.rowcount
+    cur.execute("""DELETE FROM edges e USING edge_merged m
+                   WHERE m.n1 <= 0 AND e.guild_id = %(guild)s AND e.from_user_id = m.f AND e.to_user_id = m.t AND e.kind = m.kind""", params)
+    return changed
+
+
+def forget_messages(conn: psycopg.Connection, guild_id: int, message_ids: list[int]) -> int:
+    """Removes messages that were deleted on Discord (what the live bot learns from MESSAGE_DELETE), with their links and what was derived from them.
+    Messages that are not in the database, or that belong to another server, are ignored. Returns how many were removed."""
+    if not message_ids:
+        return 0
+    with conn.transaction():
+        cur = conn.cursor()
+        cur.execute("SELECT pg_advisory_xact_lock(%s)", (locks.DATA,))
+        # A debate no longer counts a message that was deleted (docs/DEBAT.md). Whether or not the map ever stored it: the debate sees messages the map may not have.
+        cur.execute("DELETE FROM debate_claims WHERE message_id = ANY(%s)", (message_ids,))
+        cur.execute("DELETE FROM debate_answers WHERE message_id = ANY(%s)", (message_ids,))
+        cur.execute("DELETE FROM debate_messages WHERE message_id = ANY(%s)", (message_ids,))
+        cur.execute("""CREATE TEMP TABLE touched ON COMMIT DROP AS
+                       SELECT m.id, m.channel_id FROM messages m JOIN channels c ON c.id = m.channel_id WHERE m.id = ANY(%s) AND c.guild_id = %s""", (message_ids, guild_id))
+        cur.execute("SELECT count(*) FROM touched")
+        found = cur.fetchone()[0]
+        if not found:
+            return 0
+        params = {"guild": guild_id}
+        _drop_derived(cur, "touched", guild_id)
+        cur.execute("CREATE TEMP TABLE new_events (f bigint, t bigint, kind text, message_id bigint, sent_at timestamptz, c integer) ON COMMIT DROP")
+        cur.execute(_OLD_EVENTS)
+        cur.execute(_EDGE_DELTA)
+        cur.execute(_EDGE_MERGE, params)
+        cur.execute("DELETE FROM messages WHERE id IN (SELECT id FROM touched)")
+        _write_edges(cur, params)
+        cur.execute("""INSERT INTO jobs (kind, subject_id) SELECT 'conversations', t.channel_id FROM (SELECT DISTINCT channel_id FROM touched) t
+                       WHERE NOT EXISTS (SELECT 1 FROM jobs WHERE kind = 'conversations' AND subject_id = t.channel_id)""")
+        cur.execute("SELECT pg_notify(%s, %s)", (NOTIFY_CHANNEL, json.dumps({"type": "graph", "guild": str(guild_id)})))
+    return found
+
+
 def _apply(conn: psycopg.Connection, document: dict, run_id: int, params: dict, prune: bool, only_new: bool,
            result: IngestResult) -> list[dict]:
     # (the messages are in the staging tables by now: document["messages"] is gone)
@@ -264,6 +325,23 @@ def _apply(conn: psycopg.Connection, document: dict, run_id: int, params: dict, 
     cur.execute("SELECT NOT EXISTS (SELECT 1 FROM ingest_runs WHERE guild_id = %s AND exported_at > %s)", (guild_id, exported_at))
     newest = cur.fetchone()[0]
     params = {**params, "newest": newest, "run": run_id, "only_new": only_new}
+
+    # People who asked not to be recorded (privacy_subjects): nothing of them goes in, whatever the file or the run says.
+    cur.execute("SELECT 1 FROM privacy_subjects LIMIT 1")
+    if cur.fetchone():
+        cur.execute("""UPDATE stg_reactions r SET count = GREATEST(r.count - n.removed, 0)
+                       FROM (SELECT message_id, emoji_key, count(*) AS removed FROM stg_reaction_users
+                             WHERE user_id IN (SELECT user_id FROM privacy_subjects) GROUP BY message_id, emoji_key) n
+                       WHERE n.message_id = r.message_id AND n.emoji_key = r.emoji_key""")   # their reaction was counted in the total
+        for table, column in (("stg_mentions", "user_id"), ("stg_reaction_users", "user_id"), ("stg_user_roles", "user_id"), ("stg_users", "id")):
+            cur.execute(f"DELETE FROM {table} WHERE {column} IN (SELECT user_id FROM privacy_subjects)")
+        cur.execute("""UPDATE stg_messages SET reference_author_id = NULL, reference_content = NULL
+                       WHERE reference_author_id IN (SELECT user_id FROM privacy_subjects)""")
+        cur.execute("UPDATE stg_messages SET interaction_user_id = NULL WHERE interaction_user_id IN (SELECT user_id FROM privacy_subjects)")
+        cur.execute("""DELETE FROM stg_mentions WHERE message_id IN (SELECT id FROM stg_messages WHERE author_id IN (SELECT user_id FROM privacy_subjects))""")
+        cur.execute("""DELETE FROM stg_reaction_users WHERE message_id IN (SELECT id FROM stg_messages WHERE author_id IN (SELECT user_id FROM privacy_subjects))""")
+        cur.execute("DELETE FROM stg_messages WHERE author_id IN (SELECT user_id FROM privacy_subjects)")
+        result.privacy_dropped = cur.rowcount
 
     # Where the messages come from. An export older than what is known only adds what is missing.
     g = document["guild"]
@@ -343,6 +421,12 @@ def _apply(conn: psycopg.Connection, document: dict, run_id: int, params: dict, 
                 cur.execute("DELETE FROM pruned")
                 result.prune_skipped = seems_deleted
     cur.execute("CREATE TEMP TABLE touched ON COMMIT DROP AS SELECT id FROM applied UNION ALL SELECT id FROM pruned")
+    # What was derived from a message that is deleted, or whose text changed, is removed (see _drop_derived)
+    cur.execute("""CREATE TEMP TABLE changed_text ON COMMIT DROP AS
+                   SELECT m.id FROM messages m JOIN applied a ON a.id = m.id JOIN stg_messages s ON s.id = m.id
+                   WHERE a.existing AND m.content IS DISTINCT FROM s.content
+                   UNION SELECT id FROM pruned""")
+    _drop_derived(cur, "changed_text", guild_id)
     cur.execute("ANALYZE applied; ANALYZE touched")
 
     # The links, before anything is written: what the database knew against what the file says
@@ -383,17 +467,12 @@ def _apply(conn: psycopg.Connection, document: dict, run_id: int, params: dict, 
     cur.execute("""INSERT INTO reaction_users (message_id, emoji_key, user_id)
                    SELECT DISTINCT s.message_id, s.emoji_key, s.user_id FROM stg_reaction_users s
                    JOIN applied a ON a.id = s.message_id ON CONFLICT DO NOTHING""")
+    cur.execute("DELETE FROM debate_messages WHERE message_id IN (SELECT id FROM pruned)")      # the nightly catch-up found them deleted: a debate forgets them too
     cur.execute("DELETE FROM messages WHERE id IN (SELECT id FROM pruned)")
     result.messages_removed = cur.rowcount
 
     # The links, now
-    cur.execute("""INSERT INTO edges (guild_id, from_user_id, to_user_id, kind, weight, n, last_at)
-                   SELECT %(guild)s, f, t, kind, GREATEST(w1, 0), n1, tt FROM edge_merged WHERE n1 > 0
-                   ON CONFLICT (guild_id, from_user_id, to_user_id, kind) DO UPDATE
-                       SET weight = excluded.weight, n = excluded.n, last_at = excluded.last_at""", params)
-    result.edges_changed = cur.rowcount
-    cur.execute("""DELETE FROM edges e USING edge_merged m
-                   WHERE m.n1 <= 0 AND e.guild_id = %(guild)s AND e.from_user_id = m.f AND e.to_user_id = m.t AND e.kind = m.kind""", params)
+    result.edges_changed = _write_edges(cur, params)
 
     # The analysis of a channel is worth redoing as soon as it has changed
     if result.messages_new or result.messages_updated or result.messages_removed:
@@ -449,7 +528,7 @@ def ingest_document(conn: psycopg.Connection, document: dict, name: str, sha256:
         raise InvalidExport(f"{name}: unexpected content ({type(error).__name__}: {error})") from None
     with conn.transaction():
         cur = conn.cursor()
-        cur.execute("SELECT pg_advisory_xact_lock(%s)", (INGEST_LOCK,))
+        cur.execute("SELECT pg_advisory_xact_lock(%s)", (locks.DATA,))
         cur.execute("SELECT id FROM ingest_runs WHERE source_sha256 = %s", (sha256,))
         if cur.fetchone():
             result.status = "duplicate"

@@ -23,29 +23,27 @@ def _row_counts(conn) -> dict[str, int]:
 
 
 def test_a_new_database_is_healthy(conn):
-    count = lambda sql: conn.execute(sql).fetchone()[0]
+    def count(sql):
+        return conn.execute(sql).fetchone()[0]
     assert count(
         "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' "
         "AND table_type = 'BASE TABLE' AND table_name <> 'schema_migrations'"
-    ) == 37
+    ) == 52
     assert count(
         "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'VIEW'"
     ) == 9
     assert count("SELECT count(*) FROM axes") == 21
-    assert count("SELECT count(*) FROM axes WHERE is_active") == 12
-    assert count("SELECT count(*) FROM axes WHERE is_active AND origin <> '12axes'") == 0
+    assert count("SELECT count(*) FROM axes WHERE is_active") == 21
+    assert count("SELECT count(*) FROM axes WHERE origin = '12axes'") == 12
     assert count("SELECT count(*) FROM ideologies") == 28
     assert count("SELECT count(*) FROM ideology_axis_ranges") == 72
     assert count("SELECT count(*) FROM role_rules") == 37
     assert count("SELECT count(*) FROM ideologies WHERE is_validated") == 0  # waiting for the user's review
 
 
-def test_the_seed_data_is_left_as_the_user_reads_it(conn):
-    # The 12 axes of the model are active, the 9 extensions are not, until the user has reviewed them
-    inactive = {r[0] for r in conn.execute("SELECT code FROM axes WHERE NOT is_active")}
-    assert inactive == {
-        "europe", "ecologie", "rupture", "redistribution", "confiance", "genre", "animaux", "alliances", "participation",
-    }
+def test_all_the_axes_are_active_from_the_start(conn):
+    # The 12 axes of the model and the 9 extensions: all of them are scored (decision of 2026-10-04)
+    assert {r[0] for r in conn.execute("SELECT code FROM axes WHERE NOT is_active")} == set()
 
 
 def test_running_everything_again_changes_nothing(conn):

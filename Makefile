@@ -3,7 +3,7 @@ PYTHON ?= python3.13
 VENV   := .venv
 BIN    := $(VENV)/bin
 
-.PHONY: help setup web up down db migrate check test axes backup demo check-ui
+.PHONY: help setup web up down db migrate check test lint axes backup demo politique check-ui
 
 help:
 	@echo "make setup    create the Python environment (.venv) and install Dindon with its test tools"
@@ -17,6 +17,7 @@ help:
 	@echo "make check    print what the database is made of"
 	@echo "make test     run all the tests (starts and removes a throwaway database)"
 	@echo "make axes     rewrite docs/AXES.md from the database (page to review the axes)"
+	@echo "make lint     ruff: style and likely bugs"
 	@echo "make backup   dump the database to backups/ (compressed)"
 
 $(BIN)/dindon: pyproject.toml
@@ -28,6 +29,9 @@ setup: $(BIN)/dindon
 
 web:
 	cd web && npm ci --no-audit --no-fund && npm run build
+
+politique:  ## the invented political test server on http://127.0.0.1:8012 (password: test), see docs/SERVEUR-DE-TEST.md
+	./tools/politique.sh
 
 demo: setup
 	./tools/demo.sh
@@ -52,6 +56,10 @@ check: setup
 
 test: setup
 	$(BIN)/pytest
+
+lint: setup  ## style and likely bugs (ruff, configured in pyproject.toml): no finding is the rule
+	$(BIN)/pip install -q ruff
+	$(BIN)/ruff check app tools tests
 
 axes: setup
 	DATABASE_URL=$$($(BIN)/python -c "from dindon.config import load_settings; print(load_settings().database_url)") \

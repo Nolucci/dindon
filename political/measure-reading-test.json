@@ -1,0 +1,57 @@
+{
+ "kind": "reading",
+ "split": "test",
+ "prompt": "claims-4",
+ "model": "qwen3:14b",
+ "seconds": 62,
+ "predictions": {
+  "m02": [
+   "Le SMIC brut mensuel dépasse 1 800 euros depuis janvier 2025",
+   "Le SMIC n'est pas bloqué"
+  ],
+  "m04": [
+   "Le Sénat compte 348 sénateurs.",
+   "L'Assemblée nationale compte 577 députés."
+  ],
+  "m06": [
+   "Le nucléaire fournit environ 65 % de l'électricité produite en France"
+  ],
+  "m08": [
+   "Le Royaume-Uni est sorti de l'Union européenne en 2020 après le référendum de 2016."
+  ],
+  "m10": [
+   "L'âge légal de départ à la retraite était de 62 ans avant la réforme de 2023."
+  ],
+  "m12": [
+   "La Banque centrale européenne a son siège à Francfort."
+  ],
+  "m14": [
+   "La Tour Eiffel a été inaugurée en 1889 pour l'Exposition universelle de Paris."
+  ],
+  "m16": [
+   "La population française est d'environ 68 millions d'habitants."
+  ],
+  "m18": [
+   "L'espérance de vie des femmes en France dépasse 85 ans"
+  ],
+  "m20": [
+   "L'inflation en France a atteint 5,2 % en moyenne annuelle en 2022."
+  ],
+  "m22": [
+   "La peine de mort a été abolie par la loi de 1981 portée par Robert Badinter"
+  ],
+  "m24": [
+   "le nucléaire fournit environ 65 % de l'électricité française"
+  ],
+  "m26": [],
+  "m28": [],
+  "m30": [],
+  "m32": [],
+  "m34": [],
+  "m36": [],
+  "m38": [],
+  "m40": [],
+  "m42": [],
+  "m44": []
+ }
+}

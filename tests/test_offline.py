@@ -29,5 +29,5 @@ def test_the_core_of_the_bot_does_not_import_discord_py():
     code = ("import sys, dindon.bot.adapter, dindon.bot.runner; "
             "bad = sorted(m for m in sys.modules if m == 'discord' or m.startswith('discord.')); "
             "assert not bad, 'imported: ' + ', '.join(bad[:3])")
-    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
     assert done.returncode == 0, done.stderr[-300:]

@@ -1,0 +1,3162 @@
+{
+ "reviewer": "Claude (relecture du 4 octobre 2026, données inventées)",
+ "note": "Relecture des 396 propositions de la base politique inventée. Version du 4 octobre 2026 pour les 21 axes : les liens que le relecteur juge justes (axe, sens, force).",
+ "propositions": {
+  "159": {
+   "text": "La Ve République a tenu 60 ans, on ne change pas de régime pour une humeur passagère",
+   "links": [
+    [
+     "rupture",
+     -0.6
+    ]
+   ]
+  },
+  "160": {
+   "text": "Le 49.3 est un passage en force et non démocratique",
+   "links": [
+    [
+     "representation",
+     -1.0
+    ]
+   ]
+  },
+  "161": {
+   "text": "La fin de vie est un sujet à risque de dérapage, il faut prudence",
+   "links": [
+    [
+     "morale",
+     0.6
+    ]
+   ]
+  },
+  "162": {
+   "text": "La société a déjà changé, la loi doit s'adapter",
+   "links": [
+    [
+     "morale",
+     -1.0
+    ],
+    [
+     "rupture",
+     -0.6
+    ]
+   ]
+  },
+  "163": {
+   "text": "Les deux côtés d'un débat ont des arguments valables",
+   "links": []
+  },
+  "164": {
+   "text": "L'industrie d'armement crée de l'emploi et favorise l'indépendance",
+   "links": [
+    [
+     "diplomatie",
+     -0.6
+    ]
+   ]
+  },
+  "165": {
+   "text": "La France devrait sortir de l'OTAN et ne plus suivre les directives de Washington",
+   "links": [
+    [
+     "alliances",
+     -1.0
+    ]
+   ]
+  },
+  "166": {
+   "text": "La dissuasion nucléaire et une armée crédible protègent d'abord la France",
+   "links": [
+    [
+     "diplomatie",
+     -1.0
+    ]
+   ]
+  },
+  "167": {
+   "text": "Ne pas se réarmer est naïf dans un monde plus dangereux",
+   "links": [
+    [
+     "diplomatie",
+     -1.0
+    ]
+   ]
+  },
+  "168": {
+   "text": "Certaines traditions doivent être préservées sans être conservatrices",
+   "links": [
+    [
+     "morale",
+     0.6
+    ]
+   ]
+  },
+  "169": {
+   "text": "Une assemblée à la proportionnelle représenterait enfin tout le monde",
+   "links": [
+    [
+     "representation",
+     -1.0
+    ]
+   ]
+  },
+  "170": {
+   "text": "Il faut des limites pour gérer les défis de logement, soins et formation",
+   "links": [
+    [
+     "controle",
+     -1.0
+    ]
+   ]
+  },
+  "171": {
+   "text": "L'assimilation fonctionnait autrefois, mais aujourd'hui le communautarisme est laissé faire",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "172": {
+   "text": "L'innovation est le moteur de la croissance et du progrès médical",
+   "links": [
+    [
+     "technologie",
+     -1.0
+    ]
+   ]
+  },
+  "173": {
+   "text": "L'intelligence artificielle va augmenter la productivité comme l'imprimerie ou l'électricité",
+   "links": [
+    [
+     "technologie",
+     -1.0
+    ]
+   ]
+  },
+  "174": {
+   "text": "La France s'est faite par vagues successives, et les Italiens et les Polonais ont eu les mêmes procès",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "175": {
+   "text": "La moitié des secteurs en tension tournent grâce aux travailleurs étrangers",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "176": {
+   "text": "Les chiffres réels sur certains sujets sont bien plus bas que ce que raconte la télévision",
+   "links": [
+    [
+     "confiance",
+     0.6
+    ]
+   ]
+  },
+  "177": {
+   "text": "Les peurs sur l'intelligence artificielle ressemblent à celles sur le train au XIXe siècle",
+   "links": [
+    [
+     "technologie",
+     -0.6
+    ]
+   ]
+  },
+  "178": {
+   "text": "L'État doit rester neutre envers les croyances religieuses",
+   "links": [
+    [
+     "religion",
+     -1.0
+    ]
+   ]
+  },
+  "179": {
+   "text": "La laïcité doit être appliquée de manière équilibrée et mesurée",
+   "links": [
+    [
+     "religion",
+     -0.6
+    ]
+   ]
+  },
+  "180": {
+   "text": "La laïcité est une exception française qui unit le pays",
+   "links": [
+    [
+     "religion",
+     -1.0
+    ]
+   ]
+  },
+  "181": {
+   "text": "La religion ne doit pas pénétrer l'espace public",
+   "links": [
+    [
+     "religion",
+     -1.0
+    ]
+   ]
+  },
+  "182": {
+   "text": "Augmenter les moyens de la police peut entraîner plus d’abus, et les peines ne réduisent pas la délinquance.",
+   "links": [
+    [
+     "pouvoir",
+     1.0
+    ]
+   ]
+  },
+  "183": {
+   "text": "Il faut trouver un équilibre entre renforcer la police et éviter de marginaliser certains groupes.",
+   "links": []
+  },
+  "184": {
+   "text": "La formation des policiers est importante, mais il faut aussi plus de personnel pour faire face aux braquages.",
+   "links": []
+  },
+  "185": {
+   "text": "La police a besoin de plus de moyens pour lutter contre la délinquance.",
+   "links": [
+    [
+     "pouvoir",
+     -0.6
+    ]
+   ]
+  },
+  "186": {
+   "text": "La police n’est pas nécessairement sous-effectif par rapport à la moyenne européenne.",
+   "links": []
+  },
+  "187": {
+   "text": "Les systèmes de caméra peuvent réduire les crimes, mais aussi réduire les interactions humaines.",
+   "links": []
+  },
+  "188": {
+   "text": "L’enjeu est de trouver un équilibre entre sécurité et libertés, et de mesurer les coûts.",
+   "links": []
+  },
+  "189": {
+   "text": "On pourrait investir dans des caméras et l’intelligence artificielle plutôt que dans des patrouilles de police.",
+   "links": [
+    [
+     "pouvoir",
+     -0.6
+    ]
+   ]
+  },
+  "190": {
+   "text": "Des solutions comme des chambres de transit pourraient aider à éviter la surpopulation.",
+   "links": []
+  },
+  "191": {
+   "text": "Il est utile de connaître les chiffres sur les réfugiés accueillis et régularisés.",
+   "links": []
+  },
+  "192": {
+   "text": "La population en France a augmenté, mais ce n’est peut-être pas le pire problème.",
+   "links": []
+  },
+  "193": {
+   "text": "Les données du HCR montrent que peu des réfugiés ont un niveau d'éducation supérieur.",
+   "links": []
+  },
+  "194": {
+   "text": "Les réfugiés apportent un bénéfice économique et humain.",
+   "links": [
+    [
+     "immigration",
+     1.0
+    ]
+   ]
+  },
+  "195": {
+   "text": "Les réfugiés devraient être accueillis avec des conditions.",
+   "links": []
+  },
+  "196": {
+   "text": "Les réfugiés peuvent s’intégrer bien, comme dans le cas de sa copine.",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "197": {
+   "text": "Les réfugiés posent un problème pour la sécurité sociale et l'identité nationale.",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "198": {
+   "text": "On ne peut pas accueillir tout le monde.",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "199": {
+   "text": "Une gestion efficace avec des logements et de la formation est nécessaire.",
+   "links": []
+  },
+  "200": {
+   "text": "Une politique plus ouverte envers les réfugiés est nécessaire.",
+   "links": [
+    [
+     "immigration",
+     1.0
+    ]
+   ]
+  },
+  "201": {
+   "text": "Il faut trouver un équilibre entre innovation et prudence concernant l'IA.",
+   "links": []
+  },
+  "202": {
+   "text": "L'IA doit être développée sans réglementation pour accélérer son avancement.",
+   "links": [
+    [
+     "technologie",
+     -1.0
+    ]
+   ]
+  },
+  "203": {
+   "text": "L'IA peut aider les journalistes, mais ne doit pas remplacer le travail humain.",
+   "links": []
+  },
+  "204": {
+   "text": "La réglementation de l'IA est nécessaire pour assurer la véracité et l'éthique.",
+   "links": [
+    [
+     "technologie",
+     0.6
+    ]
+   ]
+  },
+  "205": {
+   "text": "La réglementation de l'IA est nécessaire pour éviter les dégâts causés par des articles mal faits.",
+   "links": [
+    [
+     "technologie",
+     0.6
+    ]
+   ]
+  },
+  "206": {
+   "text": "La réglementation peut être mise en place sans freiner l'innovation.",
+   "links": [
+    [
+     "controle",
+     -0.6
+    ]
+   ]
+  },
+  "207": {
+   "text": "Le débat actuel porte sur la confiance à accorder aux IA ou leur capacité à tromper.",
+   "links": []
+  },
+  "208": {
+   "text": "Les risques liés à l'IA peuvent être gérés par des filtres à la source.",
+   "links": [
+    [
+     "technologie",
+     -0.6
+    ]
+   ]
+  },
+  "209": {
+   "text": "Il peut y avoir des exceptions à la neutralité religieuse dans le service public",
+   "links": [
+    [
+     "religion",
+     0.6
+    ]
+   ]
+  },
+  "210": {
+   "text": "La laïcité exige l'harmonie sociale et le respect des valeurs républicaines",
+   "links": [
+    [
+     "religion",
+     -1.0
+    ]
+   ]
+  },
+  "211": {
+   "text": "La laïcité protège la liberté d'apprendre des enfants en limitant l'influence religieuse",
+   "links": [
+    [
+     "religion",
+     -1.0
+    ]
+   ]
+  },
+  "212": {
+   "text": "Les agents publics doivent être neutres et uniformes dans leur apparence",
+   "links": [
+    [
+     "religion",
+     -0.6
+    ]
+   ]
+  },
+  "213": {
+   "text": "Les agents publics peuvent pratiquer leur religion à l’extérieur de leur service public",
+   "links": []
+  },
+  "214": {
+   "text": "Les cas extrêmes sont souvent les seuls visibles dans le débat public",
+   "links": []
+  },
+  "216": {
+   "text": "Continuer la croissance infinie sur une planète finie est mathématiquement impossible",
+   "links": [
+    [
+     "ecologie",
+     1.0
+    ]
+   ]
+  },
+  "217": {
+   "text": "La sobriété coûte moins cher que de réparer les dégâts de la canicule",
+   "links": [
+    [
+     "ecologie",
+     0.6
+    ]
+   ]
+  },
+  "218": {
+   "text": "Le nucléaire est la vraie réponse au climat",
+   "links": [
+    [
+     "technologie",
+     -1.0
+    ]
+   ]
+  },
+  "219": {
+   "text": "Le solaire et l'éolien sont les énergies les moins chères",
+   "links": [
+    [
+     "ecologie",
+     0.6
+    ]
+   ]
+  },
+  "220": {
+   "text": "Les scientifiques sont clairs, on n'a plus le temps de faire du business as usual",
+   "links": [
+    [
+     "ecologie",
+     1.0
+    ]
+   ]
+  },
+  "221": {
+   "text": "Les villes doivent se refaire autour du vélo et du train, pas de la voiture",
+   "links": [
+    [
+     "ecologie",
+     0.6
+    ]
+   ]
+  },
+  "222": {
+   "text": "La laïcité protège les croyants et les non-croyants.",
+   "links": [
+    [
+     "religion",
+     -0.6
+    ]
+   ]
+  },
+  "223": {
+   "text": "La loi de 1905 interdit à l'État de reconnaître ou financer un culte.",
+   "links": [
+    [
+     "religion",
+     -1.0
+    ]
+   ]
+  },
+  "224": {
+   "text": "Laisser la religion dans l'espace public entraîne des pressions communautaires.",
+   "links": [
+    [
+     "religion",
+     -0.6
+    ]
+   ]
+  },
+  "225": {
+   "text": "Les clochers ont leur place dans le paysage national.",
+   "links": []
+  },
+  "226": {
+   "text": "Les signes religieux ostensibles n'ont pas leur place chez les agents publics.",
+   "links": [
+    [
+     "religion",
+     -1.0
+    ]
+   ]
+  },
+  "227": {
+   "text": "À l'école publique, les élèves sont avant tout des élèves, pas des croyants.",
+   "links": [
+    [
+     "religion",
+     -1.0
+    ]
+   ]
+  },
+  "228": {
+   "text": "L'État a un rôle nécessaire pour rééquilibrer les inégalités",
+   "links": [
+    [
+     "redistribution",
+     -1.0
+    ]
+   ]
+  },
+  "229": {
+   "text": "La privatisation de l'énergie entraîne une augmentation des prix et profite aux actionnaires",
+   "links": [
+    [
+     "economie",
+     -1.0
+    ]
+   ]
+  },
+  "230": {
+   "text": "La question du pays est pertinente pour comprendre le contexte",
+   "links": []
+  },
+  "231": {
+   "text": "La situation dépend des cas, il n'y a pas de solution unique",
+   "links": []
+  },
+  "232": {
+   "text": "Le SMIC actuel est trop bas et conduit à des situations de précarité",
+   "links": [
+    [
+     "redistribution",
+     -1.0
+    ]
+   ]
+  },
+  "233": {
+   "text": "Taxer les grosses fortunes permet de financer les services publics sans peser sur les classes moyennes",
+   "links": [
+    [
+     "redistribution",
+     -1.0
+    ]
+   ]
+  },
+  "234": {
+   "text": "Un salaire minimum plus élevé relance la consommation",
+   "links": [
+    [
+     "redistribution",
+     -0.6
+    ]
+   ]
+  },
+  "235": {
+   "text": "L'intégration réussit lorsque les migrants obtiennent des papiers et un emploi.",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "236": {
+   "text": "Les travailleurs étrangers sont essentiels dans de nombreux secteurs en tension.",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "237": {
+   "text": "Régulariser les migrants encourage l'immigration clandestine.",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "238": {
+   "text": "L'Union européenne est injuste envers les pays membres, car on paie plus qu'on ne reçoit.",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "239": {
+   "text": "L'euro a rendu les pays membres dépendants et a retiré leur capacité à ajuster leur économie.",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "240": {
+   "text": "L'euro a évité des dévaluations en chaîne entre les pays membres.",
+   "links": [
+    [
+     "europe",
+     0.6
+    ]
+   ]
+  },
+  "241": {
+   "text": "Le Royaume-Uni s'en sort bien en dehors de l'Union européenne.",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "242": {
+   "text": "Le marché commun crée des emplois dans les pays membres.",
+   "links": [
+    [
+     "commerce",
+     0.6
+    ]
+   ]
+  },
+  "243": {
+   "text": "Les normes européennes protègent mieux les consommateurs que les lois nationales.",
+   "links": [
+    [
+     "europe",
+     0.6
+    ]
+   ]
+  },
+  "244": {
+   "text": "Une armée européenne renforcerait l'autonomie des pays membres par rapport aux États-Unis.",
+   "links": [
+    [
+     "europe",
+     0.6
+    ],
+    [
+     "diplomatie",
+     -0.6
+    ]
+   ]
+  },
+  "245": {
+   "text": "Certains sujets ne doivent pas être réglés par la loi, mais par l'évolution sociale",
+   "links": [
+    [
+     "pouvoir",
+     1.0
+    ]
+   ]
+  },
+  "246": {
+   "text": "L'aide à mourir avec des garde-fous garantit la liberté de choisir sa fin de vie",
+   "links": [
+    [
+     "pouvoir",
+     1.0
+    ]
+   ]
+  },
+  "247": {
+   "text": "Les changements sociaux doivent être progressifs pour ne pas perturber les repères familiaux",
+   "links": [
+    [
+     "morale",
+     1.0
+    ],
+    [
+     "rupture",
+     -0.6
+    ]
+   ]
+  },
+  "248": {
+   "text": "Les droits des uns ne doivent pas entraver les droits des autres",
+   "links": []
+  },
+  "249": {
+   "text": "C’est une crise humanitaire et on ne devrait pas dire que c’est trop.",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "250": {
+   "text": "Il est impossible de vivre tous ensemble comme une utopie.",
+   "links": []
+  },
+  "251": {
+   "text": "Il faut trouver un moyen de gérer le flux des réfugiés sans surcharger le système.",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "252": {
+   "text": "La France ne devrait pas être le seul pays à fermer les portes aux réfugiés.",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "253": {
+   "text": "La France ne peut pas accepter tous les réfugiés.",
+   "links": [
+    [
+     "immigration",
+     -1.0
+    ]
+   ]
+  },
+  "254": {
+   "text": "La plupart des réfugiés sont des travailleurs.",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "255": {
+   "text": "Le problème des réfugiés est la régularisation, pas l’accueil.",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "256": {
+   "text": "On doit réfléchir et agir, pas faire des discours vides.",
+   "links": []
+  },
+  "257": {
+   "text": "Un programme de régularisation progressive devrait être testé.",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "258": {
+   "text": "Les alliés nous respectent parce qu'on peut agir, pas parce qu'on parle",
+   "links": [
+    [
+     "diplomatie",
+     -1.0
+    ]
+   ]
+  },
+  "259": {
+   "text": "Les stocks de munitions sont ridicules, c'est une faiblesse stratégique",
+   "links": [
+    [
+     "diplomatie",
+     -1.0
+    ]
+   ]
+  },
+  "260": {
+   "text": "Mieux vaut investir dans des hôpitaux que dans des missiles",
+   "links": [
+    [
+     "diplomatie",
+     1.0
+    ]
+   ]
+  },
+  "261": {
+   "text": "Un budget militaire à 3% du PIB serait raisonnable vu la situation",
+   "links": [
+    [
+     "diplomatie",
+     -0.6
+    ]
+   ]
+  },
+  "262": {
+   "text": "La décroissance est un luxe pour les gens qui ont déjà tout.",
+   "links": [
+    [
+     "ecologie",
+     -1.0
+    ]
+   ]
+  },
+  "263": {
+   "text": "Taxer le kérosène et les jets privés est nécessaire.",
+   "links": [
+    [
+     "ecologie",
+     0.6
+    ]
+   ]
+  },
+  "264": {
+   "text": "Enfermer plus ne réduit pas la récidive",
+   "links": [
+    [
+     "pouvoir",
+     0.6
+    ]
+   ]
+  },
+  "265": {
+   "text": "Il faut plus de juges et de procureurs pour que les peines tombent",
+   "links": [
+    [
+     "pouvoir",
+     -1.0
+    ]
+   ]
+  },
+  "266": {
+   "text": "La prévention et les éducateurs sont préférables aux caméras",
+   "links": [
+    [
+     "pouvoir",
+     0.6
+    ]
+   ]
+  },
+  "267": {
+   "text": "La surveillance de masse ouvre la porte aux abus",
+   "links": [
+    [
+     "pouvoir",
+     1.0
+    ]
+   ]
+  },
+  "268": {
+   "text": "Les lois sécuritaires dépassent souvent leur but initial",
+   "links": [
+    [
+     "pouvoir",
+     1.0
+    ]
+   ]
+  },
+  "269": {
+   "text": "Il faut faire marcher la Constitution actuelle avant d'en refaire une",
+   "links": [
+    [
+     "rupture",
+     -0.6
+    ]
+   ]
+  },
+  "270": {
+   "text": "La Ve République concentre trop de pouvoir dans les mains d'un seul homme",
+   "links": [
+    [
+     "representation",
+     -1.0
+    ]
+   ]
+  },
+  "271": {
+   "text": "Les citoyens doivent être associés en continu, pas seulement le jour du vote",
+   "links": [
+    [
+     "representation",
+     -1.0
+    ]
+   ]
+  },
+  "272": {
+   "text": "Un Parlement éclaté ne décide plus rien",
+   "links": [
+    [
+     "representation",
+     1.0
+    ]
+   ]
+  },
+  "273": {
+   "text": "Il faut ralentir l'innovation pour mieux maîtriser les algorithmes",
+   "links": [
+    [
+     "technologie",
+     1.0
+    ]
+   ]
+  },
+  "274": {
+   "text": "Il faut une réglementation sérieuse avant les problèmes, pas des excuses après",
+   "links": [
+    [
+     "controle",
+     -1.0
+    ]
+   ]
+  },
+  "275": {
+   "text": "Les géants du numérique deviennent plus puissants que des États",
+   "links": [
+    [
+     "controle",
+     -0.6
+    ]
+   ]
+  },
+  "276": {
+   "text": "Protéger le vivant avant de lancer n'importe quelle innovation est du bon sens",
+   "links": [
+    [
+     "technologie",
+     1.0
+    ]
+   ]
+  },
+  "277": {
+   "text": "Les hôpitaux et les écoles doivent rester publics et non marchandises",
+   "links": [
+    [
+     "economie",
+     -1.0
+    ]
+   ]
+  },
+  "278": {
+   "text": "Le SMIC doit être augmenté pour éviter que des gens dorment dans leur voiture",
+   "links": [
+    [
+     "redistribution",
+     -1.0
+    ]
+   ]
+  },
+  "279": {
+   "text": "Les entreprises créent la richesse, l'État la redistribue seulement",
+   "links": [
+    [
+     "economie",
+     1.0
+    ],
+    [
+     "redistribution",
+     0.6
+    ]
+   ]
+  },
+  "280": {
+   "text": "Les impôts sont déjà trop élevés et poussent les gens à quitter le pays",
+   "links": [
+    [
+     "redistribution",
+     0.6
+    ]
+   ]
+  },
+  "281": {
+   "text": "Un SMIC trop haut peut entraîner la fermeture de petites entreprises",
+   "links": [
+    [
+     "redistribution",
+     0.6
+    ]
+   ]
+  },
+  "282": {
+   "text": "Régulariser les travailleurs étrangers déjà employés est une mesure de bon sens, pas une charité",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "283": {
+   "text": "La laïcité empêche les pressions communautaires dans l'espace public",
+   "links": [
+    [
+     "religion",
+     -1.0
+    ]
+   ]
+  },
+  "284": {
+   "text": "La laïcité est devenue une arme contre une seule religion",
+   "links": [
+    [
+     "religion",
+     0.6
+    ]
+   ]
+  },
+  "285": {
+   "text": "La laïcité impose la neutralité dans l'espace public",
+   "links": [
+    [
+     "religion",
+     -1.0
+    ]
+   ]
+  },
+  "286": {
+   "text": "Il faut être ferme sur les expulsions pour que la loi ait de l'effet",
+   "links": [
+    [
+     "pouvoir",
+     -1.0
+    ]
+   ]
+  },
+  "287": {
+   "text": "L'assimilation est nécessaire pour éviter le communautarisme",
+   "links": [
+    [
+     "immigration",
+     -1.0
+    ]
+   ]
+  },
+  "288": {
+   "text": "Les expulsions dépendent des cas individuels",
+   "links": []
+  },
+  "289": {
+   "text": "Je n'ai pas d'avis tranché sur la question",
+   "links": []
+  },
+  "290": {
+   "text": "La vision de P2 est un peu simpliste",
+   "links": []
+  },
+  "291": {
+   "text": "Le référendum d'initiative citoyenne (RIC) finirait dans les mains des lobbies et des algorithmes des réseaux",
+   "links": [
+    [
+     "participation",
+     0.6
+    ]
+   ]
+  },
+  "292": {
+   "text": "Les services publics sont saturés dans de nombreuses villes",
+   "links": []
+  },
+  "293": {
+   "text": "Ensemble, les pays européens ont plus de poids sur des sujets comme le climat, la défense et le numérique",
+   "links": [
+    [
+     "europe",
+     1.0
+    ]
+   ]
+  },
+  "294": {
+   "text": "Les pays qui sortent de l'UE finissent par regretter leur décision",
+   "links": [
+    [
+     "europe",
+     0.6
+    ]
+   ]
+  },
+  "295": {
+   "text": "Un exécutif fort assure la stabilité",
+   "links": [
+    [
+     "representation",
+     0.6
+    ]
+   ]
+  },
+  "296": {
+   "text": "Il faut trouver un moyen de financer le système",
+   "links": []
+  },
+  "297": {
+   "text": "Les citoyens tirés au sort fonctionnent bien dans d'autres pays",
+   "links": [
+    [
+     "participation",
+     -0.6
+    ]
+   ]
+  },
+  "298": {
+   "text": "L'accueil des réfugiés est une obligation internationale.",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "299": {
+   "text": "Les quotas de votes annuels sont une forme de démocratie.",
+   "links": [
+    [
+     "representation",
+     -1.0
+    ]
+   ]
+  },
+  "300": {
+   "text": "La vidéosurveillance a permis d'élucider des affaires",
+   "links": [
+    [
+     "pouvoir",
+     -0.6
+    ]
+   ]
+  },
+  "301": {
+   "text": "Les victimes de récidivistes méritent une protection spécifique",
+   "links": [
+    [
+     "pouvoir",
+     -0.6
+    ]
+   ]
+  },
+  "302": {
+   "text": "Il est nécessaire de réarmer face à un monde plus dangereux",
+   "links": [
+    [
+     "diplomatie",
+     -1.0
+    ]
+   ]
+  },
+  "303": {
+   "text": "Il y a mieux à faire de l'argent public qu'intervenir à l'étranger",
+   "links": [
+    [
+     "intervention",
+     -1.0
+    ]
+   ]
+  },
+  "304": {
+   "text": "Intervenir à l'étranger ne crée pas de stabilité durable",
+   "links": [
+    [
+     "intervention",
+     -1.0
+    ]
+   ]
+  },
+  "305": {
+   "text": "Une armée plus grande encourage l'utilisation de la force",
+   "links": [
+    [
+     "diplomatie",
+     1.0
+    ]
+   ]
+  },
+  "306": {
+   "text": "L'égalité salariale exige des sanctions réelles pour être atteinte",
+   "links": [
+    [
+     "genre",
+     -1.0
+    ]
+   ]
+  },
+  "307": {
+   "text": "La légalisation de l'aide à mourir peut entraîner des risques inacceptables",
+   "links": [
+    [
+     "morale",
+     0.6
+    ]
+   ]
+  },
+  "308": {
+   "text": "Les familles ne suivent plus un seul modèle social",
+   "links": [
+    [
+     "morale",
+     -1.0
+    ]
+   ]
+  },
+  "309": {
+   "text": "L'Union européenne crée des emplois en France",
+   "links": [
+    [
+     "europe",
+     0.6
+    ]
+   ]
+  },
+  "310": {
+   "text": "La coopération entre les pays européens est nécessaire pour agir sur le climat, la défense et le numérique",
+   "links": [
+    [
+     "europe",
+     0.6
+    ]
+   ]
+  },
+  "311": {
+   "text": "La souveraineté implique de choisir ses propres lois",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "312": {
+   "text": "La vision selon laquelle les droits des uns ne retirent rien aux autres est simpliste",
+   "links": [
+    [
+     "morale",
+     0.6
+    ]
+   ]
+  },
+  "313": {
+   "text": "Les droits des uns ne retirent rien aux autres",
+   "links": [
+    [
+     "morale",
+     -0.6
+    ]
+   ]
+  },
+  "314": {
+   "text": "La famille reste un REPÈRE important pour beaucoup",
+   "links": [
+    [
+     "morale",
+     0.6
+    ]
+   ]
+  },
+  "315": {
+   "text": "La pente vers l'aide à mourir est glissante, comme ailleurs",
+   "links": [
+    [
+     "morale",
+     0.6
+    ]
+   ]
+  },
+  "316": {
+   "text": "La fin de vie est un sujet délicat et complexe.",
+   "links": []
+  },
+  "317": {
+   "text": "Il est préférable d'investir dans la santé plutôt que dans la défense",
+   "links": [
+    [
+     "diplomatie",
+     0.6
+    ]
+   ]
+  },
+  "318": {
+   "text": "La sécurité dépend de la capacité à agir, pas des discours",
+   "links": [
+    [
+     "pouvoir",
+     -1.0
+    ]
+   ]
+  },
+  "319": {
+   "text": "Il faut concilier l'évolution rapide avec la stabilité sociale.",
+   "links": []
+  },
+  "320": {
+   "text": "Il faut un cadre clair pour l'évolution, sans changements brutaux.",
+   "links": [
+    [
+     "morale",
+     0.6
+    ],
+    [
+     "rupture",
+     -0.6
+    ]
+   ]
+  },
+  "321": {
+   "text": "Il faut écouter les gens, pas se laisser guider par une idéologie à l’aveugle.",
+   "links": []
+  },
+  "322": {
+   "text": "L'évolution doit se faire par étapes, pas en un coup.",
+   "links": [
+    [
+     "morale",
+     0.6
+    ],
+    [
+     "rupture",
+     -0.6
+    ]
+   ]
+  },
+  "323": {
+   "text": "L'évolution sociale doit se faire progressivement, en respectant les racines de la société.",
+   "links": [
+    [
+     "morale",
+     1.0
+    ],
+    [
+     "rupture",
+     -0.6
+    ]
+   ]
+  },
+  "324": {
+   "text": "La GPA doit être abordée avec prudence, en tenant compte des risques sociaux.",
+   "links": [
+    [
+     "morale",
+     0.6
+    ]
+   ]
+  },
+  "325": {
+   "text": "Les droits humains et l'égalité doivent être respectés immédiatement, sans attendre.",
+   "links": [
+    [
+     "morale",
+     -0.6
+    ]
+   ]
+  },
+  "326": {
+   "text": "Les lois doivent suivre la vérité et les besoins de tous, sans attendre la perfection.",
+   "links": []
+  },
+  "327": {
+   "text": "Les lois inadaptées et l'absence de débat public sont des problèmes à résoudre.",
+   "links": []
+  },
+  "328": {
+   "text": "L'État doit rester en contrôle des services publics comme les hôpitaux et les écoles",
+   "links": [
+    [
+     "economie",
+     -1.0
+    ]
+   ]
+  },
+  "329": {
+   "text": "L'État ne doit pas contrôler l'économie car cela freine l'innovation",
+   "links": [
+    [
+     "controle",
+     1.0
+    ]
+   ]
+  },
+  "330": {
+   "text": "La paperasse étatique est un gaspillage",
+   "links": [
+    [
+     "controle",
+     0.6
+    ]
+   ]
+  },
+  "331": {
+   "text": "La régulation de l'économie doit ne pas entraver l'économie",
+   "links": [
+    [
+     "controle",
+     1.0
+    ]
+   ]
+  },
+  "332": {
+   "text": "Réduire les normes et les charges permet de relancer l'industrie",
+   "links": [
+    [
+     "controle",
+     1.0
+    ]
+   ]
+  },
+  "333": {
+   "text": "Il faut réglementer l'IA pour éviter l'inégalité et la précarisation du travail.",
+   "links": [
+    [
+     "technologie",
+     0.6
+    ],
+    [
+     "controle",
+     -0.6
+    ]
+   ]
+  },
+  "334": {
+   "text": "Il ne faut pas freiner l'IA, car cela pourrait nuire à l'innovation et à la compétitivité.",
+   "links": [
+    [
+     "technologie",
+     -1.0
+    ]
+   ]
+  },
+  "335": {
+   "text": "L'intégration est plus efficace avec des papiers et un travail qu'avec l'incertitude",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "336": {
+   "text": "La vidéosurveillance est une vision simpliste de la justice",
+   "links": [
+    [
+     "pouvoir",
+     0.6
+    ]
+   ]
+  },
+  "337": {
+   "text": "La VIe République pourrait aider à répartir le pouvoir de manière plus équitable.",
+   "links": [
+    [
+     "structure",
+     -0.6
+    ]
+   ]
+  },
+  "338": {
+   "text": "Le 49.3 doit être utilisé avec prudence, en tenant compte de la stabilité du pays.",
+   "links": []
+  },
+  "339": {
+   "text": "Le 49.3 doit être utilisé uniquement en cas d'urgence.",
+   "links": [
+    [
+     "representation",
+     -0.6
+    ]
+   ]
+  },
+  "340": {
+   "text": "Le 49.3 est une menace pour la démocratie et doit être arrêté.",
+   "links": [
+    [
+     "representation",
+     -1.0
+    ]
+   ]
+  },
+  "341": {
+   "text": "Le 49.3 peut être utilisé à des fins malveillantes par les partis politiques.",
+   "links": [
+    [
+     "representation",
+     -0.6
+    ]
+   ]
+  },
+  "342": {
+   "text": "Les changements trop rapides peuvent nuire à la stabilité familiale",
+   "links": [
+    [
+     "morale",
+     0.6
+    ],
+    [
+     "rupture",
+     -0.6
+    ]
+   ]
+  },
+  "343": {
+   "text": "Des compromis peuvent être faits sur l’affichage religieux, comme aux États-Unis.",
+   "links": [
+    [
+     "religion",
+     0.6
+    ]
+   ]
+  },
+  "344": {
+   "text": "La laïcité doit exclure toute expression religieuse de l’espace public.",
+   "links": [
+    [
+     "religion",
+     -1.0
+    ]
+   ]
+  },
+  "345": {
+   "text": "La laïcité ne devrait pas interdire toute expression religieuse, comme les croix dans les hôpitaux.",
+   "links": [
+    [
+     "religion",
+     0.6
+    ]
+   ]
+  },
+  "346": {
+   "text": "La laïcité permet à tous de vivre ensemble malgré les différences, sans dictature morale.",
+   "links": [
+    [
+     "religion",
+     -1.0
+    ]
+   ]
+  },
+  "347": {
+   "text": "Il faut légaliser le suicide assisté sans le banaliser.",
+   "links": [
+    [
+     "morale",
+     -0.6
+    ]
+   ]
+  },
+  "348": {
+   "text": "Il faut réduire le nombre de personnes qui meurent dans des conditions non souhaitées.",
+   "links": []
+  },
+  "349": {
+   "text": "La France doit adopter une loi claire sur le droit au refus des soins.",
+   "links": []
+  },
+  "350": {
+   "text": "La fin de vie concerne aussi les proches et la solidarité sociale.",
+   "links": []
+  },
+  "351": {
+   "text": "La loi doit refléter l'humain et non un idéalisme destructeur de valeurs.",
+   "links": [
+    [
+     "morale",
+     0.6
+    ]
+   ]
+  },
+  "352": {
+   "text": "Le suicide assisté est déshumanisant et ne vise plus le bien-être du malade.",
+   "links": [
+    [
+     "morale",
+     1.0
+    ]
+   ]
+  },
+  "353": {
+   "text": "Légaliser le suicide assisté pourrait avoir des conséquences sur la solidarité sociale.",
+   "links": [
+    [
+     "morale",
+     0.6
+    ]
+   ]
+  },
+  "354": {
+   "text": "Le président ne devrait pas avoir trop de pouvoir.",
+   "links": [
+    [
+     "representation",
+     -1.0
+    ]
+   ]
+  },
+  "355": {
+   "text": "Les citoyens devraient participer directement à la prise de décisions politiques.",
+   "links": [
+    [
+     "participation",
+     -1.0
+    ]
+   ]
+  },
+  "356": {
+   "text": "Les partis politiques devraient être réformés pour mieux représenter les citoyens.",
+   "links": [
+    [
+     "representation",
+     -0.6
+    ]
+   ]
+  },
+  "357": {
+   "text": "L’État doit être renforcé pour rétablir la confiance des citoyens.",
+   "links": [
+    [
+     "structure",
+     0.6
+    ]
+   ]
+  },
+  "358": {
+   "text": "Un référendum citoyen pourrait ne pas résoudre les problèmes actuels.",
+   "links": [
+    [
+     "participation",
+     0.6
+    ]
+   ]
+  },
+  "359": {
+   "text": "Augmenter l'accueil des migrants augmentera le taux de chômage.",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "360": {
+   "text": "Augmenter l’ouverture des frontières est utopique, comme en Espagne, où le chômage augmente.",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "361": {
+   "text": "La France a des limites et n’est pas une usine de régularisation.",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "362": {
+   "text": "La régularisation actuelle est déjà à 68%, et augmenter le nombre de migrants poserait des problèmes logistiques.",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "363": {
+   "text": "Le gouvernement peut améliorer l’intégration des migrants avec de l’organisation.",
+   "links": []
+  },
+  "364": {
+   "text": "Une solution mixte est nécessaire, sans plan B, l’ouverture seule n’est pas suffisante.",
+   "links": []
+  },
+  "365": {
+   "text": "Utiliser la technologie et des accords internationaux est une solution technique pour gérer l’immigration.",
+   "links": []
+  },
+  "366": {
+   "text": "L'innovation technique résout plus de problèmes que les interdictions",
+   "links": [
+    [
+     "technologie",
+     -1.0
+    ]
+   ]
+  },
+  "367": {
+   "text": "La Chine pollue plus que l'ensemble des autres pays réunis",
+   "links": []
+  },
+  "368": {
+   "text": "L'Union européenne impose des décisions sans consultation des citoyens",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ],
+    [
+     "representation",
+     -0.6
+    ]
+   ]
+  },
+  "369": {
+   "text": "L'uniformité européenne ne fonctionne pas car chaque pays a sa propre culture",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "370": {
+   "text": "La liberté religieuse est garantie par la Déclaration de 1789",
+   "links": [
+    [
+     "religion",
+     0.6
+    ]
+   ]
+  },
+  "371": {
+   "text": "La neutralité des agents publics exige l'absence de signes religieux ostensibles",
+   "links": [
+    [
+     "religion",
+     -1.0
+    ]
+   ]
+  },
+  "372": {
+   "text": "Les gens ont le droit de vivre leur foi en public",
+   "links": [
+    [
+     "religion",
+     1.0
+    ]
+   ]
+  },
+  "373": {
+   "text": "L'Union européenne impose des coûts plus élevés que les bénéfices reçus.",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "374": {
+   "text": "La vision selon laquelle les normes européennes protègent mieux les consommateurs est simpliste.",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "375": {
+   "text": "Le Royaume-Uni s'en sort bien malgré les prédictions négatives.",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "376": {
+   "text": "La Chine pollue plus que l'Europe, donc nos efforts n'ont que peu d'impact",
+   "links": [
+    [
+     "ecologie",
+     -0.6
+    ]
+   ]
+  },
+  "377": {
+   "text": "Il faut agir même si tout le monde n'est pas d'accord",
+   "links": []
+  },
+  "378": {
+   "text": "La proposition est trop simpliste",
+   "links": []
+  },
+  "379": {
+   "text": "Il faut des limites dans l'intégration des migrants",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "380": {
+   "text": "La France s'est formée par vagues successives, avec des procès équitablement appliqués à tous les migrants",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "381": {
+   "text": "Il faut arrêter de faire du business as usual pour lutter contre le changement climatique",
+   "links": [
+    [
+     "ecologie",
+     1.0
+    ],
+    [
+     "rupture",
+     0.6
+    ]
+   ]
+  },
+  "382": {
+   "text": "L'écologie punitive peut provoquer des mouvements sociaux violents",
+   "links": [
+    [
+     "ecologie",
+     -0.6
+    ]
+   ]
+  },
+  "383": {
+   "text": "La France est déjà le pays le plus taxé d'Europe, ce qui peut pousser les gens à partir",
+   "links": [
+    [
+     "redistribution",
+     0.6
+    ]
+   ]
+  },
+  "384": {
+   "text": "La France n’a pas d’ennemi hors de ses frontières, donc le budget militaire n’est pas utile",
+   "links": [
+    [
+     "diplomatie",
+     1.0
+    ]
+   ]
+  },
+  "385": {
+   "text": "La défense doit inclure des forces d’intervention en cas de crise",
+   "links": [
+    [
+     "diplomatie",
+     -0.6
+    ]
+   ]
+  },
+  "386": {
+   "text": "La priorité doit être de résoudre la crise économique plutôt que d’investir dans l’armée",
+   "links": [
+    [
+     "diplomatie",
+     0.6
+    ]
+   ]
+  },
+  "387": {
+   "text": "Le budget militaire doit être augmenté pour couvrir la défense cybernétique, les drones et le renseignement",
+   "links": [
+    [
+     "diplomatie",
+     -0.6
+    ]
+   ]
+  },
+  "388": {
+   "text": "Le budget militaire doit être augmenté pour se protéger en Europe",
+   "links": [
+    [
+     "diplomatie",
+     -1.0
+    ]
+   ]
+  },
+  "389": {
+   "text": "Le budget militaire doit être augmenté, mais pas à n’importe quel prix",
+   "links": [
+    [
+     "diplomatie",
+     -0.6
+    ]
+   ]
+  },
+  "390": {
+   "text": "La fin de vie peut mener à des dérives, comme ailleurs",
+   "links": [
+    [
+     "morale",
+     0.6
+    ]
+   ]
+  },
+  "391": {
+   "text": "Les gens sont fatigués d'être dirigés sur des sujets sensibles",
+   "links": []
+  },
+  "392": {
+   "text": "L'argent public devrait être utilisé autrement que pour l'armée",
+   "links": [
+    [
+     "diplomatie",
+     0.6
+    ]
+   ]
+  },
+  "393": {
+   "text": "La diplomatie est plus efficace et moins coûteuse que l'armée",
+   "links": [
+    [
+     "diplomatie",
+     1.0
+    ]
+   ]
+  },
+  "394": {
+   "text": "L'Union européenne n'a pas de légitimité démocratique",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "395": {
+   "text": "Régulariser les travailleurs clandestins envoie le message que passer par la porte de derrière paie",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "396": {
+   "text": "L'Union européenne impose des conditions inéquitables aux pays membres",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "397": {
+   "text": "L'IA est un progrès absolu et le futur, les humains ont juste à attendre.",
+   "links": [
+    [
+     "technologie",
+     -1.0
+    ]
+   ]
+  },
+  "398": {
+   "text": "Les grandes entreprises ne respecteront pas les réglementations de l'IA tant que ça rapporte.",
+   "links": []
+  },
+  "399": {
+   "text": "Quand l'IA est bien faite, tout le monde gagne. C’est un compromis.",
+   "links": [
+    [
+     "technologie",
+     -0.6
+    ]
+   ]
+  },
+  "400": {
+   "text": "Sans contrôle, la dérive de l'IA est rapide et l'équilibre est fragile.",
+   "links": [
+    [
+     "controle",
+     -1.0
+    ],
+    [
+     "technologie",
+     0.6
+    ]
+   ]
+  },
+  "401": {
+   "text": "Attendre que tout le monde soit d'accord c'est ne jamais rien changer",
+   "links": [
+    [
+     "rupture",
+     0.6
+    ]
+   ]
+  },
+  "402": {
+   "text": "Le RIC permettrait de débloquer des sujets évités par les partis",
+   "links": [
+    [
+     "participation",
+     -0.6
+    ]
+   ]
+  },
+  "403": {
+   "text": "La dépendance vis-à-vis de Washington est un enjeu complexe.",
+   "links": []
+  },
+  "404": {
+   "text": "La proposition de P1 est simpliste.",
+   "links": []
+  },
+  "405": {
+   "text": "L'idée de se réarmer est simpliste.",
+   "links": [
+    [
+     "diplomatie",
+     0.6
+    ]
+   ]
+  },
+  "406": {
+   "text": "Sortir de l'OTAN et ne plus suivre Washington partout est sain",
+   "links": [
+    [
+     "alliances",
+     -1.0
+    ]
+   ]
+  },
+  "407": {
+   "text": "Ensemble, on pèse plus sur le climat, la défense et le numérique que seul",
+   "links": [
+    [
+     "europe",
+     1.0
+    ]
+   ]
+  },
+  "408": {
+   "text": "L'UE nous fait payer plus qu'on ne reçoit et nous donne des leçons en prime",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "409": {
+   "text": "L'euro a enlevé tout moyen d'ajuster notre économie, c'est un carcan",
+   "links": [
+    [
+     "europe",
+     -1.0
+    ]
+   ]
+  },
+  "410": {
+   "text": "L'Union européenne impose des normes climatiques contraignantes",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "411": {
+   "text": "Les quotas d'immigration sont une forme de démocratie, pas de racisme",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "412": {
+   "text": "La loi doit s'adapter aux divers modèles familiaux",
+   "links": [
+    [
+     "morale",
+     -0.6
+    ]
+   ]
+  },
+  "413": {
+   "text": "Il est nécessaire de ne pas attendre l'unanimité pour apporter des changements",
+   "links": [
+    [
+     "rupture",
+     0.6
+    ]
+   ]
+  },
+  "414": {
+   "text": "L'aide à mourir doit être encadrée par des garde-fous",
+   "links": []
+  },
+  "415": {
+   "text": "Certains quartiers vivent sous la loi des trafics",
+   "links": [
+    [
+     "pouvoir",
+     -1.0
+    ]
+   ]
+  },
+  "416": {
+   "text": "La formation des policiers est plus importante que leur armement",
+   "links": [
+    [
+     "pouvoir",
+     0.6
+    ]
+   ]
+  },
+  "444": {
+   "text": "Interdire partout les signes religieux peut effacer les croyants.",
+   "links": [
+    [
+     "religion",
+     1.0
+    ]
+   ]
+  },
+  "445": {
+   "text": "La laïcité exige la neutralité de l'État envers les cultes.",
+   "links": [
+    [
+     "religion",
+     -1.0
+    ]
+   ]
+  },
+  "446": {
+   "text": "La question de la laïcité dépend des contextes et des cas.",
+   "links": []
+  },
+  "447": {
+   "text": "L'État doit reprendre le contrôle des quartiers touchés par le trafic",
+   "links": [
+    [
+     "pouvoir",
+     -0.6
+    ]
+   ]
+  },
+  "448": {
+   "text": "Il est difficile de se positionner sans comprendre les détails de la proposition.",
+   "links": []
+  },
+  "449": {
+   "text": "Il est urgent de changer les comportements économiques pour lutter contre le changement climatique.",
+   "links": [
+    [
+     "ecologie",
+     1.0
+    ]
+   ]
+  },
+  "450": {
+   "text": "Les situations doivent être analysées individuellement pour prendre une décision.",
+   "links": []
+  },
+  "451": {
+   "text": "On devrait demander des sources pour appuyer les affirmations.",
+   "links": []
+  },
+  "452": {
+   "text": "On peut comprendre un argument même s'il n'est pas partagé.",
+   "links": []
+  },
+  "453": {
+   "text": "La Ve République a montré sa stabilité sur une longue période",
+   "links": []
+  },
+  "454": {
+   "text": "La question de l'égalité salariale dépend des contextes",
+   "links": []
+  },
+  "455": {
+   "text": "Les solutions climatiques dépendent des contextes locaux",
+   "links": []
+  },
+  "456": {
+   "text": "Il est nécessaire de se baser sur des articles sérieux pour débattre de ces sujets",
+   "links": []
+  },
+  "457": {
+   "text": "L'Union européenne limite la souveraineté nationale en imposant des lois prêtes faites",
+   "links": [
+    [
+     "europe",
+     -1.0
+    ]
+   ]
+  },
+  "458": {
+   "text": "La question de l'Europe dépend des contextes et des cas spécifiques",
+   "links": []
+  },
+  "459": {
+   "text": "L'intelligence artificielle va détruire des métiers sans plan de reprise pour les travailleurs.",
+   "links": [
+    [
+     "technologie",
+     0.6
+    ]
+   ]
+  },
+  "460": {
+   "text": "Les débats sur la fin de vie divisent les gens, même si cela concerne une minorité",
+   "links": []
+  },
+  "461": {
+   "text": "Il faut trouver des moyens de financer les politiques d'immigration",
+   "links": []
+  },
+  "462": {
+   "text": "L'immigration doit être gérée de manière différenciée selon les cas",
+   "links": []
+  },
+  "463": {
+   "text": "La France s'est développée grâce à l'immigration, comme d'autres pays européens",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "464": {
+   "text": "La vision de l'écologie punitive est trop simpliste",
+   "links": []
+  },
+  "465": {
+   "text": "Il faut appliquer des peines strictes pour dissuader les crimes",
+   "links": [
+    [
+     "pouvoir",
+     -0.6
+    ]
+   ]
+  },
+  "466": {
+   "text": "La police est sous-équipée et sous-payée, il faut plus d'investissements",
+   "links": [
+    [
+     "pouvoir",
+     -0.6
+    ]
+   ]
+  },
+  "467": {
+   "text": "Les entreprises qui s'engagent tôt dans des initiatives créent des emplois, les autres disparaissent",
+   "links": []
+  },
+  "468": {
+   "text": "Trop de réglementation nuit aux startups",
+   "links": [
+    [
+     "controle",
+     1.0
+    ]
+   ]
+  },
+  "469": {
+   "text": "L'uniformité européenne n'est pas viable",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "470": {
+   "text": "Il faut réduire les dépenses publiques pour éviter que nos enfants paient la dette",
+   "links": [
+    [
+     "economie",
+     0.6
+    ],
+    [
+     "controle",
+     0.6
+    ]
+   ]
+  },
+  "471": {
+   "text": "Souhaiter comprendre les débats sur le financement des services publics",
+   "links": []
+  },
+  "472": {
+   "text": "Une armée européenne réduit la dépendance envers Washington",
+   "links": [
+    [
+     "alliances",
+     -0.6
+    ],
+    [
+     "europe",
+     0.6
+    ]
+   ]
+  },
+  "473": {
+   "text": "L'impact de l'IA dépend des cas spécifiques",
+   "links": []
+  },
+  "474": {
+   "text": "La France a historiquement été peuplée par des vagues migratoires successives",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "475": {
+   "text": "La vision de l'immigration est trop simpliste",
+   "links": []
+  },
+  "476": {
+   "text": "Le financement du RIC est un problème",
+   "links": []
+  },
+  "477": {
+   "text": "La IVe République a échoué à cause de la faiblesse de l'exécutif",
+   "links": [
+    [
+     "representation",
+     0.6
+    ]
+   ]
+  },
+  "478": {
+   "text": "Les peines non appliquées n'ont aucun effet dissuasif",
+   "links": [
+    [
+     "pouvoir",
+     -0.6
+    ]
+   ]
+  },
+  "479": {
+   "text": "L'égalité salariale est un objectif longtemps attendu",
+   "links": [
+    [
+     "genre",
+     -0.6
+    ]
+   ]
+  },
+  "480": {
+   "text": "L'armement est nécessaire pour assurer la sécurité nationale",
+   "links": [
+    [
+     "diplomatie",
+     -1.0
+    ]
+   ]
+  },
+  "481": {
+   "text": "La France a des faiblesses stratégiques en matière de munitions",
+   "links": [
+    [
+     "diplomatie",
+     -0.6
+    ]
+   ]
+  },
+  "482": {
+   "text": "Il n'est pas nécessaire d'ajouter des lois supplémentaires pour protéger la laïcité",
+   "links": []
+  },
+  "483": {
+   "text": "La loi de 1905 est claire sur la neutralité de l'État envers les cultes",
+   "links": [
+    [
+     "religion",
+     -0.6
+    ]
+   ]
+  },
+  "484": {
+   "text": "Les racines chrétiennes ont leur place dans le paysage français",
+   "links": [
+    [
+     "religion",
+     1.0
+    ]
+   ]
+  },
+  "485": {
+   "text": "Taxer le kérosène et les jets privés est le minimum syndical",
+   "links": [
+    [
+     "ecologie",
+     0.6
+    ]
+   ]
+  },
+  "486": {
+   "text": "La vidéosurveillance n'a pas toujours un impact clair sur la résolution des affaires",
+   "links": [
+    [
+     "pouvoir",
+     0.6
+    ]
+   ]
+  },
+  "487": {
+   "text": "On doit se poser la question de la financement du 49.3",
+   "links": []
+  },
+  "488": {
+   "text": "Freiner la recherche en France permettrait aux États-Unis et à la Chine de décider seuls",
+   "links": [
+    [
+     "technologie",
+     -1.0
+    ]
+   ]
+  },
+  "489": {
+   "text": "Fermer des usines ici pour les rouvrir ailleurs n'a pas d'impact net",
+   "links": [
+    [
+     "commerce",
+     -0.6
+    ]
+   ]
+  },
+  "490": {
+   "text": "L'État est un mauvais gestionnaire",
+   "links": [
+    [
+     "controle",
+     1.0
+    ],
+    [
+     "economie",
+     0.6
+    ]
+   ]
+  },
+  "491": {
+   "text": "Le point de P4 est bon",
+   "links": []
+  },
+  "492": {
+   "text": "Améliorer la qualité des infrastructures et la capacité technologique plutôt qu’augmenter massivement les budgets militaires",
+   "links": [
+    [
+     "diplomatie",
+     0.6
+    ]
+   ]
+  },
+  "493": {
+   "text": "Augmenter le budget militaire de la France pour rapprocher les dépenses de la moyenne OCDE",
+   "links": [
+    [
+     "diplomatie",
+     -0.6
+    ]
+   ]
+  },
+  "494": {
+   "text": "Investir dans l’éducation et les soins plutôt que dans les armes",
+   "links": [
+    [
+     "diplomatie",
+     0.6
+    ]
+   ]
+  },
+  "495": {
+   "text": "Un budget militaire plus élevé ne garantit pas une meilleure défense si les dépenses sont mal réparties",
+   "links": [
+    [
+     "diplomatie",
+     0.6
+    ]
+   ]
+  },
+  "496": {
+   "text": "La proposition doit préciser le pays concerné",
+   "links": []
+  },
+  "497": {
+   "text": "L'euro limite la capacité d'ajustement de l'économie nationale",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "498": {
+   "text": "La vision de l'euro comme un carcan est simpliste",
+   "links": [
+    [
+     "europe",
+     0.6
+    ]
+   ]
+  },
+  "499": {
+   "text": "La régulation des algorithmes évite des abus",
+   "links": [
+    [
+     "controle",
+     -0.6
+    ],
+    [
+     "technologie",
+     0.6
+    ]
+   ]
+  },
+  "500": {
+   "text": "Moins de réglementation favorise l'innovation",
+   "links": [
+    [
+     "controle",
+     0.6
+    ]
+   ]
+  },
+  "501": {
+   "text": "L'immigration est un sujet complexe avec des arguments de chaque côté",
+   "links": []
+  },
+  "502": {
+   "text": "Des peines planchers pour les violences répétées ou les agressions sexuelles pourraient aider à lutter contre l'impunité.",
+   "links": [
+    [
+     "pouvoir",
+     -0.6
+    ]
+   ]
+  },
+  "503": {
+   "text": "Durcir les peines entraînerait une augmentation du taux d'incarcération, déjà très élevé en France.",
+   "links": [
+    [
+     "pouvoir",
+     0.6
+    ]
+   ]
+  },
+  "504": {
+   "text": "Il faut mettre en place des programmes de réinsertion pour éviter la récidive et repenser le système pénal.",
+   "links": [
+    [
+     "pouvoir",
+     0.6
+    ]
+   ]
+  },
+  "505": {
+   "text": "L'absence de suivi post-prison est un facteur important de récidive, avec 40% des rechutes liées à cela.",
+   "links": []
+  },
+  "506": {
+   "text": "La police doit être mieux outillée pour identifier les récidivistes rapidement, notamment via des prises de sang.",
+   "links": [
+    [
+     "pouvoir",
+     -0.6
+    ]
+   ]
+  },
+  "507": {
+   "text": "La prison n'est pas une solution efficace pour les mineurs ou les sans-emploi, car elle renforce le cycle de l'exclusion sociale.",
+   "links": [
+    [
+     "pouvoir",
+     0.6
+    ]
+   ]
+  },
+  "508": {
+   "text": "Le système actuel est trop laxiste pour les petits délits.",
+   "links": [
+    [
+     "pouvoir",
+     -0.6
+    ]
+   ]
+  },
+  "509": {
+   "text": "Le système actuel renforce l'état de siège plutôt que la justice sociale.",
+   "links": [
+    [
+     "pouvoir",
+     0.6
+    ]
+   ]
+  },
+  "510": {
+   "text": "Le Royaume-Uni paie plus qu'il ne reçoit de l'Union européenne",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "511": {
+   "text": "La vision simpliste de l'IA est problématique",
+   "links": [
+    [
+     "technologie",
+     0.6
+    ]
+   ]
+  },
+  "512": {
+   "text": "Les deux côtés du débat sur l'IA ont des points valides",
+   "links": []
+  },
+  "513": {
+   "text": "La vision simpliste de la sécurité est problématique",
+   "links": []
+  },
+  "514": {
+   "text": "L'argument de la croissance infinie étant impossible est compréhensible",
+   "links": [
+    [
+     "ecologie",
+     0.6
+    ]
+   ]
+  },
+  "515": {
+   "text": "La société évolue naturellement, sans intervention législative nécessaire",
+   "links": [
+    [
+     "pouvoir",
+     0.6
+    ]
+   ]
+  },
+  "516": {
+   "text": "L'immigration en masse et les frontières sont des problèmes à considérer",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "517": {
+   "text": "La France a un devoir d'humanité et doit régulariser les travailleurs sans papiers",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "518": {
+   "text": "La France ne doit pas être une terre d'accueil pour les illégaux",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "519": {
+   "text": "La régularisation doit être un droit, pas un privilège",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "520": {
+   "text": "Les politiques d'expulsion sont en partie responsables de la situation des migrants",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "521": {
+   "text": "Régulariser les travailleurs sans papiers est une faiblesse politique",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "522": {
+   "text": "Augmenter le SMIC réduit la dette à long terme en diminuant la pauvreté.",
+   "links": [
+    [
+     "redistribution",
+     -0.6
+    ]
+   ]
+  },
+  "523": {
+   "text": "Augmenter les impôts sur les entreprises pourrait les pousser à embaucher moins ou fermer.",
+   "links": [
+    [
+     "redistribution",
+     0.6
+    ]
+   ]
+  },
+  "524": {
+   "text": "Encourager les PME avec des subventions permet leur croissance sans ruiner l'État.",
+   "links": []
+  },
+  "525": {
+   "text": "Il faut réduire les dépenses non essentielles de l'État pour éviter d'augmenter la dette.",
+   "links": [
+    [
+     "economie",
+     0.6
+    ],
+    [
+     "controle",
+     0.6
+    ]
+   ]
+  },
+  "526": {
+   "text": "L'État doit réguler l'économie en augmentant le SMIC et en améliorant les services publics.",
+   "links": [
+    [
+     "controle",
+     -0.6
+    ],
+    [
+     "economie",
+     -0.6
+    ]
+   ]
+  },
+  "527": {
+   "text": "L'État doit soutenir l'économie pour éviter l'aggravation des inégalités.",
+   "links": [
+    [
+     "redistribution",
+     -1.0
+    ],
+    [
+     "controle",
+     -0.6
+    ]
+   ]
+  },
+  "528": {
+   "text": "Les impôts progressifs touchent surtout les très riches, qui pourraient investir dans l'économie locale.",
+   "links": [
+    [
+     "redistribution",
+     -0.6
+    ]
+   ]
+  },
+  "529": {
+   "text": "Les très riches devraient investir plutôt que d'épargner.",
+   "links": []
+  },
+  "555": {
+   "text": "Il faut investir dans la langue, mais pas au détriment des priorités existantes et sans contrôler les flux.",
+   "links": []
+  },
+  "556": {
+   "text": "La France a toujours été un mélange de cultures, le problème est le manque d’investissement dans l’apprentissage du français.",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "557": {
+   "text": "La France doit attirer des gens compétents et surmonter les obstacles linguistiques.",
+   "links": []
+  },
+  "558": {
+   "text": "La France doit contrôler l'entrée des immigrés pour gérer les coûts sociaux.",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "559": {
+   "text": "La France doit contrôler les flux pour éviter des problèmes sociaux, mais doit aussi évoluer pour ne pas vieillir.",
+   "links": []
+  },
+  "560": {
+   "text": "La France doit intégrer les compétents, mais craindre une dilution culturelle.",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "561": {
+   "text": "La France doit réguler l’immigration, pas l’ouvrir à tout le monde.",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "562": {
+   "text": "La France doit s’ouvrir pour se réinventer et profiter d’opportunités économiques.",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "563": {
+   "text": "La langue est une barrière à l'intégration des immigrés.",
+   "links": [
+    [
+     "immigration",
+     -0.6
+    ]
+   ]
+  },
+  "564": {
+   "text": "Il faut des compromis pour changer les normes tout en maintenant le cadre social.",
+   "links": [
+    [
+     "rupture",
+     -0.6
+    ]
+   ]
+  },
+  "565": {
+   "text": "La France ne fait pas de compromis en légalisant rapidement les mariages entre personnes du même sexe.",
+   "links": [
+    [
+     "morale",
+     -0.6
+    ]
+   ]
+  },
+  "566": {
+   "text": "La société doit évoluer plus rapidement.",
+   "links": [
+    [
+     "morale",
+     -1.0
+    ],
+    [
+     "rupture",
+     0.6
+    ]
+   ]
+  },
+  "567": {
+   "text": "La vitesse d'adoption des changements dépend du sujet.",
+   "links": []
+  },
+  "568": {
+   "text": "Les normes sociales doivent s'adapter plus rapidement pour réduire le stress chez les jeunes.",
+   "links": [
+    [
+     "morale",
+     -0.6
+    ]
+   ]
+  },
+  "569": {
+   "text": "Les réformes rapides ne garantissent pas un meilleur fonctionnement social.",
+   "links": [
+    [
+     "rupture",
+     -0.6
+    ]
+   ]
+  },
+  "570": {
+   "text": "La coopération européenne est nécessaire, mais doit rester limitée et respecter l’autonomie nationale",
+   "links": []
+  },
+  "571": {
+   "text": "Les traités européens sont une perte de contrôle et une menace pour l’indépendance nationale",
+   "links": [
+    [
+     "europe",
+     -1.0
+    ]
+   ]
+  },
+  "572": {
+   "text": "L’Europe doit être indépendante et non contrôlée par des institutions externes",
+   "links": []
+  },
+  "573": {
+   "text": "Approuver l'idée de P2 sur la taxation des grosses fortunes",
+   "links": [
+    [
+     "redistribution",
+     -0.6
+    ]
+   ]
+  },
+  "574": {
+   "text": "Taxer les grosses fortunes est une vision simpliste",
+   "links": [
+    [
+     "redistribution",
+     0.6
+    ]
+   ]
+  },
+  "575": {
+   "text": "Il y a un problème de logement en France",
+   "links": []
+  },
+  "576": {
+   "text": "Le monde est devenu plus dangereux",
+   "links": []
+  },
+  "577": {
+   "text": "La vision simpliste de la privatisation et du marché est problématique",
+   "links": []
+  },
+  "578": {
+   "text": "Le marché seul ne résout pas les inégalités, l'État doit intervenir",
+   "links": [
+    [
+     "redistribution",
+     -1.0
+    ],
+    [
+     "controle",
+     -0.6
+    ]
+   ]
+  },
+  "579": {
+   "text": "Les médias surestiment les chiffres sur certains sujets",
+   "links": [
+    [
+     "confiance",
+     0.6
+    ]
+   ]
+  },
+  "580": {
+   "text": "Les visions simplistes ne sont pas utiles pour comprendre les enjeux",
+   "links": []
+  },
+  "581": {
+   "text": "L'action militaire est un facteur de respect international",
+   "links": [
+    [
+     "diplomatie",
+     -1.0
+    ]
+   ]
+  },
+  "582": {
+   "text": "La loi doit suivre les changements sociaux, notamment sur la fin de vie",
+   "links": [
+    [
+     "morale",
+     -0.6
+    ]
+   ]
+  },
+  "583": {
+   "text": "Les changements trop rapides sur la fin de vie peuvent être dangereux",
+   "links": [
+    [
+     "morale",
+     0.6
+    ],
+    [
+     "rupture",
+     -0.6
+    ]
+   ]
+  },
+  "584": {
+   "text": "La croissance économique est liée à la pollution, et réduire la pollution peut nuire à la croissance",
+   "links": []
+  },
+  "585": {
+   "text": "La sobriété énergétique doit être prioritaire, notamment en réduisant l'utilisation des avions",
+   "links": [
+    [
+     "ecologie",
+     1.0
+    ]
+   ]
+  },
+  "586": {
+   "text": "La sobriété énergétique est bénéfique pour l'environnement, notamment en réduisant les déplacements aériens",
+   "links": [
+    [
+     "ecologie",
+     0.6
+    ]
+   ]
+  },
+  "587": {
+   "text": "La sobriété énergétique peut entraîner des crises économiques si elle est trop rapide ou massive",
+   "links": [
+    [
+     "ecologie",
+     -0.6
+    ]
+   ]
+  },
+  "588": {
+   "text": "La taxe kérosène doit être accompagnée d'investissements dans les transports alternatifs et les énergies renouvelables",
+   "links": [
+    [
+     "ecologie",
+     0.6
+    ]
+   ]
+  },
+  "589": {
+   "text": "Le tourisme a un impact économique significatif et ne doit pas être négligé dans les politiques environnementales",
+   "links": [
+    [
+     "ecologie",
+     -0.6
+    ]
+   ]
+  },
+  "590": {
+   "text": "Les énergies renouvelables sont importantes, mais leur coût est un obstacle à leur développement",
+   "links": []
+  },
+  "591": {
+   "text": "L'énergie doit rester publique pour éviter les hausses de prix",
+   "links": [
+    [
+     "economie",
+     -1.0
+    ]
+   ]
+  },
+  "592": {
+   "text": "Il faut des preuves concrètes pour justifier les propositions politiques",
+   "links": []
+  },
+  "593": {
+   "text": "Les impôts doivent être réduits pour éviter la fuite des cerveaux",
+   "links": [
+    [
+     "redistribution",
+     0.6
+    ]
+   ]
+  },
+  "594": {
+   "text": "Les propositions politiques doivent être contextualisées géographiquement",
+   "links": []
+  },
+  "595": {
+   "text": "La dette actuelle sera payée par les générations futures",
+   "links": []
+  },
+  "596": {
+   "text": "L'intégration des migrants dépend de la régularisation et de l'accès au travail",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "597": {
+   "text": "Régulariser les migrants est une mesure complexe qui dépend des cas",
+   "links": []
+  },
+  "598": {
+   "text": "Régulariser les travailleurs étrangers envoie un message clair que le travail légal est valorisé",
+   "links": [
+    [
+     "immigration",
+     0.6
+    ]
+   ]
+  },
+  "599": {
+   "text": "Certains débats divisent les gens sans concerner la majorité",
+   "links": []
+  },
+  "600": {
+   "text": "Il existe déjà des lois suffisantes, il n'est pas nécessaire d'en ajouter",
+   "links": []
+  },
+  "601": {
+   "text": "La vision selon laquelle les pays qui sortent de l'UE finissent par le regretter est simpliste",
+   "links": [
+    [
+     "europe",
+     -0.6
+    ]
+   ]
+  },
+  "602": {
+   "text": "Les problèmes sociaux ne se résolvent pas par des mesures pénales",
+   "links": [
+    [
+     "pouvoir",
+     0.6
+    ]
+   ]
+  },
+  "603": {
+   "text": "Il faut des moyens financiers pour mettre en place des mesures de prévention",
+   "links": []
+  },
+  "604": {
+   "text": "Les droits des uns ne retirent rien aux autres, c'est le principe fondamental",
+   "links": []
+  },
+  "605": {
+   "text": "La neutralité de l'État est un principe important",
+   "links": [
+    [
+     "religion",
+     -0.6
+    ]
+   ]
+  },
+  "606": {
+   "text": "On ne peut pas avoir d'avis tranché sur la question des signes religieux",
+   "links": []
+  }
+ },
+ "unclear": [
+  215
+ ]
+}

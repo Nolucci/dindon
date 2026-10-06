@@ -1,0 +1,246 @@
+{
+ "kind": "verify",
+ "split": "dev",
+ "prompt": "verify-2",
+ "model": "qwen3:14b",
+ "searxng": true,
+ "seconds": 308,
+ "predictions": {
+  "c01": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 1,
+   "evidence": []
+  },
+  "c03": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 3,
+   "evidence": []
+  },
+  "c05": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 3,
+   "evidence": []
+  },
+  "c07": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 3,
+   "evidence": []
+  },
+  "c09": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 2,
+   "evidence": []
+  },
+  "c11": {
+   "verdict": "confirmed",
+   "reason": null,
+   "period": "1944",
+   "queries": 1,
+   "pages": 3,
+   "evidence": [
+    {
+     "url": "https://www.cheminsdememoire.gouv.fr/fr/21-avril-1944-les-francaises-obtiennent-le-droit-de-vote",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "Alors que la France a été l’un des premiers pays à instaurer le suffrage universel masculin, ce droit n’est étendu aux femmes qu’en 1944."
+    },
+    {
+     "url": "https://www.egalite-femmes-hommes.gouv.fr/79-ans-du-droit-de-vote-des-femmes-long-vote-lance-en-partenariat-avec-le-gouvernement-une-campagne-inedite-pour-mettre-lhonneur-les-suffragettes-francaises",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "il a fallu attendre le 21 avril 1944 pour que les femmes obtiennent le droit de voter et de se présenter à une élection"
+    }
+   ]
+  },
+  "c13": {
+   "verdict": "confirmed",
+   "reason": null,
+   "period": "2016",
+   "queries": 1,
+   "pages": 2,
+   "evidence": [
+    {
+     "url": "https://www.ecologie.gouv.fr/politiques-publiques/production-delectricite",
+     "tier": "official",
+     "stance": "supports",
+     "quote": "La production nette d’électricité d’origine nucléaire s’est élevée à 384 TWh en 2016, soit 72.3 % de la production totale."
+    }
+   ]
+  },
+  "c15": {
+   "verdict": "contradicted",
+   "reason": null,
+   "period": "2026",
+   "queries": 1,
+   "pages": 3,
+   "evidence": [
+    {
+     "url": "https://www.insee.fr/fr/statistiques/5225246",
+     "tier": "official",
+     "stance": "contradicts",
+     "quote": "au 1ᵉʳ janvier 2026, la France compte 69 082 000 habitants."
+    },
+    {
+     "url": "https://formation-civique.interieur.gouv.fr/fiches-par-thematiques/histoire-geographie-et-culture/atlas-de-la-france/la-demographie-francaise/",
+     "tier": "official",
+     "stance": "contradicts",
+     "quote": "Population totale 68,6 millions d’habitants vivent en France (au 1er janvier 2025)"
+    },
+    {
+     "url": "https://www.insee.fr/fr/statistiques/8719824",
+     "tier": "official",
+     "stance": "contradicts",
+     "quote": "Au 1er janvier 2026, la population en France est estimée à 69,1 millions d’habitants"
+    }
+   ]
+  },
+  "c17": {
+   "verdict": "contradicted",
+   "reason": null,
+   "period": "fin du deuxième trimestre 2026",
+   "queries": 1,
+   "pages": 2,
+   "evidence": [
+    {
+     "url": "https://www.insee.fr/fr/statistiques/9053525",
+     "tier": "official",
+     "stance": "contradicts",
+     "quote": "À la fin du deuxième trimestre 2026, le ratio de dette publique s’établit à 119,0 %"
+    }
+   ]
+  },
+  "c19": {
+   "verdict": "contradicted",
+   "reason": null,
+   "period": "31 janvier 2020",
+   "queries": 1,
+   "pages": 3,
+   "evidence": [
+    {
+     "url": "https://agriculture.gouv.fr/sortie-du-royaume-uni-de-lunion-europeenne-tout-ce-quil-faut-savoir-sur-le-brexit",
+     "tier": "official",
+     "stance": "contradicts",
+     "quote": "Le droit de l'UE a cessé de s'appliquer au Royaume-Uni."
+    },
+    {
+     "url": "https://commission.europa.eu/strategy-and-policy/relations-united-kingdom/eu-uk-withdrawal-agreement_fr",
+     "tier": "official",
+     "stance": "contradicts",
+     "quote": "L’accord de retrait conclu entre l’Union européenne et le Royaume-Uni fixe les conditions du retrait ordonné du Royaume-Uni de l’UE, conformément à l’article 50 du traité sur l’Union européenne."
+    }
+   ]
+  },
+  "c21": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 3,
+   "evidence": []
+  },
+  "c23": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 3,
+   "evidence": []
+  },
+  "c25": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 2,
+   "pages": 1,
+   "evidence": []
+  },
+  "c27": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 2,
+   "pages": 1,
+   "evidence": []
+  },
+  "c30": {
+   "verdict": "unverifiable",
+   "reason": "no_source",
+   "period": null,
+   "queries": 1,
+   "pages": 3,
+   "evidence": []
+  },
+  "c31": {
+   "verdict": "contradicted",
+   "reason": null,
+   "period": "2025",
+   "queries": 1,
+   "pages": 2,
+   "evidence": [
+    {
+     "url": "https://www.insee.fr/fr/statistiques/2381412",
+     "tier": "official",
+     "stance": "contradicts",
+     "quote": "en 2025, le taux de prélèvements obligatoires s’établit à 43,6 % du produit intérieur brut (PIB)."
+    },
+    {
+     "url": "https://www.insee.fr/fr/statistiques/2381410",
+     "tier": "official",
+     "stance": "contradicts",
+     "quote": "en 2024, le taux de prélèvements obligatoires s’établit à 45,3 % du produit intérieur brut (PIB) en France"
+    }
+   ]
+  },
+  "c34": {
+   "verdict": "contradicted",
+   "reason": null,
+   "period": "2025",
+   "queries": 1,
+   "pages": 1,
+   "evidence": [
+    {
+     "url": "https://www.statistiques.developpement-durable.gouv.fr/edition-numerique/chiffres-cles-energie/6-bilan-energetique-de-la-france",
+     "tier": "official",
+     "stance": "contradicts",
+     "quote": "La production nucléaire est comptabilisée pour la chaleur produite par la réaction, chaleur dont les deux tiers sont perdus lors de la conversion en énergie électrique."
+    }
+   ]
+  },
+  "c35": {
+   "verdict": "contradicted",
+   "reason": null,
+   "period": "2024",
+   "queries": 1,
+   "pages": 3,
+   "evidence": [
+    {
+     "url": "https://www.statistiques.developpement-durable.gouv.fr/edition-numerique/chiffres-cles-energies-renouvelables/fr/4-lelectricite-renouvelable-en-france",
+     "tier": "official",
+     "stance": "contradicts",
+     "quote": "La production d'électricité renouvelable s'élève à 152 TWh en 2024, soit 27 % de la production totale d'électricité."
+    },
+    {
+     "url": "https://www.insee.fr/fr/statistiques/4318263",
+     "tier": "official",
+     "stance": "contradicts",
+     "quote": "en 2024, la part des énergies renouvelables dans la consommation finale brute d'énergie est de 23,0 % en France"
+    }
+   ]
+  }
+ }
+}

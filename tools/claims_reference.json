@@ -1,0 +1,761 @@
+{
+ "version": 1,
+ "labelled_by": "Claude, 2026-10-06, from memory. THE LABELS MUST BE CHECKED BY A HUMAN against the sources before the figures of a measure are trusted: a wrong label counts as a wrong answer of Dindon.",
+ "how": "messages: what a message must give (expect = groups of keywords that one found claim must contain; [] = nothing). claims: the verdict that trusted sources should give. pairs: same expected verdict, opposite camps.",
+ "messages": [
+  {
+   "id": "m01",
+   "category": "chiffre",
+   "text": "Faut arrêter de dire n'importe quoi, la France compte 101 départements si on compte l'outre-mer.",
+   "expect": [
+    [
+     "101",
+     "département"
+    ]
+   ]
+  },
+  {
+   "id": "m02",
+   "category": "chiffre",
+   "text": "Le SMIC brut mensuel dépasse 1 800 euros depuis janvier 2025, donc non il n'est pas bloqué.",
+   "expect": [
+    [
+     "smic",
+     "1800"
+    ]
+   ]
+  },
+  {
+   "id": "m03",
+   "category": "chiffre",
+   "text": "Le chômage est à 12 % en France, c'est écrit partout et personne ne dit rien.",
+   "expect": [
+    [
+     "chômage",
+     "12"
+    ]
+   ]
+  },
+  {
+   "id": "m04",
+   "category": "chiffre",
+   "text": "Au Sénat il y a 348 sénateurs, pas 577, tu confonds avec l'Assemblée nationale.",
+   "expect": [
+    [
+     "348",
+     "sénat"
+    ]
+   ]
+  },
+  {
+   "id": "m05",
+   "category": "chiffre",
+   "text": "La dette publique dépasse les 3 000 milliards d'euros, c'est un record absolu pour le pays.",
+   "expect": [
+    [
+     "dette",
+     "3000"
+    ]
+   ]
+  },
+  {
+   "id": "m06",
+   "category": "chiffre",
+   "text": "Le nucléaire fournit environ 65 % de l'électricité produite en France, c'est la base.",
+   "expect": [
+    [
+     "nucléaire",
+     "65"
+    ]
+   ]
+  },
+  {
+   "id": "m07",
+   "category": "date",
+   "text": "La loi Veil sur l'IVG date de 1975, ça fait presque un demi-siècle maintenant.",
+   "expect": [
+    [
+     "1975"
+    ]
+   ]
+  },
+  {
+   "id": "m08",
+   "category": "date",
+   "text": "Le Royaume-Uni est sorti de l'Union européenne en 2020 après le référendum de 2016.",
+   "expect": [
+    [
+     "royaume",
+     "2020"
+    ]
+   ]
+  },
+  {
+   "id": "m09",
+   "category": "chiffre",
+   "text": "L'Union européenne compte 27 États membres depuis le Brexit, plus 28 comme avant.",
+   "expect": [
+    [
+     "27"
+    ]
+   ]
+  },
+  {
+   "id": "m10",
+   "category": "loi",
+   "text": "L'âge légal de départ à la retraite était de 62 ans avant la réforme de 2023.",
+   "expect": [
+    [
+     "62",
+     "retraite"
+    ]
+   ]
+  },
+  {
+   "id": "m11",
+   "category": "propos public",
+   "text": "Macron avait promis en 2017 de faire passer le chômage sous les 7 %, c'est dans son programme.",
+   "expect": [
+    [
+     "7",
+     "chômage"
+    ]
+   ]
+  },
+  {
+   "id": "m12",
+   "category": "événement",
+   "text": "La Banque centrale européenne a son siège à Francfort, pas à Bruxelles.",
+   "expect": [
+    [
+     "francfort"
+    ]
+   ]
+  },
+  {
+   "id": "m13",
+   "category": "chiffre",
+   "text": "Le taux de TVA normal est de 20 % en France depuis 2014, ça n'a pas bougé.",
+   "expect": [
+    [
+     "20",
+     "tva"
+    ]
+   ]
+  },
+  {
+   "id": "m14",
+   "category": "date",
+   "text": "La Tour Eiffel a été inaugurée en 1889 pour l'Exposition universelle de Paris.",
+   "expect": [
+    [
+     "1889"
+    ]
+   ]
+  },
+  {
+   "id": "m15",
+   "category": "chiffre",
+   "text": "Plus de 9 millions de personnes vivent sous le seuil de pauvreté en France aujourd'hui.",
+   "expect": [
+    [
+     "9",
+     "pauvreté"
+    ]
+   ]
+  },
+  {
+   "id": "m16",
+   "category": "chiffre",
+   "text": "Selon l'Insee la population française est d'environ 68 millions d'habitants, pas 100.",
+   "expect": [
+    [
+     "68",
+     "millions"
+    ]
+   ]
+  },
+  {
+   "id": "m17",
+   "category": "décision",
+   "text": "Le Conseil constitutionnel a censuré une partie de la loi immigration en janvier 2024.",
+   "expect": [
+    [
+     "conseil constitutionnel",
+     "2024"
+    ]
+   ]
+  },
+  {
+   "id": "m18",
+   "category": "chiffre",
+   "text": "L'espérance de vie des femmes dépasse 85 ans en France, c'est un des meilleurs scores.",
+   "expect": [
+    [
+     "espérance",
+     "85"
+    ]
+   ]
+  },
+  {
+   "id": "m19",
+   "category": "chiffre",
+   "text": "Les émissions de gaz à effet de serre de la France ont baissé d'environ 30 % depuis 1990.",
+   "expect": [
+    [
+     "émissions",
+     "30"
+    ]
+   ]
+  },
+  {
+   "id": "m20",
+   "category": "chiffre",
+   "text": "En 2022 l'inflation en France a atteint 5,2 % en moyenne annuelle, selon les chiffres officiels.",
+   "expect": [
+    [
+     "inflation",
+     "5.2"
+    ]
+   ]
+  },
+  {
+   "id": "m21",
+   "category": "événement",
+   "text": "Le Parlement européen se réunit à Strasbourg, c'est écrit dans les traités depuis longtemps.",
+   "expect": [
+    [
+     "strasbourg"
+    ]
+   ]
+  },
+  {
+   "id": "m22",
+   "category": "loi",
+   "text": "La peine de mort a été abolie par la loi de 1981 portée par Robert Badinter.",
+   "expect": [
+    [
+     "1981"
+    ]
+   ]
+  },
+  {
+   "id": "m23",
+   "category": "chiffre",
+   "text": "L'Assemblée nationale compte 577 députés et le Sénat 348 sénateurs, ça fait 925 élus.",
+   "expect": [
+    [
+     "577",
+     "député"
+    ],
+    [
+     "348",
+     "sénat"
+    ]
+   ]
+  },
+  {
+   "id": "m24",
+   "category": "mixte",
+   "text": "Je trouve le nucléaire formidable, et d'ailleurs il fournit environ 65 % de l'électricité française.",
+   "expect": [
+    [
+     "nucléaire",
+     "65"
+    ]
+   ]
+  },
+  {
+   "id": "m25",
+   "category": "opinion",
+   "text": "Franchement je trouve que la réforme des retraites est une catastrophe pour tout le monde.",
+   "expect": []
+  },
+  {
+   "id": "m26",
+   "category": "question",
+   "text": "À ton avis, est-ce qu'on devrait augmenter le SMIC dans les prochaines années ou pas ?",
+   "expect": []
+  },
+  {
+   "id": "m27",
+   "category": "prévision",
+   "text": "Dans dix ans la France sera sûrement la première puissance économique d'Europe, je le sens.",
+   "expect": []
+  },
+  {
+   "id": "m28",
+   "category": "plaisanterie",
+   "text": "Mdr il est tellement nul ce ministre, il n'a jamais rien compris à rien, c'est une blague ambulante.",
+   "expect": []
+  },
+  {
+   "id": "m29",
+   "category": "anecdote",
+   "text": "Hier j'ai attendu deux heures aux urgences, c'était vraiment horrible comme expérience personnelle.",
+   "expect": []
+  },
+  {
+   "id": "m30",
+   "category": "personne privée",
+   "text": "<@1000000000000000001> a encore changé d'avis trois fois cette semaine, quelle girouette ce type.",
+   "expect": []
+  },
+  {
+   "id": "m31",
+   "category": "personne privée",
+   "text": "Jean Dupont habite au 12 rue des Lilas à Lyon et il a été condamné pour fraude fiscale l'an dernier.",
+   "expect": []
+  },
+  {
+   "id": "m32",
+   "category": "citation",
+   "text": "> La dette atteint 3 000 milliards d'euros\nOui mais ça ne veut rien dire sans le PIB, tu es d'accord ?",
+   "expect": []
+  },
+  {
+   "id": "m33",
+   "category": "lien seul",
+   "text": "https://exemple.org/article-sur-la-dette-publique regardez ça c'est incroyable à lire absolument",
+   "expect": []
+  },
+  {
+   "id": "m34",
+   "category": "opinion",
+   "text": "Il faudrait vraiment supprimer l'impôt sur la fortune, ce serait beaucoup plus juste pour les entrepreneurs.",
+   "expect": []
+  },
+  {
+   "id": "m35",
+   "category": "hypothèse",
+   "text": "Si on baissait la TVA à 10 %, les prix baisseraient forcément, imaginez le résultat pour les gens.",
+   "expect": []
+  },
+  {
+   "id": "m36",
+   "category": "opinion",
+   "text": "Le gouvernement ment tout le temps, on ne peut plus lui faire confiance sur absolument rien.",
+   "expect": []
+  },
+  {
+   "id": "m37",
+   "category": "question",
+   "text": "Quelqu'un a un lien vers les chiffres officiels du chômage ? Je cherche depuis tout à l'heure.",
+   "expect": []
+  },
+  {
+   "id": "m38",
+   "category": "anecdote",
+   "text": "Ma sœur travaille à l'hôpital depuis dix ans et elle est épuisée, c'est un vrai scandale.",
+   "expect": []
+  },
+  {
+   "id": "m39",
+   "category": "opinion",
+   "text": "Je préfère largement le modèle suédois, il est plus humain que le nôtre à tous points de vue.",
+   "expect": []
+  },
+  {
+   "id": "m40",
+   "category": "plaisanterie",
+   "text": "Haha oui bien sûr, et demain les poules auront des dents, vraiment très drôle comme argument.",
+   "expect": []
+  },
+  {
+   "id": "m41",
+   "category": "données personnelles",
+   "text": "Mon numéro c'est le 06 12 34 56 78 si tu veux qu'on en discute en vrai ce soir.",
+   "expect": []
+  },
+  {
+   "id": "m42",
+   "category": "politesse",
+   "text": "Merci pour ces précisions, je vais y réfléchir ce soir avant de répondre à tout le monde.",
+   "expect": []
+  },
+  {
+   "id": "m43",
+   "category": "modération",
+   "text": "Ce serait mieux si tout le monde se calmait un peu et lisait vraiment avant de répondre.",
+   "expect": []
+  },
+  {
+   "id": "m44",
+   "category": "personne privée",
+   "text": "Tu dis ça parce que tu es payé par le lobby, avoue que c'est la vraie raison de ton message.",
+   "expect": []
+  }
+ ],
+ "claims": [
+  {
+   "id": "c01",
+   "claim": "La France compte 101 départements, outre-mer compris.",
+   "query": "nombre de départements français outre-mer compris",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c02",
+   "claim": "L'Assemblée nationale compte 577 députés.",
+   "query": "nombre de députés Assemblée nationale",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c03",
+   "claim": "Le Sénat compte 348 sénateurs.",
+   "query": "nombre de sénateurs Sénat",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c04",
+   "claim": "Le président de la République française est élu pour cinq ans.",
+   "query": "durée du mandat du président de la République",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c05",
+   "claim": "Le taux normal de TVA en France est de 20 %.",
+   "query": "taux normal de TVA en France",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c06",
+   "claim": "L'Union européenne compte 27 États membres.",
+   "query": "nombre d'États membres de l'Union européenne",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c07",
+   "claim": "La Banque centrale européenne a son siège à Francfort.",
+   "query": "siège de la Banque centrale européenne",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c08",
+   "claim": "La peine de mort a été abolie en France en 1981.",
+   "query": "abolition de la peine de mort en France année",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c09",
+   "claim": "La loi légalisant l'IVG en France date de 1975.",
+   "query": "loi Veil IVG année",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c10",
+   "claim": "Le mariage entre personnes de même sexe est légal en France depuis 2013.",
+   "query": "mariage pour tous loi année France",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c11",
+   "claim": "Le droit de vote des femmes en France a été instauré en 1944.",
+   "query": "droit de vote des femmes France année",
+   "expected": "confirmed",
+   "confidence": "medium",
+   "pair": null,
+   "side": null,
+   "note": "1944 (ordonnance) ; premier vote en 1945"
+  },
+  {
+   "id": "c12",
+   "claim": "La loi de séparation des Églises et de l'État date de 1905.",
+   "query": "loi de séparation des Églises et de l'État année",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c13",
+   "claim": "Le nucléaire est la première source de production d'électricité en France.",
+   "query": "première source de production d'électricité en France",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c14",
+   "claim": "L'euro est en circulation en France depuis 2002.",
+   "query": "euro billets et pièces en circulation France 2002",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c15",
+   "claim": "La France compte plus de 100 millions d'habitants.",
+   "query": "population de la France nombre d'habitants",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c16",
+   "claim": "Le chômage en France dépasse 20 % de la population active.",
+   "query": "taux de chômage en France",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c17",
+   "claim": "La dette publique de la France est inférieure à 50 % du PIB.",
+   "query": "dette publique de la France en % du PIB",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c18",
+   "claim": "L'âge légal de départ à la retraite en France est de 55 ans.",
+   "query": "âge légal de départ à la retraite en France",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c19",
+   "claim": "Le Royaume-Uni fait toujours partie de l'Union européenne.",
+   "query": "Royaume-Uni Union européenne Brexit sortie",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c20",
+   "claim": "Le Parlement français compte trois chambres.",
+   "query": "composition du Parlement français chambres",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c21",
+   "claim": "Le mandat du président de la République française dure sept ans.",
+   "query": "durée du mandat du président de la République",
+   "expected": "contradicted",
+   "confidence": "medium",
+   "pair": null,
+   "side": null,
+   "note": "septennat jusqu'en 2002 ; quinquennat depuis"
+  },
+  {
+   "id": "c22",
+   "claim": "Le Sénat compte 577 sénateurs.",
+   "query": "nombre de sénateurs Sénat",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c23",
+   "claim": "La peine de mort a été abolie en France en 1945.",
+   "query": "abolition de la peine de mort en France année",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c24",
+   "claim": "La Banque centrale européenne a son siège à Bruxelles.",
+   "query": "siège de la Banque centrale européenne",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c25",
+   "claim": "Le nombre exact de chats domestiques à Lyon en 2022 était de 41 238.",
+   "query": "nombre de chats domestiques à Lyon 2022",
+   "expected": "unverifiable",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": "aucune source de confiance ne le donne"
+  },
+  {
+   "id": "c26",
+   "claim": "Un maire d'une petite commune a dépensé 12 345 euros de fleurs en 2021.",
+   "query": "maire petite commune 12 345 euros fleurs 2021",
+   "expected": "unverifiable",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c27",
+   "claim": "La moitié des Français préfèrent faire leurs courses le vendredi plutôt que le samedi.",
+   "query": "Français courses vendredi samedi préférence moitié",
+   "expected": "unverifiable",
+   "confidence": "medium",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "c28",
+   "claim": "Le taux de pauvreté monétaire en France dépasse 10 % de la population.",
+   "query": "taux de pauvreté monétaire France",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": "p1",
+   "side": "camp_1",
+   "note": ""
+  },
+  {
+   "id": "c29",
+   "claim": "Le taux de prélèvements obligatoires en France dépasse 40 % du PIB.",
+   "query": "taux de prélèvements obligatoires France PIB",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": "p1",
+   "side": "camp_2",
+   "note": ""
+  },
+  {
+   "id": "c30",
+   "claim": "Le SMIC brut mensuel est inférieur à 1 000 euros en France.",
+   "query": "montant du SMIC brut mensuel",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": "p2",
+   "side": "camp_1",
+   "note": ""
+  },
+  {
+   "id": "c31",
+   "claim": "Les prélèvements obligatoires en France sont inférieurs à 20 % du PIB.",
+   "query": "taux de prélèvements obligatoires France PIB",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": "p2",
+   "side": "camp_2",
+   "note": ""
+  },
+  {
+   "id": "c32",
+   "claim": "Les énergies renouvelables représentent plus de 20 % de la production d'électricité en France.",
+   "query": "part des énergies renouvelables production d'électricité France",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": "p3",
+   "side": "camp_1",
+   "note": ""
+  },
+  {
+   "id": "c33",
+   "claim": "Le nucléaire représente plus de 50 % de la production d'électricité en France.",
+   "query": "part du nucléaire production d'électricité France",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": "p3",
+   "side": "camp_2",
+   "note": ""
+  },
+  {
+   "id": "c34",
+   "claim": "Le nucléaire représente plus de 90 % de l'électricité produite en France.",
+   "query": "part du nucléaire production d'électricité France",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": "p4",
+   "side": "camp_1",
+   "note": ""
+  },
+  {
+   "id": "c35",
+   "claim": "Les énergies renouvelables ne représentent que 1 % de l'électricité produite en France.",
+   "query": "part des énergies renouvelables production d'électricité France",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": "p4",
+   "side": "camp_2",
+   "note": ""
+  },
+  {
+   "id": "c36",
+   "claim": "Le Sénat compte plus de 400 sénateurs.",
+   "query": "nombre de sénateurs Sénat",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": "p5",
+   "side": "camp_1",
+   "note": ""
+  },
+  {
+   "id": "c37",
+   "claim": "L'Assemblée nationale compte moins de 400 députés.",
+   "query": "nombre de députés Assemblée nationale",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": "p5",
+   "side": "camp_2",
+   "note": ""
+  }
+ ]
+}

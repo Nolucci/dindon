@@ -13,7 +13,7 @@ def world(conn):
 
 
 def _activate(conn, axis_code: str) -> None:
-    # The extension axes are inactive until the user has reviewed them; the test does it, then rolls back
+    # For a test that switched an axis off first: the test does it, then rolls back
     conn.execute("UPDATE axes SET is_active = true WHERE code = %s", (axis_code,))
 
 
@@ -49,7 +49,8 @@ def test_one_remark_never_gives_a_firm_score(world):
     assert abs(score) <= 0.5 and uncertainty >= 0.35
 
 
-def test_inactive_axes_are_not_scored(world):
+def test_inactive_axes_are_not_scored(world, conn):
+    conn.execute("UPDATE axes SET is_active = false WHERE code = 'europe'")                  # all the axes are active from the start: switch one off
     person = world.person("alice")
     world.claim(person, world.proposition("p1", {"europe": 1.0}), stance=1, confidence=0.9)
     world.refresh_scores()
@@ -112,12 +113,20 @@ def test_roles_that_contradict_each_other_are_spotted(world):
     assert world.conflicts(person) == {frozenset({"protectionnisme", "mondialiste"})}
 
 
-def test_few_positions_are_not_enough_to_check(world, conn):
+def test_a_remark_that_weighs_almost_nothing_is_not_enough_to_check(world, conn):
     _activate(conn, "europe")
     person = world.person("erin", roles=("Européiste",))
-    _eurosceptic_claims(world, person, n=1)
+    world.claim(person, world.proposition("Quitter l'UE 0", {"europe": -1.0}), stance=1, confidence=0.3)             # a remark that the model is hardly sure of
     world.refresh_scores()
     assert world.verdicts(person) == {"Européiste": "not_verifiable"}
+
+
+def test_one_clear_position_is_enough_to_check(world, conn):
+    _activate(conn, "europe")
+    person = world.person("erin", roles=("Européiste",))
+    _eurosceptic_claims(world, person, n=1)                                                                          # (a decisive check: the interval keeps it from being rash)
+    world.refresh_scores()
+    assert world.verdicts(person)["Européiste"] in ("discordant", "concordant")
 
 
 # ---------------------------------------------------------------------------------------------

@@ -37,6 +37,36 @@ export const api = {
   importStatus: () => request('/api/import'),
   importStart: (body) => request('/api/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   importCancel: () => request('/api/import/cancel', { method: 'POST' }),
+  botInvite: () => request('/api/bot/invite'),
+  system: () => request('/api/system'),
+  automation: () => request('/api/automation'),
+  automationSave: (body) => request('/api/automation', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  discordMap: () => request('/api/discord-map'),
+  discordMapSave: (body) => request('/api/discord-map', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  automationRun: () => request('/api/automation/run', { method: 'POST' }),
+  performance: () => request('/api/performance'),
+  performanceSave: (body) => request('/api/performance', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  debates: () => request('/api/debates'),
+  debate: (id) => request(`/api/debates/${id}`),
+  privacy: () => request('/api/privacy'),
+  privacyFind: (q) => request(`/api/privacy/find${query({ q })}`),
+  privacyAct: (action, user_id, reason) =>
+    request(`/api/privacy/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: String(user_id), reason: reason || '' }) }),
+  positions: (guild, filters = {}) => request(`/api/positions${query({ guild, ...filters })}`),
+  positionsProposition: (id, guild) => request(`/api/positions/proposition/${id}${query({ guild })}`),
+  coherence: (guild) => request(`/api/positions/coherence${query({ guild })}`),
+  positionsLinks: (id, guild, links) =>
+    request(`/api/positions/proposition/${id}/axes${query({ guild })}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ links }) }),
+  positionsValidateLinks: (id, guild) => request(`/api/positions/proposition/${id}/axes/validate${query({ guild })}`, { method: 'POST' }),
+  positionsOnlyValidated: (value, guild) =>
+    request(`/api/positions/only-validated${query({ guild })}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value }) }),
+  positionsPerson: (id, guild) => request(`/api/positions/person/${id}${query({ guild })}`),
+  analysis: (guild) => request(`/api/analysis${query({ guild })}`),
+  analysisStart: (body) => request('/api/analysis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  analysisCancel: () => request('/api/analysis/cancel', { method: 'POST' }),
+  topics: (guild, rejected) => request(`/api/topics${query({ guild, rejected: rejected ? 'true' : undefined })}`),
+  topicChange: (id, body) => request(`/api/topics/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  topicMerge: (id, into) => request(`/api/topics/${id}/merge`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ into }) }),
 };
 
 // Live events. The browser reconnects by itself; `onState` says whether the line is open.
@@ -52,4 +82,17 @@ export function openEvents(onEvent, onState) {
     }
   };
   return () => source.close();
+}
+
+/** A function that runs a call to the application and, if it fails, tells what to do: `onAuthLost` when the session is gone, `onProblem(message)` otherwise. It returns what the call returns, or undefined. */
+export function makeGuard(onAuthLost, onProblem) {
+  return async (action) => {
+    try {
+      return await action();
+    } catch (error) {
+      if (error instanceof AuthError) onAuthLost();
+      else onProblem(error.message);
+      return undefined;
+    }
+  };
 }

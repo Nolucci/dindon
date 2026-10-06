@@ -34,7 +34,7 @@ def options(request: Request) -> dict:
         known = {row["id"]: row["name"] for row in conn.execute("SELECT id, name FROM guilds").fetchall()}
     guilds = []
     try:
-        for guild_id in state.settings.guild_ids:
+        for guild_id in state.settings.followed():
             channels = [{"id": str(c.id), "name": c.name or str(c.id), "kind": c.kind, "empty": c.last_message_id is None}
                         for c in api.channels(guild_id) if c.kind != "thread"]
             guilds.append({"id": str(guild_id), "name": known.get(guild_id, str(guild_id)), "channels": sorted(channels, key=lambda c: c["name"].casefold())})
@@ -57,8 +57,8 @@ def start(request: Request, body: ImportRequest) -> dict:
         guild_id = int(body.guild)
     except ValueError:
         raise HTTPException(status_code=422, detail="Serveur : identifiant invalide.") from None
-    if guild_id not in state.settings.guild_ids:
-        raise HTTPException(status_code=403, detail="Ce serveur ne fait pas partie de DINDON_GUILD_IDS : il ne peut pas être importé.")
+    if guild_id not in state.settings.followed():
+        raise HTTPException(status_code=403, detail="Ce serveur n'est pas suivi (le bot n'y est pas, ou il n'est pas dans DINDON_GUILD_IDS) : il ne peut pas être importé.")
     try:
         selection = ImportSelection.parse(body.channels, body.authors, body.mentions, body.after, body.before)
         state.imports.start(guild_id, selection)

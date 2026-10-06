@@ -15,7 +15,7 @@
 </svg>
 
 <style>
-  .spark { width: 100%; height: 44px; display: block; }
-  rect { fill: var(--accent); opacity: 0.8; }
+  .spark { width: 100%; height: 2.75rem; display: block; }
+  rect { fill: var(--accent); opacity: 0.8; transition: opacity var(--transition-fast); }
   rect:hover { opacity: 1; }
 </style>

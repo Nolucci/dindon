@@ -58,3 +58,63 @@ Le délai est **environ la moitié de l'intervalle de relevé, plus 0,3 s**. Ave
 - Débit réel de l'exportateur contre Discord, et durée du premier import d'un vrai serveur (le prompt estime environ une heure pour un million de messages, plus les réactions : **non vérifié**).
 - Durée du rattrapage nocturne sur un vrai serveur.
 - Tout ce qui touche à l'IA locale (phase 2) : aucun modèle n'est installé.
+
+## L'analyse locale (mesuré, données inventées, vrais modèles)
+
+Même machine (Mac M4 Pro, 24 Go, GPU Metal : 17,8 Go de mémoire vidéo utilisable). Ollama 0.35.1 sur le Mac, `bge-m3` (vecteurs), `qwen3:14b` et `gemma4:12b` (noms). Données : un serveur inventé de 3 000 messages et 40 personnes (`tools/make_demo_server.py`, graine 11). Commande : voir [ANALYSE.md](ANALYSE.md). **Ce sont des conversations fabriquées à partir de modèles de phrases : elles se regroupent très facilement. Aucune de ces mesures ne dit comment les modèles se comportent sur de vraies conversations.**
+
+| Mesure | Résultat |
+| --- | --- |
+| Découpage en conversations (SQL) | 3 000 messages → 436 conversations (6,9 messages en moyenne), dont **360 retenues** (deux messages qui disent quelque chose, ou un long) |
+| **Vecteurs** (`bge-m3`, lots de 16) | **360 conversations en 22 s**, soit environ 16 par seconde (médiane 0,45 s par lot). Premier lot : 8,9 s (chargement du modèle) |
+| Nombre de thèmes trouvé par la silhouette | 19 (scores des candidats : 4 → 0,197 ; 9 → 0,348 ; 14 → 0,343 ; **19 → 0,364** ; 25 → 0,325 ; 30 → 0,300 ; 35 → 0,292 ; 40 → 0,307). Les scores sont **proches** de 9 à 25 : le nombre n'est pas net, il se règle à la main (`--topics`) |
+| Regroupement + nom de 19 thèmes (`qwen3:14b`) | 204 s en tout, dont environ 11 s par nom (médiane 11,1 s sur 21 appels, premier chargement compris) |
+| Comparaison des deux modèles de noms sur 10 thèmes | `qwen3:14b` : **6,2 s** par nom ; `gemma4:12b` : **9,4 s** ; voir [ANALYSE.md](ANALYSE.md) §6 pour la qualité |
+
+**Estimé (non mesuré)** pour un vrai serveur de 100 000 messages : environ 15 000 conversations, donc environ **15 minutes** de vecteurs, puis 20 à 40 thèmes à nommer, soit **4 à 7 minutes**. La taille d'un vecteur est d'environ 5 Ko (voir `db/schema-vector.sql`) : 15 000 conversations ≈ 75 Mo.
+
+## Vie privée et charge d'un gros serveur (mesuré, données inventées)
+
+`tools/measure_privacy.py` et `tools/measure_bot_load.py`, sur le Mac (M4 Pro, PostgreSQL dans Docker), base temporaire supprimée ensuite. Serveur inventé : **300 000 messages, 5 000 personnes, 60 salons**, 120 000 liens.
+
+| | Mesuré |
+| --- | --- |
+| Import de ces 300 000 messages (60 fichiers) | 29,8 s |
+| Un import d'un fichier, registre vide / registre de 1 500 personnes | 637 ms / 639 ms (le registre ne coûte rien) |
+| Effacer une personne moyenne (15 messages) / la plus active (40 518 messages), base seule | 0,24 s / 1,52 s |
+| Copie des données d'une personne active | 0,04 s |
+| Réécrire les fichiers d'`archive/` sans la personne (2 400 fichiers, 4,2 Go, la personne dans tous) | **126 s** : le seul point lent ; la personne moyenne est dans une fraction des fichiers |
+| Purge de tout (300 000 messages, lots de 20 000, liens refaits) | 6,2 s |
+| Le bot en direct, 100 messages/s sur 40 salons pendant 20 s | 2 000 sur 2 000 écrits, vidé 1,1 s après le dernier, aucune perte ni reprise |
+| Le bot en direct, **300 messages/s** sur 80 salons pendant 20 s | 6 000 sur 6 000 écrits, vidé 3,9 s après le dernier, aucune perte ni reprise |
+
+Limites de cette mesure : un seul poste, base chaude, données inventées (messages courts), un seul serveur ; le débit réel de Discord vers le Gateway n'est pas mesuré ici.
+
+## Un gros serveur : 5 000 personnes, 300 000 messages (mesuré le 5 octobre 2026, données inventées)
+
+| Mesure | Résultat |
+| --- | --- |
+| Génération des 40 fichiers (98 Mo) | 12 s |
+| Import | **18 s** pour 300 000 messages, 4 994 personnes, 122 084 liens ; base de 196 Mo |
+| API : le graphe (3 000 personnes et 20 000 liens affichés, le reste masqué et compté) | 0,32 à 0,43 s, 4,2 Mo |
+| API : liste des serveurs, état du système, recherche d'une personne | 0,13 s, 0,07 s, 0,04 s |
+| Interface (Chromium sans carte graphique) | comptes affichés **2,9 s** après la connexion ; mémoire JS 37 Mo ; 20 mouvements de souris traités en 1,5 s ; aucune erreur dans la page |
+
+La carte ne dessine que les 3 000 personnes les plus liées et dit combien elle en masque. Non mesuré : un vrai Discord de cette taille, l'analyse par l'IA sur ce volume.
+
+## Les débats : lecture et vérification des affirmations (2026-10-06, vrai modèle, vrai Internet)
+
+Détail, méthode et limites dans [DEBAT.md](DEBAT.md) § « Mesure ». Jeu de référence `tools/claims_reference.json` (étiquettes de Claude, de mémoire, **à faire vérifier par une personne**), moitié « réglage » et moitié « test » (mesurée une seule fois). Machine : Mac M4 Pro, `qwen3:14b` via Ollama, SearXNG local.
+
+| Mesure | Résultat (moitié test) | Remarque |
+|---|---|---|
+| Lecture : affirmations retrouvées / précision des affirmations rendues | **100 % / 86 %** (22 messages, 12 avec une affirmation) | 36 % / 75 % avant le réglage de la consigne ; environ 3 s par message |
+| Lecture : messages sans affirmation où le modèle en trouve une ; **fuites** vers une personne privée ou des données personnelles | **0 % ; 0** | |
+| Vérification : précision de « contredit » | **100 % sur 2 corrections** (réglage : 100 % sur 6) | trop peu de corrections pour être une mesure ; le verrou exige au moins 8 |
+| Vérification : vrai déclaré faux / fausse déclarée vraie | **0 / 0** | aucune erreur de sens sur 37 affirmations (les deux moitiés) |
+| Vérification : tranchées dans le bon sens / laissées sans verdict | **56 % / 44 %** | pages illisibles par un robot, pages sans le chiffre, extraits en anglais, résultats de recherche variables |
+| Vérification : invérifiables restées invérifiables | **100 %** | une erreur (« confirmé » à tort) corrigée pendant le réglage |
+| Durée de la vérification | environ 15 s par affirmation | recherche, jusqu'à 3 pages, appels au modèle |
+
+**Niveau de preuve : mesuré, sur un petit jeu aux étiquettes non vérifiées. Pas une garantie sur votre serveur.**
+

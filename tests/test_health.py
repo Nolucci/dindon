@@ -11,9 +11,9 @@ def test_health_reports_the_state_of_the_database(migrated_url, tmp_path):
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
-    # 37 tables of the starter kit, 9 views, 21 axes of which the 12 of the model are active
-    assert body["database"]["tables"] == 37 and body["database"]["views"] == 9
-    assert body["database"]["axes"] == 21 and body["database"]["axes_active"] == 12
+    # 37 tables of the starter kit, 2 of the analysis (migration 0003) and 1 of the services (0004), 9 views, 21 axes, all active
+    assert body["database"]["tables"] == 52 and body["database"]["views"] == 9
+    assert body["database"]["axes"] == 21 and body["database"]["axes_active"] == 21
     assert body["ollama"] == {"reachable": False, "models": []}  # the AI is optional: not a failure
 
 

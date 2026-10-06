@@ -1,0 +1,197 @@
+{"sentence": "La Ve République a tenu 60 ans, on ne change pas de régime pour une humeur passagère", "answer": {"axes": [{"axis": "rupture", "toward": "Réforme", "strength": "forte"}]}}
+{"sentence": "La fin de vie est un sujet à risque de dérapage, il faut prudence", "answer": {"axes": []}}
+{"sentence": "Les deux côtés d'un débat ont des arguments valables", "answer": {"axes": []}}
+{"sentence": "La France devrait sortir de l'OTAN et ne plus suivre les directives de Washington", "answer": {"axes": [{"axis": "alliances", "toward": "Non-alignement", "strength": "forte"}]}}
+{"sentence": "Ne pas se réarmer est naïf dans un monde plus dangereux", "answer": {"axes": [{"axis": "diplomatie", "toward": "Militariste", "strength": "forte"}]}}
+{"sentence": "Une assemblée à la proportionnelle représenterait enfin tout le monde", "answer": {"axes": [{"axis": "representation", "toward": "Démocratie", "strength": "forte"}]}}
+{"sentence": "L'assimilation fonctionnait autrefois, mais aujourd'hui le communautarisme est laissé faire", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "moyenne"}]}}
+{"sentence": "L'intelligence artificielle va augmenter la productivité comme l'imprimerie ou l'électricité", "answer": {"axes": [{"axis": "technologie", "toward": "Technologie", "strength": "forte"}]}}
+{"sentence": "La moitié des secteurs en tension tournent grâce aux travailleurs étrangers", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "moyenne"}]}}
+{"sentence": "Les peurs sur l'intelligence artificielle ressemblent à celles sur le train au XIXe siècle", "answer": {"axes": [{"axis": "technologie", "toward": "Technologie", "strength": "moyenne"}]}}
+{"sentence": "La laïcité doit être appliquée de manière équilibrée et mesurée", "answer": {"axes": []}}
+{"sentence": "La religion ne doit pas pénétrer l'espace public", "answer": {"axes": [{"axis": "religion", "toward": "Irréligieux", "strength": "forte"}]}}
+{"sentence": "Il faut trouver un équilibre entre renforcer la police et éviter de marginaliser certains groupes.", "answer": {"axes": []}}
+{"sentence": "La police a besoin de plus de moyens pour lutter contre la délinquance.", "answer": {"axes": []}}
+{"sentence": "Les systèmes de caméra peuvent réduire les crimes, mais aussi réduire les interactions humaines.", "answer": {"axes": []}}
+{"sentence": "On pourrait investir dans des caméras et l’intelligence artificielle plutôt que dans des patrouilles de police.", "answer": {"axes": [{"axis": "pouvoir", "toward": "Sécurité", "strength": "moyenne"}]}}
+{"sentence": "Il est utile de connaître les chiffres sur les réfugiés accueillis et régularisés.", "answer": {"axes": []}}
+{"sentence": "Les données du HCR montrent que peu des réfugiés ont un niveau d'éducation supérieur.", "answer": {"axes": []}}
+{"sentence": "Les réfugiés devraient être accueillis avec des conditions.", "answer": {"axes": [{"axis": "immigration", "toward": "Multiculturalisme", "strength": "moyenne"}]}}
+{"sentence": "Les réfugiés posent un problème pour la sécurité sociale et l'identité nationale.", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "moyenne"}]}}
+{"sentence": "Une gestion efficace avec des logements et de la formation est nécessaire.", "answer": {"axes": []}}
+{"sentence": "Il faut trouver un équilibre entre innovation et prudence concernant l'IA.", "answer": {"axes": []}}
+{"sentence": "L'IA peut aider les journalistes, mais ne doit pas remplacer le travail humain.", "answer": {"axes": [{"axis": "technologie", "toward": "Biologie", "strength": "moyenne"}]}}
+{"sentence": "La réglementation de l'IA est nécessaire pour éviter les dégâts causés par des articles mal faits.", "answer": {"axes": [{"axis": "technologie", "toward": "Biologie", "strength": "moyenne"}]}}
+{"sentence": "Le débat actuel porte sur la confiance à accorder aux IA ou leur capacité à tromper.", "answer": {"axes": [{"axis": "technologie", "toward": "Biologie", "strength": "moyenne"}]}}
+{"sentence": "Il peut y avoir des exceptions à la neutralité religieuse dans le service public", "answer": {"axes": [{"axis": "religion", "toward": "Religieux", "strength": "moyenne"}]}}
+{"sentence": "La laïcité protège la liberté d'apprendre des enfants en limitant l'influence religieuse", "answer": {"axes": [{"axis": "religion", "toward": "Irréligieux", "strength": "forte"}]}}
+{"sentence": "Les agents publics peuvent pratiquer leur religion à l’extérieur de leur service public", "answer": {"axes": [{"axis": "religion", "toward": "Irréligieux", "strength": "moyenne"}]}}
+{"sentence": "La sobriété coûte moins cher que de réparer les dégâts de la canicule", "answer": {"axes": [{"axis": "ecologie", "toward": "Écologie", "strength": "moyenne"}]}}
+{"sentence": "Le solaire et l'éolien sont les énergies les moins chères", "answer": {"axes": [{"axis": "ecologie", "toward": "Productivisme", "strength": "moyenne"}]}}
+{"sentence": "Les villes doivent se refaire autour du vélo et du train, pas de la voiture", "answer": {"axes": [{"axis": "ecologie", "toward": "Écologie", "strength": "forte"}]}}
+{"sentence": "La loi de 1905 interdit à l'État de reconnaître ou financer un culte.", "answer": {"axes": []}}
+{"sentence": "Les clochers ont leur place dans le paysage national.", "answer": {"axes": []}}
+{"sentence": "À l'école publique, les élèves sont avant tout des élèves, pas des croyants.", "answer": {"axes": [{"axis": "religion", "toward": "Irréligieux", "strength": "forte"}]}}
+{"sentence": "La privatisation de l'énergie entraîne une augmentation des prix et profite aux actionnaires", "answer": {"axes": [{"axis": "economie", "toward": "Public", "strength": "forte"}]}}
+{"sentence": "La situation dépend des cas, il n'y a pas de solution unique", "answer": {"axes": []}}
+{"sentence": "Taxer les grosses fortunes permet de financer les services publics sans peser sur les classes moyennes", "answer": {"axes": [{"axis": "redistribution", "toward": "Redistribution", "strength": "forte"}]}}
+{"sentence": "L'intégration réussit lorsque les migrants obtiennent des papiers et un emploi.", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "moyenne"}]}}
+{"sentence": "Régulariser les migrants encourage l'immigration clandestine.", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "moyenne"}]}}
+{"sentence": "L'euro a rendu les pays membres dépendants et a retiré leur capacité à ajuster leur économie.", "answer": {"axes": [{"axis": "europe", "toward": "Souveraineté nationale", "strength": "forte"}]}}
+{"sentence": "Le Royaume-Uni s'en sort bien en dehors de l'Union européenne.", "answer": {"axes": [{"axis": "europe", "toward": "Souveraineté nationale", "strength": "moyenne"}]}}
+{"sentence": "Les normes européennes protègent mieux les consommateurs que les lois nationales.", "answer": {"axes": [{"axis": "europe", "toward": "Intégration européenne", "strength": "forte"}]}}
+{"sentence": "Certains sujets ne doivent pas être réglés par la loi, mais par l'évolution sociale", "answer": {"axes": [{"axis": "representation", "toward": "Démocratie", "strength": "moyenne"}]}}
+{"sentence": "Les changements sociaux doivent être progressifs pour ne pas perturber les repères familiaux", "answer": {"axes": [{"axis": "rupture", "toward": "Réforme", "strength": "moyenne"}]}}
+{"sentence": "C’est une crise humanitaire et on ne devrait pas dire que c’est trop.", "answer": {"axes": [{"axis": "ecologie", "toward": "Écologie", "strength": "forte"}]}}
+{"sentence": "Il faut trouver un moyen de gérer le flux des réfugiés sans surcharger le système.", "answer": {"axes": []}}
+{"sentence": "La France ne peut pas accepter tous les réfugiés.", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "forte"}]}}
+{"sentence": "Le problème des réfugiés est la régularisation, pas l’accueil.", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "moyenne"}]}}
+{"sentence": "Un programme de régularisation progressive devrait être testé.", "answer": {"axes": [{"axis": "immigration", "toward": "Multiculturalisme", "strength": "moyenne"}]}}
+{"sentence": "Les stocks de munitions sont ridicules, c'est une faiblesse stratégique", "answer": {"axes": [{"axis": "diplomatie", "toward": "Militariste", "strength": "forte"}]}}
+{"sentence": "Un budget militaire à 3% du PIB serait raisonnable vu la situation", "answer": {"axes": [{"axis": "diplomatie", "toward": "Militariste", "strength": "moyenne"}]}}
+{"sentence": "Taxer le kérosène et les jets privés est nécessaire.", "answer": {"axes": [{"axis": "ecologie", "toward": "Écologie", "strength": "moyenne"}]}}
+{"sentence": "Il faut plus de juges et de procureurs pour que les peines tombent", "answer": {"axes": [{"axis": "pouvoir", "toward": "Sécurité", "strength": "moyenne"}]}}
+{"sentence": "La surveillance de masse ouvre la porte aux abus", "answer": {"axes": [{"axis": "pouvoir", "toward": "Liberté", "strength": "forte"}]}}
+{"sentence": "Il faut faire marcher la Constitution actuelle avant d'en refaire une", "answer": {"axes": [{"axis": "rupture", "toward": "Réforme", "strength": "forte"}]}}
+{"sentence": "Les citoyens doivent être associés en continu, pas seulement le jour du vote", "answer": {"axes": [{"axis": "participation", "toward": "Démocratie directe", "strength": "forte"}]}}
+{"sentence": "Il faut ralentir l'innovation pour mieux maîtriser les algorithmes", "answer": {"axes": [{"axis": "technologie", "toward": "Biologie", "strength": "moyenne"}]}}
+{"sentence": "Les géants du numérique deviennent plus puissants que des États", "answer": {"axes": [{"axis": "pouvoir", "toward": "Sécurité", "strength": "moyenne"}]}}
+{"sentence": "Les hôpitaux et les écoles doivent rester publics et non marchandises", "answer": {"axes": [{"axis": "economie", "toward": "Public", "strength": "forte"}]}}
+{"sentence": "Les entreprises créent la richesse, l'État la redistribue seulement", "answer": {"axes": [{"axis": "redistribution", "toward": "Mérite individuel", "strength": "forte"}]}}
+{"sentence": "Un SMIC trop haut peut entraîner la fermeture de petites entreprises", "answer": {"axes": [{"axis": "redistribution", "toward": "Mérite individuel", "strength": "moyenne"}]}}
+{"sentence": "La laïcité empêche les pressions communautaires dans l'espace public", "answer": {"axes": [{"axis": "religion", "toward": "Irréligieux", "strength": "forte"}]}}
+{"sentence": "La laïcité impose la neutralité dans l'espace public", "answer": {"axes": [{"axis": "religion", "toward": "Irréligieux", "strength": "forte"}]}}
+{"sentence": "L'assimilation est nécessaire pour éviter le communautarisme", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "forte"}]}}
+{"sentence": "Je n'ai pas d'avis tranché sur la question", "answer": {"axes": []}}
+{"sentence": "Le référendum d'initiative citoyenne (RIC) finirait dans les mains des lobbies et des algorithmes des réseaux", "answer": {"axes": [{"axis": "participation", "toward": "Démocratie représentative", "strength": "forte"}]}}
+{"sentence": "Ensemble, les pays européens ont plus de poids sur des sujets comme le climat, la défense et le numérique", "answer": {"axes": [{"axis": "europe", "toward": "Intégration européenne", "strength": "forte"}]}}
+{"sentence": "Un exécutif fort assure la stabilité", "answer": {"axes": [{"axis": "representation", "toward": "Autocratie", "strength": "forte"}]}}
+{"sentence": "Les citoyens tirés au sort fonctionnent bien dans d'autres pays", "answer": {"axes": [{"axis": "participation", "toward": "Démocratie directe", "strength": "moyenne"}]}}
+{"sentence": "Les quotas de votes annuels sont une forme de démocratie.", "answer": {"axes": [{"axis": "representation", "toward": "Démocratie", "strength": "moyenne"}]}}
+{"sentence": "Les victimes de récidivistes méritent une protection spécifique", "answer": {"axes": [{"axis": "structure", "toward": "Fédéral", "strength": "moyenne"}]}}
+{"sentence": "Il y a mieux à faire de l'argent public qu'intervenir à l'étranger", "answer": {"axes": [{"axis": "intervention", "toward": "Non-interventionniste", "strength": "forte"}]}}
+{"sentence": "Une armée plus grande encourage l'utilisation de la force", "answer": {"axes": [{"axis": "diplomatie", "toward": "Militariste", "strength": "moyenne"}]}}
+{"sentence": "La légalisation de l'aide à mourir peut entraîner des risques inacceptables", "answer": {"axes": [{"axis": "morale", "toward": "Traditionaliste", "strength": "moyenne"}]}}
+{"sentence": "L'Union européenne crée des emplois en France", "answer": {"axes": [{"axis": "europe", "toward": "Intégration européenne", "strength": "moyenne"}]}}
+{"sentence": "La souveraineté implique de choisir ses propres lois", "answer": {"axes": [{"axis": "structure", "toward": "Unitaire", "strength": "forte"}]}}
+{"sentence": "Les droits des uns ne retirent rien aux autres", "answer": {"axes": []}}
+{"sentence": "La pente vers l'aide à mourir est glissante, comme ailleurs", "answer": {"axes": [{"axis": "morale", "toward": "Traditionaliste", "strength": "moyenne"}]}}
+{"sentence": "Il est préférable d'investir dans la santé plutôt que dans la défense", "answer": {"axes": [{"axis": "diplomatie", "toward": "Pacifiste", "strength": "moyenne"}]}}
+{"sentence": "Il faut concilier l'évolution rapide avec la stabilité sociale.", "answer": {"axes": []}}
+{"sentence": "Il faut écouter les gens, pas se laisser guider par une idéologie à l’aveugle.", "answer": {"axes": []}}
+{"sentence": "L'évolution sociale doit se faire progressivement, en respectant les racines de la société.", "answer": {"axes": [{"axis": "rupture", "toward": "Réforme", "strength": "forte"}]}}
+{"sentence": "Les droits humains et l'égalité doivent être respectés immédiatement, sans attendre.", "answer": {"axes": []}}
+{"sentence": "Les lois inadaptées et l'absence de débat public sont des problèmes à résoudre.", "answer": {"axes": []}}
+{"sentence": "L'État ne doit pas contrôler l'économie car cela freine l'innovation", "answer": {"axes": [{"axis": "controle", "toward": "Libre marché", "strength": "forte"}]}}
+{"sentence": "La régulation de l'économie doit ne pas entraver l'économie", "answer": {"axes": [{"axis": "controle", "toward": "Libre marché", "strength": "forte"}]}}
+{"sentence": "Il faut réglementer l'IA pour éviter l'inégalité et la précarisation du travail.", "answer": {"axes": [{"axis": "technologie", "toward": "Biologie", "strength": "moyenne"}]}}
+{"sentence": "L'intégration est plus efficace avec des papiers et un travail qu'avec l'incertitude", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "moyenne"}]}}
+{"sentence": "La VIe République pourrait aider à répartir le pouvoir de manière plus équitable.", "answer": {"axes": [{"axis": "structure", "toward": "Fédéral", "strength": "moyenne"}]}}
+{"sentence": "Le 49.3 doit être utilisé uniquement en cas d'urgence.", "answer": {"axes": [{"axis": "representation", "toward": "Démocratie", "strength": "moyenne"}]}}
+{"sentence": "Le 49.3 peut être utilisé à des fins malveillantes par les partis politiques.", "answer": {"axes": [{"axis": "representation", "toward": "Autocratie", "strength": "moyenne"}]}}
+{"sentence": "Des compromis peuvent être faits sur l’affichage religieux, comme aux États-Unis.", "answer": {"axes": [{"axis": "religion", "toward": "Irréligieux", "strength": "moyenne"}]}}
+{"sentence": "La laïcité ne devrait pas interdire toute expression religieuse, comme les croix dans les hôpitaux.", "answer": {"axes": [{"axis": "religion", "toward": "Irréligieux", "strength": "moyenne"}]}}
+{"sentence": "Il faut légaliser le suicide assisté sans le banaliser.", "answer": {"axes": []}}
+{"sentence": "La France doit adopter une loi claire sur le droit au refus des soins.", "answer": {"axes": []}}
+{"sentence": "La loi doit refléter l'humain et non un idéalisme destructeur de valeurs.", "answer": {"axes": [{"axis": "representation", "toward": "Démocratie", "strength": "moyenne"}]}}
+{"sentence": "Légaliser le suicide assisté pourrait avoir des conséquences sur la solidarité sociale.", "answer": {"axes": []}}
+{"sentence": "Les citoyens devraient participer directement à la prise de décisions politiques.", "answer": {"axes": [{"axis": "participation", "toward": "Démocratie directe", "strength": "forte"}]}}
+{"sentence": "L’État doit être renforcé pour rétablir la confiance des citoyens.", "answer": {"axes": [{"axis": "confiance", "toward": "Confiance", "strength": "forte"}]}}
+{"sentence": "Augmenter l'accueil des migrants augmentera le taux de chômage.", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "moyenne"}]}}
+{"sentence": "La France a des limites et n’est pas une usine de régularisation.", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "moyenne"}]}}
+{"sentence": "Le gouvernement peut améliorer l’intégration des migrants avec de l’organisation.", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "moyenne"}]}}
+{"sentence": "Utiliser la technologie et des accords internationaux est une solution technique pour gérer l’immigration.", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "moyenne"}, {"axis": "technologie", "toward": "Technologie", "strength": "moyenne"}]}}
+{"sentence": "La Chine pollue plus que l'ensemble des autres pays réunis", "answer": {"axes": [{"axis": "ecologie", "toward": "Productivisme", "strength": "moyenne"}]}}
+{"sentence": "L'uniformité européenne ne fonctionne pas car chaque pays a sa propre culture", "answer": {"axes": [{"axis": "europe", "toward": "Souveraineté nationale", "strength": "forte"}]}}
+{"sentence": "La neutralité des agents publics exige l'absence de signes religieux ostensibles", "answer": {"axes": [{"axis": "religion", "toward": "Irréligieux", "strength": "forte"}]}}
+{"sentence": "L'Union européenne impose des coûts plus élevés que les bénéfices reçus.", "answer": {"axes": [{"axis": "europe", "toward": "Souveraineté nationale", "strength": "moyenne"}]}}
+{"sentence": "Le Royaume-Uni s'en sort bien malgré les prédictions négatives.", "answer": {"axes": []}}
+{"sentence": "Il faut agir même si tout le monde n'est pas d'accord", "answer": {"axes": [{"axis": "rupture", "toward": "Rupture", "strength": "moyenne"}]}}
+{"sentence": "Il faut des limites dans l'intégration des migrants", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "moyenne"}]}}
+{"sentence": "Il faut arrêter de faire du business as usual pour lutter contre le changement climatique", "answer": {"axes": [{"axis": "ecologie", "toward": "Écologie", "strength": "forte"}]}}
+{"sentence": "La France est déjà le pays le plus taxé d'Europe, ce qui peut pousser les gens à partir", "answer": {"axes": [{"axis": "redistribution", "toward": "Mérite individuel", "strength": "moyenne"}]}}
+{"sentence": "La défense doit inclure des forces d’intervention en cas de crise", "answer": {"axes": [{"axis": "diplomatie", "toward": "Militariste", "strength": "moyenne"}]}}
+{"sentence": "Le budget militaire doit être augmenté pour couvrir la défense cybernétique, les drones et le renseignement", "answer": {"axes": [{"axis": "diplomatie", "toward": "Militariste", "strength": "forte"}]}}
+{"sentence": "Le budget militaire doit être augmenté, mais pas à n’importe quel prix", "answer": {"axes": [{"axis": "diplomatie", "toward": "Militariste", "strength": "moyenne"}]}}
+{"sentence": "Les gens sont fatigués d'être dirigés sur des sujets sensibles", "answer": {"axes": [{"axis": "representation", "toward": "Démocratie", "strength": "moyenne"}]}}
+{"sentence": "La diplomatie est plus efficace et moins coûteuse que l'armée", "answer": {"axes": [{"axis": "diplomatie", "toward": "Pacifiste", "strength": "forte"}]}}
+{"sentence": "Régulariser les travailleurs clandestins envoie le message que passer par la porte de derrière paie", "answer": {"axes": [{"axis": "representation", "toward": "Autocratie", "strength": "moyenne"}]}}
+{"sentence": "L'IA est un progrès absolu et le futur, les humains ont juste à attendre.", "answer": {"axes": [{"axis": "technologie", "toward": "Technologie", "strength": "forte"}]}}
+{"sentence": "Quand l'IA est bien faite, tout le monde gagne. C’est un compromis.", "answer": {"axes": []}}
+{"sentence": "Attendre que tout le monde soit d'accord c'est ne jamais rien changer", "answer": {"axes": [{"axis": "rupture", "toward": "Rupture", "strength": "forte"}]}}
+{"sentence": "La dépendance vis-à-vis de Washington est un enjeu complexe.", "answer": {"axes": []}}
+{"sentence": "L'idée de se réarmer est simpliste.", "answer": {"axes": [{"axis": "diplomatie", "toward": "Pacifiste", "strength": "moyenne"}]}}
+{"sentence": "Ensemble, on pèse plus sur le climat, la défense et le numérique que seul", "answer": {"axes": [{"axis": "rupture", "toward": "Réforme", "strength": "moyenne"}]}}
+{"sentence": "L'euro a enlevé tout moyen d'ajuster notre économie, c'est un carcan", "answer": {"axes": [{"axis": "economie", "toward": "Privé", "strength": "moyenne"}]}}
+{"sentence": "Les quotas d'immigration sont une forme de démocratie, pas de racisme", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "moyenne"}]}}
+{"sentence": "Il est nécessaire de ne pas attendre l'unanimité pour apporter des changements", "answer": {"axes": [{"axis": "rupture", "toward": "Rupture", "strength": "moyenne"}]}}
+{"sentence": "Certains quartiers vivent sous la loi des trafics", "answer": {"axes": [{"axis": "structure", "toward": "Fédéral", "strength": "moyenne"}]}}
+{"sentence": "La laïcité exige la neutralité de l'État envers les cultes.", "answer": {"axes": [{"axis": "religion", "toward": "Irréligieux", "strength": "forte"}]}}
+{"sentence": "L'État doit reprendre le contrôle des quartiers touchés par le trafic", "answer": {"axes": [{"axis": "economie", "toward": "Public", "strength": "moyenne"}]}}
+{"sentence": "Il est urgent de changer les comportements économiques pour lutter contre le changement climatique.", "answer": {"axes": [{"axis": "ecologie", "toward": "Écologie", "strength": "forte"}]}}
+{"sentence": "On devrait demander des sources pour appuyer les affirmations.", "answer": {"axes": []}}
+{"sentence": "La Ve République a montré sa stabilité sur une longue période", "answer": {"axes": [{"axis": "representation", "toward": "Démocratie", "strength": "moyenne"}]}}
+{"sentence": "Les solutions climatiques dépendent des contextes locaux", "answer": {"axes": []}}
+{"sentence": "L'Union européenne limite la souveraineté nationale en imposant des lois prêtes faites", "answer": {"axes": [{"axis": "europe", "toward": "Souveraineté nationale", "strength": "forte"}]}}
+{"sentence": "L'intelligence artificielle va détruire des métiers sans plan de reprise pour les travailleurs.", "answer": {"axes": [{"axis": "technologie", "toward": "Biologie", "strength": "moyenne"}]}}
+{"sentence": "Il faut trouver des moyens de financer les politiques d'immigration", "answer": {"axes": [{"axis": "redistribution", "toward": "Mérite individuel", "strength": "moyenne"}]}}
+{"sentence": "La France s'est développée grâce à l'immigration, comme d'autres pays européens", "answer": {"axes": [{"axis": "immigration", "toward": "Multiculturalisme", "strength": "moyenne"}]}}
+{"sentence": "Il faut appliquer des peines strictes pour dissuader les crimes", "answer": {"axes": [{"axis": "pouvoir", "toward": "Sécurité", "strength": "forte"}]}}
+{"sentence": "Les entreprises qui s'engagent tôt dans des initiatives créent des emplois, les autres disparaissent", "answer": {"axes": [{"axis": "rupture", "toward": "Réforme", "strength": "moyenne"}]}}
+{"sentence": "L'uniformité européenne n'est pas viable", "answer": {"axes": [{"axis": "europe", "toward": "Souveraineté nationale", "strength": "forte"}]}}
+{"sentence": "Souhaiter comprendre les débats sur le financement des services publics", "answer": {"axes": []}}
+{"sentence": "L'impact de l'IA dépend des cas spécifiques", "answer": {"axes": []}}
+{"sentence": "La vision de l'immigration est trop simpliste", "answer": {"axes": []}}
+{"sentence": "La IVe République a échoué à cause de la faiblesse de l'exécutif", "answer": {"axes": [{"axis": "representation", "toward": "Autocratie", "strength": "moyenne"}]}}
+{"sentence": "L'égalité salariale est un objectif longtemps attendu", "answer": {"axes": [{"axis": "redistribution", "toward": "Redistribution", "strength": "moyenne"}]}}
+{"sentence": "La France a des faiblesses stratégiques en matière de munitions", "answer": {"axes": [{"axis": "diplomatie", "toward": "Militariste", "strength": "moyenne"}]}}
+{"sentence": "La loi de 1905 est claire sur la neutralité de l'État envers les cultes", "answer": {"axes": [{"axis": "religion", "toward": "Irréligieux", "strength": "forte"}]}}
+{"sentence": "Taxer le kérosène et les jets privés est le minimum syndical", "answer": {"axes": [{"axis": "ecologie", "toward": "Écologie", "strength": "forte"}]}}
+{"sentence": "On doit se poser la question de la financement du 49.3", "answer": {"axes": []}}
+{"sentence": "Fermer des usines ici pour les rouvrir ailleurs n'a pas d'impact net", "answer": {"axes": []}}
+{"sentence": "Le point de P4 est bon", "answer": {"axes": []}}
+{"sentence": "Augmenter le budget militaire de la France pour rapprocher les dépenses de la moyenne OCDE", "answer": {"axes": [{"axis": "diplomatie", "toward": "Militariste", "strength": "moyenne"}]}}
+{"sentence": "Un budget militaire plus élevé ne garantit pas une meilleure défense si les dépenses sont mal réparties", "answer": {"axes": [{"axis": "diplomatie", "toward": "Pacifiste", "strength": "moyenne"}]}}
+{"sentence": "L'euro limite la capacité d'ajustement de l'économie nationale", "answer": {"axes": [{"axis": "europe", "toward": "Souveraineté nationale", "strength": "forte"}]}}
+{"sentence": "La régulation des algorithmes évite des abus", "answer": {"axes": [{"axis": "technologie", "toward": "Biologie", "strength": "moyenne"}]}}
+{"sentence": "L'immigration est un sujet complexe avec des arguments de chaque côté", "answer": {"axes": []}}
+{"sentence": "Durcir les peines entraînerait une augmentation du taux d'incarcération, déjà très élevé en France.", "answer": {"axes": [{"axis": "pouvoir", "toward": "Liberté", "strength": "moyenne"}]}}
+{"sentence": "L'absence de suivi post-prison est un facteur important de récidive, avec 40% des rechutes liées à cela.", "answer": {"axes": []}}
+{"sentence": "La prison n'est pas une solution efficace pour les mineurs ou les sans-emploi, car elle renforce le cycle de l'exclusion sociale.", "answer": {"axes": [{"axis": "ecologie", "toward": "Productivisme", "strength": "moyenne"}]}}
+{"sentence": "Le système actuel renforce l'état de siège plutôt que la justice sociale.", "answer": {"axes": [{"axis": "rupture", "toward": "Rupture", "strength": "forte"}]}}
+{"sentence": "La vision simpliste de l'IA est problématique", "answer": {"axes": []}}
+{"sentence": "La vision simpliste de la sécurité est problématique", "answer": {"axes": [{"axis": "pouvoir", "toward": "Liberté", "strength": "moyenne"}]}}
+{"sentence": "La société évolue naturellement, sans intervention législative nécessaire", "answer": {"axes": [{"axis": "rupture", "toward": "Réforme", "strength": "forte"}]}}
+{"sentence": "La France a un devoir d'humanité et doit régulariser les travailleurs sans papiers", "answer": {"axes": [{"axis": "morale", "toward": "Progressiste", "strength": "forte"}]}}
+{"sentence": "La régularisation doit être un droit, pas un privilège", "answer": {"axes": [{"axis": "immigration", "toward": "Multiculturalisme", "strength": "moyenne"}]}}
+{"sentence": "Régulariser les travailleurs sans papiers est une faiblesse politique", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "moyenne"}]}}
+{"sentence": "Augmenter les impôts sur les entreprises pourrait les pousser à embaucher moins ou fermer.", "answer": {"axes": [{"axis": "redistribution", "toward": "Mérite individuel", "strength": "moyenne"}]}}
+{"sentence": "Il faut réduire les dépenses non essentielles de l'État pour éviter d'augmenter la dette.", "answer": {"axes": [{"axis": "controle", "toward": "Libre marché", "strength": "moyenne"}]}}
+{"sentence": "L'État doit soutenir l'économie pour éviter l'aggravation des inégalités.", "answer": {"axes": [{"axis": "redistribution", "toward": "Redistribution", "strength": "forte"}]}}
+{"sentence": "Les très riches devraient investir plutôt que d'épargner.", "answer": {"axes": [{"axis": "redistribution", "toward": "Redistribution", "strength": "moyenne"}]}}
+{"sentence": "Il faut investir dans la langue, mais pas au détriment des priorités existantes et sans contrôler les flux.", "answer": {"axes": []}}
+{"sentence": "La France doit attirer des gens compétents et surmonter les obstacles linguistiques.", "answer": {"axes": []}}
+{"sentence": "La France doit contrôler les flux pour éviter des problèmes sociaux, mais doit aussi évoluer pour ne pas vieillir.", "answer": {"axes": []}}
+{"sentence": "La France doit réguler l’immigration, pas l’ouvrir à tout le monde.", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "forte"}]}}
+{"sentence": "La langue est une barrière à l'intégration des immigrés.", "answer": {"axes": [{"axis": "immigration", "toward": "Assimilation", "strength": "forte"}]}}
+{"sentence": "La France ne fait pas de compromis en légalisant rapidement les mariages entre personnes du même sexe.", "answer": {"axes": [{"axis": "representation", "toward": "Démocratie", "strength": "moyenne"}]}}
+{"sentence": "La vitesse d'adoption des changements dépend du sujet.", "answer": {"axes": []}}
+{"sentence": "Les réformes rapides ne garantissent pas un meilleur fonctionnement social.", "answer": {"axes": [{"axis": "rupture", "toward": "Réforme", "strength": "moyenne"}]}}
+{"sentence": "Les traités européens sont une perte de contrôle et une menace pour l’indépendance nationale", "answer": {"axes": [{"axis": "europe", "toward": "Souveraineté nationale", "strength": "forte"}]}}
+{"sentence": "Approuver l'idée de P2 sur la taxation des grosses fortunes", "answer": {"axes": [{"axis": "redistribution", "toward": "Redistribution", "strength": "moyenne"}]}}
+{"sentence": "Il y a un problème de logement en France", "answer": {"axes": []}}
+{"sentence": "La vision simpliste de la privatisation et du marché est problématique", "answer": {"axes": [{"axis": "economie", "toward": "Public", "strength": "moyenne"}]}}
+{"sentence": "Les médias surestiment les chiffres sur certains sujets", "answer": {"axes": [{"axis": "confiance", "toward": "Défiance", "strength": "moyenne"}]}}
+{"sentence": "L'action militaire est un facteur de respect international", "answer": {"axes": [{"axis": "diplomatie", "toward": "Militariste", "strength": "moyenne"}]}}
+{"sentence": "Les changements trop rapides sur la fin de vie peuvent être dangereux", "answer": {"axes": [{"axis": "rupture", "toward": "Réforme", "strength": "moyenne"}]}}
+{"sentence": "La sobriété énergétique doit être prioritaire, notamment en réduisant l'utilisation des avions", "answer": {"axes": [{"axis": "ecologie", "toward": "Écologie", "strength": "forte"}]}}
+{"sentence": "La sobriété énergétique peut entraîner des crises économiques si elle est trop rapide ou massive", "answer": {"axes": [{"axis": "ecologie", "toward": "Productivisme", "strength": "moyenne"}]}}
+{"sentence": "Le tourisme a un impact économique significatif et ne doit pas être négligé dans les politiques environnementales", "answer": {"axes": [{"axis": "ecologie", "toward": "Productivisme", "strength": "moyenne"}]}}
+{"sentence": "L'énergie doit rester publique pour éviter les hausses de prix", "answer": {"axes": [{"axis": "economie", "toward": "Public", "strength": "forte"}]}}
+{"sentence": "Les impôts doivent être réduits pour éviter la fuite des cerveaux", "answer": {"axes": [{"axis": "redistribution", "toward": "Mérite individuel", "strength": "moyenne"}]}}
+{"sentence": "La dette actuelle sera payée par les générations futures", "answer": {"axes": [{"axis": "redistribution", "toward": "Mérite individuel", "strength": "moyenne"}]}}
+{"sentence": "Régulariser les migrants est une mesure complexe qui dépend des cas", "answer": {"axes": []}}
+{"sentence": "Certains débats divisent les gens sans concerner la majorité", "answer": {"axes": [{"axis": "rupture", "toward": "Réforme", "strength": "moyenne"}]}}
+{"sentence": "La vision selon laquelle les pays qui sortent de l'UE finissent par le regretter est simpliste", "answer": {"axes": []}}
+{"sentence": "Il faut des moyens financiers pour mettre en place des mesures de prévention", "answer": {"axes": [{"axis": "redistribution", "toward": "Redistribution", "strength": "moyenne"}]}}
+{"sentence": "La neutralité de l'État est un principe important", "answer": {"axes": [{"axis": "religion", "toward": "Irréligieux", "strength": "moyenne"}]}}

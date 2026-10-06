@@ -1,0 +1,1354 @@
+[
+ {
+  "id": 654,
+  "quote": "régulariser c'est envoyer le message que passer par la porte de derrière paie",
+  "proposition": "Régulariser les migrants encourage l'immigration clandestine.",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 331,
+  "quote": "Les exceptions sont la porte d'entrée de la dérive.",
+  "proposition": "Les exceptions ouvrent la porte à la dérive",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 387,
+  "quote": "On réfléchit et on agit… pas des discours à la con.",
+  "proposition": "On doit réfléchir et agir, pas faire des discours vides.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 367,
+  "quote": "on paie plus qu'on ne reçoit et on nous donne des leçons en prime",
+  "proposition": "L'Union européenne est injuste envers les pays membres, car on paie plus qu'on ne reçoit.",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 747,
+  "quote": "le RIC finirait dans les mains des lobbies et des algorithmes des réseaux",
+  "proposition": "Le référendum d'initiative citoyenne (RIC) finirait dans les mains des lobbies et des algorithmes des réseaux",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1221,
+  "quote": "la moitié de nos secteurs en tension tournent grâce à des travailleurs étrangers, on le sait tous // la moitié de nos secteurs en tension tournent grâce à des travailleurs étrangers, on le sait tous",
+  "proposition": "Les travailleurs étrangers sont essentiels dans de nombreux secteurs en tension.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 306,
+  "quote": "C’est trouver le bon équilibre entre sécurité et libertés… Et comment on mesure ce que ça coûte ?",
+  "proposition": "L’enjeu est de trouver un équilibre entre sécurité et libertés, et de mesurer les coûts.",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 408,
+  "quote": "le 49.3 c'est un passage en force, point, ça n'a rien de démocratique",
+  "proposition": "Le 49.3 est un passage en force et non démocratique",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1185,
+  "quote": "y’a que ça qui marche pas mec… les trats c’est qu’une façon de perdre le contrôle // t’es ben naïf mec. c’était comme ça avant aussi. et puis les eurosceptiques ils ont raison // c’est déjà en train de se faire. et la france qui suit sans rien dire ? // tu veux dire qu’on doit se faire saigner par des bureaucrates alors que ça peut être gérée en interne ?",
+  "proposition": "Les traités européens sont une perte de contrôle et une menace pour l’indépendance nationale",
+  "extracted": -1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 835,
+  "quote": "les lois securitaires sont toujours etendues bien au-delà de leur but initial",
+  "proposition": "Les lois sécuritaires dépassent souvent leur but initial",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 693,
+  "quote": "Bruxelles décide pour nous et personne n'a voté pour ces gens // ok c'est vrai que la souveraineté c'est choisir nos lois, pas les recevoir toutes faites",
+  "proposition": "L'Union européenne n'a pas de légitimité démocratique",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1394,
+  "quote": "j'avoue ke je n'ai pa d'avis tranche, les deux côtes ont des points // j'avoue ke je n'ai pa d'avis tranche, les deux côtes ont des points",
+  "proposition": "Les deux côtés d'un débat ont des arguments valables",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 1071,
+  "quote": "et tu fais comment pour financer ça ?",
+  "proposition": "Le financement du RIC est un problème",
+  "extracted": -1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 354,
+  "quote": "régulariser c'est envoyer le message que passer par la porte de derrière paie",
+  "proposition": "Régulariser les migrants encourage l'immigration clandestine.",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1077,
+  "quote": "le marché commun c'est des millions d'emplois chez nous, pas un détail",
+  "proposition": "Le marché commun crée des emplois dans les pays membres.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1241,
+  "quote": "les hôpitaux et les ecoles c'est pa une marchandise, ça doit rester public",
+  "proposition": "Les hôpitaux et les écoles doivent rester publics et non marchandises",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 691,
+  "quote": "la diplomatie coûte moins cher que les chars et elle a déjà évité des guerres",
+  "proposition": "La diplomatie est plus efficace et moins coûteuse que l'armée",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 919,
+  "quote": "c'est pas un peu simpliste comme vision ?",
+  "proposition": "La proposition est trop simpliste",
+  "extracted": -1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 594,
+  "quote": "ça dépend vraiment des cas, non ?",
+  "proposition": "La situation dépend des cas, il n'y a pas de solution unique",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 444,
+  "quote": "on n'arrive plus à loger, soigner et former tout le monde, il faut des limites",
+  "proposition": "Il faut des limites pour gérer les défis de logement, soins et formation",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1088,
+  "quote": "c'est une exception française et c'est ce qui nous garde unis",
+  "proposition": "La laïcité est une exception française qui unit le pays",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 850,
+  "quote": "l'intégration marche quand on donne des papiers et un travail, pas quand on laisse dans le flou",
+  "proposition": "L'intégration réussit lorsque les migrants obtiennent des papiers et un emploi.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1309,
+  "quote": "la liberté religieuse est dans la déclaration de 1789",
+  "proposition": "La liberté religieuse est garantie par la Déclaration de 1789",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1121,
+  "quote": "le 49.3 c'est un passage en force, point, ça n'a rien de démocratique",
+  "proposition": "Le 49.3 est un passage en force et non démocratique",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 941,
+  "quote": "c'est quoi concrètement la proposition ? parce ke j'ai du mal à me positionner",
+  "proposition": "Il est difficile de se positionner sans comprendre les détails de la proposition.",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 419,
+  "quote": "le marché seul n'a jamais réglé les inégalités, il faut un État qui rééquilibre",
+  "proposition": "L'État a un rôle nécessaire pour rééquilibrer les inégalités",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1083,
+  "quote": "le ric finirait dans les mains des lobbies et des algorithmes des reseaux",
+  "proposition": "Le référendum d'initiative citoyenne (RIC) finirait dans les mains des lobbies et des algorithmes des réseaux",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 512,
+  "quote": "c'est pa un peu simpliste comme vision ?",
+  "proposition": "La vision selon laquelle les droits des uns ne retirent rien aux autres est simpliste",
+  "extracted": -1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 323,
+  "quote": "Moi je veux juste savoir si on fait confiance aux IA ou si elles deviennent des machines à tromper.",
+  "proposition": "Le débat actuel porte sur la confiance à accorder aux IA ou leur capacité à tromper.",
+  "extracted": 1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 791,
+  "quote": "le Royaume-Uni s'en sort très bien, on nous avait promis l'apocalypse // le Royaume-Uni s'en sort très bien, on nous avait promis l'apocalypse",
+  "proposition": "Le Royaume-Uni s'en sort bien en dehors de l'Union européenne.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1052,
+  "quote": "l'État est un mauvais gestionnaire, regarde les entreprises publiques qui perdent de l'argent",
+  "proposition": "L'État est un mauvais gestionnaire",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 915,
+  "quote": "les deux côtés ont des points",
+  "proposition": "Les deux côtés d'un débat ont des arguments valables",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 1250,
+  "quote": "les signes religieux ostensibles n'ont pas leur place chez les agents publics, neutralité oblige",
+  "proposition": "Les signes religieux ostensibles n'ont pas leur place chez les agents publics.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1228,
+  "quote": "c'est pas un peu simpliste comme vision ?",
+  "proposition": "Les visions simplistes ne sont pas utiles pour comprendre les enjeux",
+  "extracted": 1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 1239,
+  "quote": "avec le smic actuel des gens bossent à plein temps et dorment dans leur voiture // avec le smic actuel des gens bossent à plein temps et dorment dans leur voiture",
+  "proposition": "Le SMIC doit être augmenté pour éviter que des gens dorment dans leur voiture",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1225,
+  "quote": "l'intégration marche quand on donne des papiers et un travail, pas quand on laisse dans le flou 🔥 // l'intégration marche quand on donne des papiers et un travail, pas quand on laisse dans le flou",
+  "proposition": "L'intégration réussit lorsque les migrants obtiennent des papiers et un emploi.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 722,
+  "quote": "une vraie armée européenne ça nous rendrait moins dépendants de Washington",
+  "proposition": "Une armée européenne renforcerait l'autonomie des pays membres par rapport aux États-Unis.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1373,
+  "quote": "il y a des lois qui suffisent déjà, pas besoin d'en rajouter",
+  "proposition": "Il existe déjà des lois suffisantes, il n'est pas nécessaire d'en ajouter",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1295,
+  "quote": "tu parles de quel pays au juste ?",
+  "proposition": "Les propositions politiques doivent être contextualisées géographiquement",
+  "extracted": 1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 1087,
+  "quote": "les deux côtés ont des points 🔥",
+  "proposition": "L'immigration est un sujet complexe avec des arguments de chaque côté",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 520,
+  "quote": "sur la fin de vie la pente est glissante, regardez ce qui se passe ailleurs",
+  "proposition": "La fin de vie est un sujet délicat et complexe.",
+  "extracted": 0,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 974,
+  "quote": "les droits des uns ne retirent rien aux autres, c'est tout le principe // la societe a déjà changé, c'est la loi qui est en retard",
+  "proposition": "La société a déjà changé, la loi doit s'adapter",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1114,
+  "quote": "les villes doivent se refaire autour du velo et du train, pa de la voiture",
+  "proposition": "Les villes doivent se refaire autour du vélo et du train, pas de la voiture",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1105,
+  "quote": "c'est pas un peu simpliste comme vision ?",
+  "proposition": "La vision simpliste de l'IA est problématique",
+  "extracted": -1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 386,
+  "quote": "Et si on testait un programme de régularisation progressive ? Sans tout jeter par terre.",
+  "proposition": "Un programme de régularisation progressive devrait être testé.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1249,
+  "quote": "la laïcite est devenue une arme contre une seule religion, il faut de la mesure // la laïcite est devenue une arme contre une seule religion, il faut de la mesure",
+  "proposition": "La laïcité doit être appliquée de manière équilibrée et mesurée",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1237,
+  "quote": "quand l'energie est privatisee les prix explosent et les actionnaires se gavent",
+  "proposition": "La privatisation de l'énergie entraîne une augmentation des prix et profite aux actionnaires",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 550,
+  "quote": "les geants du numerique deviennent plus puissants ke des états",
+  "proposition": "Les géants du numérique deviennent plus puissants que des États",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 412,
+  "quote": "la Ve République concentre trop de pouvoir dans les mains d'un seul homme",
+  "proposition": "La Ve République concentre trop de pouvoir dans les mains d'un seul homme",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 539,
+  "quote": "Mais si l’état controle tout, les entreprises elles vont pas avoir envie d’innover ?",
+  "proposition": "L'État ne doit pas contrôler l'économie car cela freine l'innovation",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 355,
+  "quote": "aujourd'hui on laisse faire le communautarisme",
+  "proposition": "L'assimilation fonctionnait autrefois, mais aujourd'hui le communautarisme est laissé faire",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 302,
+  "quote": "Mais si on durcit trop les peines, risque-t-on de marginaliser certains groupes ?",
+  "proposition": "Il faut trouver un équilibre entre renforcer la police et éviter de marginaliser certains groupes.",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 1287,
+  "quote": "ok c'est vrai que un SALAIRE minimum plus haut ça relance aussi la consommation",
+  "proposition": "Un salaire minimum plus élevé relance la consommation",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 964,
+  "quote": "les familles ne ressemblent plus à un seul modèle, la loi doit suivre // c'est la loi qui est en retard",
+  "proposition": "La loi doit s'adapter aux divers modèles familiaux",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1069,
+  "quote": "@Zoé63 t'as une source pour ça ?",
+  "proposition": "On devrait demander des sources pour appuyer les affirmations.",
+  "extracted": 1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 694,
+  "quote": "le marché commun c'est des MILLIONS d'emplois chez nous, pas un détail ! // le marché commun c'est des millions D'EMPLOIS chez nous, pas un détail !",
+  "proposition": "L'Union européenne crée des emplois en France",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 598,
+  "quote": "PAS de la voiture !",
+  "proposition": "Les villes doivent se refaire autour du vélo et du train, pas de la voiture",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1256,
+  "quote": "les normes européennes protègent les consommateurs plus que n'importe quelle loi nationale",
+  "proposition": "Les normes européennes protègent mieux les consommateurs que les lois nationales.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 845,
+  "quote": "le solaire et l'eolien sont devenus les energies les moins chères, faut arrêter de se mentir // le solaire et l'eolien sont devenus les energies les moins chères, faut arrêter de se mentir",
+  "proposition": "Le solaire et l'éolien sont les énergies les moins chères",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 370,
+  "quote": "l'euro nous a enlevé tout moyen d'ajuster notre économie",
+  "proposition": "L'euro a rendu les pays membres dépendants et a retiré leur capacité à ajuster leur économie.",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 719,
+  "quote": "ok c'est vrai que les normes européennes protègent les consommateurs plus que n'importe quelle loi nationale",
+  "proposition": "Les normes européennes protègent mieux les consommateurs que les lois nationales.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 842,
+  "quote": "ça dépend vraiment des cas, non ? // j'avoue que je n'ai pas d'avis tranché, les deux côtés ont des points",
+  "proposition": "La question de la laïcité dépend des contextes et des cas.",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 1026,
+  "quote": "la Ve République concentre trop de pouvoir dans les mains d'un seul homme",
+  "proposition": "La Ve République concentre trop de pouvoir dans les mains d'un seul homme",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 787,
+  "quote": "le marché commun c'est des millions d'emplois chez nous, pas un détail",
+  "proposition": "L'Union européenne crée des emplois en France",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1021,
+  "quote": "j'avoue ke je n'ai pa d'avis tranche, les deux côtes ont des points // je suis un peu perdu sur le sujet, vous en pensez quoi ?",
+  "proposition": "Je n'ai pas d'avis tranché sur la question",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 1361,
+  "quote": "les villes doivent se refaire autour du velo et du train, pa de la voiture",
+  "proposition": "Les villes doivent se refaire autour du vélo et du train, pas de la voiture",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 773,
+  "quote": "c'est pas un peu simpliste comme vision ? mdr",
+  "proposition": "L'idée de se réarmer est simpliste.",
+  "extracted": -1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 756,
+  "quote": "ça dépend vraiment des cas, non ?",
+  "proposition": "La dépendance vis-à-vis de Washington est un enjeu complexe.",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 523,
+  "quote": "faut des sanctions réelles",
+  "proposition": "L'égalité salariale exige des sanctions réelles pour être atteinte",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 401,
+  "quote": "les lois sécuritaires sont toujours étendues bien au-delà de leur but initial",
+  "proposition": "Les lois sécuritaires dépassent souvent leur but initial",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1381,
+  "quote": "c'est pas un peu simpliste comme vision ?",
+  "proposition": "La vision selon laquelle les pays qui sortent de l'UE finissent par le regretter est simpliste",
+  "extracted": -1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 840,
+  "quote": "à l'ecole publique on est elève avant d'être croyant, c'est le principe // quand on laisse la religion entrer dans l'espace public les pressions communautaires suivent",
+  "proposition": "À l'école publique, les élèves sont avant tout des élèves, pas des croyants.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1268,
+  "quote": "BRUXELLES décide pour nous et personne n'a voté pour ces gens ! // Bruxelles décide pour nous et PERSONNE n'a voté pour ces gens ! // la souveraineté c'est choisir nos lois, pas les recevoir toutes faites // on paie plus qu'on ne REÇOIT et on nous donne des leçons en prime ! // LE Royaume-Uni s'en sort très bien, on nous avait promis l'apocalypse !",
+  "proposition": "L'Union européenne n'a pas de légitimité démocratique",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 403,
+  "quote": "plus de juges et de procureurs pour ke les peines tombent vraiment",
+  "proposition": "Il faut plus de juges et de procureurs pour que les peines tombent",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1027,
+  "quote": "la Ve République concentre trop de pouvoir dans les mains d'un seul homme",
+  "proposition": "La Ve République concentre trop de pouvoir dans les mains d'un seul homme",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1199,
+  "quote": "regulariser c'est envoyer le message ke passer par la porte de derrière paie",
+  "proposition": "Régulariser les migrants encourage l'immigration clandestine.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 582,
+  "quote": "Ou serait-ce juste du bruit ?",
+  "proposition": "Un référendum citoyen pourrait ne pas résoudre les problèmes actuels.",
+  "extracted": -1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 496,
+  "quote": "la pente est glissante, regardez ce qui se passe ailleurs",
+  "proposition": "La légalisation de l'aide à mourir peut entraîner des risques inacceptables",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 525,
+  "quote": "nos alliés nous respectent parce qu'on peut agir, pas parce qu'on parle",
+  "proposition": "La sécurité dépend de la capacité à agir, pas des discours",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1204,
+  "quote": "la Ve République concentre trop de pouvoir dans les mains d'un seul homme",
+  "proposition": "La Ve République concentre trop de pouvoir dans les mains d'un seul homme",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1254,
+  "quote": "ok c'est vrai que Bruxelles décide pour nous et personne n'a voté pour ces gens",
+  "proposition": "L'Union européenne impose des décisions sans consultation des citoyens",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 715,
+  "quote": "on paie plus qu'on ne reçoit et on nous donne des leçons en prime",
+  "proposition": "L'Union européenne impose des conditions inéquitables aux pays membres",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1091,
+  "quote": "La prison n'est pas une solution, surtout pour les mineurs ou les sans-emploi. Ca relance le cycle de l'exclusion sociale.",
+  "proposition": "La prison n'est pas une solution efficace pour les mineurs ou les sans-emploi, car elle renforce le cycle de l'exclusion sociale.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 381,
+  "quote": "Je comprends les deux côtés… mais comment gérer ce flux sans surcharger le système ?",
+  "proposition": "Il faut trouver un moyen de gérer le flux des réfugiés sans surcharger le système.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 748,
+  "quote": "ok c'est vrai que le RIC permettrait de débloquer des sujets que les partis évitent",
+  "proposition": "Le RIC permettrait de débloquer des sujets évités par les partis",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 451,
+  "quote": "c'est pas un peu simpliste comme vision ?",
+  "proposition": "La vision de P2 est un peu simpliste",
+  "extracted": -1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 383,
+  "quote": "Et si on n’a pas de place ? On ne peut pas vivre tous ensemble comme un utopie.",
+  "proposition": "Il est impossible de vivre tous ensemble comme une utopie.",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 980,
+  "quote": "régulariser c'est envoyer le message que passer par LA porte de derrière paie !",
+  "proposition": "Régulariser les travailleurs clandestins envoie le message que passer par la porte de derrière paie",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1074,
+  "quote": "les deux côtés ont des points",
+  "proposition": "Les deux côtés d'un débat ont des arguments valables",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 1079,
+  "quote": "c'est pas un peu simpliste comme vision ?",
+  "proposition": "La vision de l'euro comme un carcan est simpliste",
+  "extracted": -1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 678,
+  "quote": "TANT QU’ON NE RESOUDRA PAS LA CRISE ÉCONOMIQUE, ON RISQUE DE SE RETROUVER AVEC DES ARMES ET PAS DE HABITANTS",
+  "proposition": "La priorité doit être de résoudre la crise économique plutôt que d’investir dans l’armée",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 405,
+  "quote": "mieux vaut de la prévention et des éducateurs que des caméras partout",
+  "proposition": "La prévention et les éducateurs sont préférables aux caméras",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 393,
+  "quote": "mieux vaut des hôpitaux que des missiles en PLUS !",
+  "proposition": "Mieux vaut investir dans des hôpitaux que dans des missiles",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1028,
+  "quote": "le RIC permettrait de débloquer des sujets que les partis évitent",
+  "proposition": "Le RIC permettrait de débloquer des sujets évités par les partis",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 972,
+  "quote": "les signes religieux ostensibles n'ont pas leur place chez les agents publics",
+  "proposition": "Les signes religieux ostensibles n'ont pas leur place chez les agents publics.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 901,
+  "quote": "j'avoue ke je n'ai pa d'avis tranche, les deux côtes ont des points",
+  "proposition": "Les deux côtés d'un débat ont des arguments valables",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 304,
+  "quote": "On pourrait investir dans des caméras, de l’intelligence artificielle… Pas besoin de flics partout.",
+  "proposition": "On pourrait investir dans des caméras et l’intelligence artificielle plutôt que dans des patrouilles de police.",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1385,
+  "quote": "la souveraineté c'est choisir nos lois, pas les recevoir toutes faites",
+  "proposition": "La souveraineté implique de choisir ses propres lois",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 452,
+  "quote": "j'avoue que je n'ai pas d'avis tranché, les deux côtés ont des points",
+  "proposition": "Je n'ai pas d'avis tranché sur la question",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 434,
+  "quote": "la laïcité protège justement les croyants comme les non-croyants",
+  "proposition": "La laïcité protège les croyants et les non-croyants.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 593,
+  "quote": "j'avoue que je n'ai pas d'avis tranché, les deux côtés ont des points",
+  "proposition": "Les deux côtés d'un débat ont des arguments valables",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 711,
+  "quote": "avec le SMIC actuel des gens bossent à plein temps et dorment dans leur voiture, c'est pas normal",
+  "proposition": "Le SMIC actuel est trop bas et conduit à des situations de précarité",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 340,
+  "quote": "nos racines chrétiennes ont leur place, les clochers ça fait partie du paysage",
+  "proposition": "Les clochers ont leur place dans le paysage national.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 391,
+  "quote": "un budget militaire à 3% du PIB ce serait raisonnable vu la situation",
+  "proposition": "Un budget militaire à 3% du PIB serait raisonnable vu la situation",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 859,
+  "quote": "ça depend vraiment des cas, non ?",
+  "proposition": "Les situations doivent être analysées individuellement pour prendre une décision.",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 952,
+  "quote": "et tu fais comment pour financer ça ?",
+  "proposition": "Le financement du RIC est un problème",
+  "extracted": -1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 862,
+  "quote": "ok c'est vrai que gouverner c'est décider, un Parlement éclaté ne décide plus rien",
+  "proposition": "Un Parlement éclaté ne décide plus rien",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 977,
+  "quote": "les droits des uns ne retirent rien aux autres, c'est tout le principe",
+  "proposition": "Les droits des uns ne retirent rien aux autres",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 844,
+  "quote": "ok c'est vrai ke les villes doivent se refaire autour du velo et du train, pa de la voiture // bon point, cela dit les villes doivent se refaire autour du velo et du train, pa de la voiture",
+  "proposition": "Les villes doivent se refaire autour du vélo et du train, pas de la voiture",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 472,
+  "quote": "proteger le vivant avant de lancer n'importe quelle innovation, c'est du bon sens 🔥",
+  "proposition": "Protéger le vivant avant de lancer n'importe quelle innovation est du bon sens",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 692,
+  "quote": "les DEUX côtés ont des points",
+  "proposition": "Les deux côtés d'un débat ont des arguments valables",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 1406,
+  "quote": "les hôpitaux et les écoles c'est pas une marchandise, ça doit rester public",
+  "proposition": "Les hôpitaux et les écoles doivent rester publics et non marchandises",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1389,
+  "quote": "continuer la croissance infinie sur une planète finie c'est mathématiquement impossible // on n'a plus le temps de faire du business as usual",
+  "proposition": "Continuer la croissance infinie sur une planète finie est mathématiquement impossible",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 763,
+  "quote": "le 49.3 c'est un passage en force, point, ça n'a rien de democratique",
+  "proposition": "Le 49.3 est un passage en force et non démocratique",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 411,
+  "quote": "un Parlement éclaté ne décide plus rien",
+  "proposition": "Un Parlement éclaté ne décide plus rien",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1164,
+  "quote": "La langue, c’est une barrière. Si on ne parle pas français, comment s’intégrer ?",
+  "proposition": "La langue est une barrière à l'intégration des immigrés.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 396,
+  "quote": "le solaire et l'éolien sont devenus les énergies les moins chères // le solaire et l'éolien sont devenus les énergies les moins chères",
+  "proposition": "Le solaire et l'éolien sont les énergies les moins chères",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 657,
+  "quote": "quand l'énergie est privatisée les prix explosent et les actionnaires se gavent",
+  "proposition": "La privatisation de l'énergie entraîne une augmentation des prix et profite aux actionnaires",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1167,
+  "quote": "Moi je dis que s’il y a des compétences, il faut les intégrer. Mais en même temps… Si on régularise trop de monde, est-ce qu’on ne dilue pas la culture ?",
+  "proposition": "La France doit intégrer les compétents, mais craindre une dilution culturelle.",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 1072,
+  "quote": "parce que j'ai du MAL à me positionner !",
+  "proposition": "Il est difficile de se positionner sans comprendre les détails de la proposition.",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 541,
+  "quote": "ok c'est vrai ke quand l'energie est privatisee les prix explosent et les actionnaires se gavent",
+  "proposition": "La privatisation de l'énergie entraîne une augmentation des prix et profite aux actionnaires",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 660,
+  "quote": "un SMIC trop haut c'est des petites boîtes qui ferment ou qui n'embauchent plus",
+  "proposition": "Un SMIC trop haut peut entraîner la fermeture de petites entreprises",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 986,
+  "quote": "demande aux Grecs ce qu'ils en pensent !",
+  "proposition": "L'euro a évité des dévaluations en chaîne entre les pays membres.",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1344,
+  "quote": "quand l'energie est privatisee les prix explosent et les actionnaires se gavent",
+  "proposition": "La privatisation de l'énergie entraîne une augmentation des prix et profite aux actionnaires",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1005,
+  "quote": "c'est pas un peu simpliste comme vision ?",
+  "proposition": "La vision de l'immigration est trop simpliste",
+  "extracted": -1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 1013,
+  "quote": "la vidéosurveillance a élucidé plein d'affaires, c'est factuel // la vidéosurveillance a élucidé plein d'affaires, c'est factuel",
+  "proposition": "La vidéosurveillance a permis d'élucider des affaires",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1132,
+  "quote": "Si on ne fait pas ça, la dette va exploser encore plus. L’économie a besoin de soutien fort",
+  "proposition": "L'État doit soutenir l'économie pour éviter l'aggravation des inégalités.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 786,
+  "quote": "Bruxelles décide pour nous et personne n'a voté pour ces gens // la souveraineté c'est choisir nos lois, pas les recevoir toutes faites",
+  "proposition": "L'Union européenne impose des décisions sans consultation des citoyens",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1108,
+  "quote": "c'est pas un peu simpliste comme vision ?",
+  "proposition": "La vision simpliste de la sécurité est problématique",
+  "extracted": -1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 353,
+  "quote": "ok c'est vrai que l'intégration marche quand on donne des papiers et un travail, pas quand on laisse dans le flou // bon point, cela dit l'intégration marche quand on donne des papiers et un travail, pas quand on laisse dans le flou",
+  "proposition": "L'intégration réussit lorsque les migrants obtiennent des papiers et un emploi.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 557,
+  "quote": "Le 49.3 c'est une arme de destruction massive pour la démocratie. On doit stopper ça. // Le pouvoir au président c'est dangereux quand il est seul à décider.",
+  "proposition": "Le 49.3 est une menace pour la démocratie et doit être arrêté.",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 828,
+  "quote": "l'écologie punitive va nous mettre les gens dans la RUE, regarde les gilets jaunes !",
+  "proposition": "L'écologie punitive peut provoquer des mouvements sociaux violents",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 959,
+  "quote": "la Ve République concentre trop de pouvoir dans les mains d'un seul homme",
+  "proposition": "La Ve République concentre trop de pouvoir dans les mains d'un seul homme",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 764,
+  "quote": "la Ve République concentre trop de pouvoir dans les mains d'un seul homme",
+  "proposition": "La Ve République concentre trop de pouvoir dans les mains d'un seul homme",
+  "extracted": -1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 626,
+  "quote": "c'est pas un peu simpliste comme vision ?",
+  "proposition": "La vision selon laquelle les normes européennes protègent mieux les consommateurs est simpliste.",
+  "extracted": -1,
+  "gold": null,
+  "origin": "base"
+ },
+ {
+  "id": 1106,
+  "quote": "c'est quoi concrètement la proposition ? parce que j'ai du mal à me positionner",
+  "proposition": "Il est difficile de se positionner sans comprendre les détails de la proposition.",
+  "extracted": 0,
+  "gold": 0,
+  "origin": "base"
+ },
+ {
+  "id": 1260,
+  "quote": "sur le climat, la défense, le numérique : seuls on pèse rien, ensemble on peut",
+  "proposition": "La coopération entre les pays européens est nécessaire pour agir sur le climat, la défense et le numérique",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 1246,
+  "quote": "on ferme des usines ici pour les rouvrir ailleurs, résultat net : zéro 🙄 mdr // génial comme idée, on ferme des usines ici pour les rouvrir ailleurs, résultat net : zéro 🙄 mdr",
+  "proposition": "Fermer des usines ici pour les rouvrir ailleurs n'a pas d'impact net",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 783,
+  "quote": "sur le climat, la défense, le numérique : seuls on pèse rien, ensemble on peut",
+  "proposition": "Ensemble, on pèse plus sur le climat, la défense et le numérique que seul",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": 770,
+  "quote": "on vit dans un monde plus dangereux, ne pas réarmer c'est naïf // ok c'est vrai que on vit dans un monde plus dangereux, ne pas réarmer c'est naïf",
+  "proposition": "Il est nécessaire de réarmer face à un monde plus dangereux",
+  "extracted": 1,
+  "gold": 1,
+  "origin": "base"
+ },
+ {
+  "id": null,
+  "quote": "Non, l'euro nous a plutôt protégés, il faut le garder",
+  "proposition": "L'euro a rendu les pays membres dépendants et a retiré leur capacité à ajuster leur économie.",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Au contraire, la privatisation fait baisser les prix",
+  "proposition": "La privatisation de l'énergie entraîne une augmentation des prix et profite aux actionnaires",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Les lois sécuritaires ne dépassent pas leur but, arrêtez de dramatiser",
+  "proposition": "Les lois sécuritaires dépassent souvent leur but initial",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Faux, le 49.3 est prévu par la Constitution et il est tout à fait démocratique",
+  "proposition": "Le 49.3 est un passage en force et non démocratique",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Je ne suis pas d'accord, le nucléaire n'est pas la solution au climat",
+  "proposition": "Le nucléaire est la vraie réponse au climat",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Non, les travailleurs étrangers ne sont pas essentiels, c'est un mythe",
+  "proposition": "Les travailleurs étrangers sont essentiels dans de nombreux secteurs en tension.",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Le Royaume-Uni s'enfonce, le Brexit a été un désastre",
+  "proposition": "Le Royaume-Uni s'en sort bien en dehors de l'Union européenne.",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Ce n'est pas vrai, la vidéosurveillance n'a quasiment jamais servi",
+  "proposition": "La vidéosurveillance a permis d'élucider des affaires",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Au contraire, il faut plus d'État, pas moins",
+  "proposition": "L'État est un mauvais gestionnaire",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "La laïcité n'a rien d'une arme, c'est une protection pour tous",
+  "proposition": "La laïcité est devenue une arme contre une seule religion",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Surtout pas, ce serait une folie de réarmer",
+  "proposition": "Il est nécessaire de réarmer face à un monde plus dangereux",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Je ne crois pas, la sobriété coûte une fortune",
+  "proposition": "La sobriété coûte moins cher que de réparer les dégâts de la canicule",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Le RIC ne serait jamais détourné, c'est le meilleur outil démocratique",
+  "proposition": "Le RIC finirait dans les mains des lobbies et des algorithmes des réseaux",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Régulariser ne crée aucun appel d'air, toutes les études le montrent",
+  "proposition": "Régulariser les migrants encourage l'immigration clandestine.",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "L'armée européenne serait une catastrophe, on perdrait toute autonomie",
+  "proposition": "Une armée européenne renforcerait l'autonomie des pays membres par rapport aux États-Unis.",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Les normes européennes sont une usine à gaz qui n'a protégé personne",
+  "proposition": "Les normes européennes protègent mieux les consommateurs que les lois nationales.",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Le SMIC n'est pas trop bas, il est déjà élevé",
+  "proposition": "Le SMIC actuel est trop bas et conduit à des situations de précarité",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Pas du tout, la Ve République est très équilibrée",
+  "proposition": "La Ve République concentre trop de pouvoir dans les mains d'un seul homme",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Au contraire, l'écologie punitive est acceptée par la majorité",
+  "proposition": "L'écologie punitive peut provoquer des mouvements sociaux violents",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Non, les hôpitaux seraient mieux gérés par le privé",
+  "proposition": "Les hôpitaux et les écoles doivent rester publics et non marchandises",
+  "extracted": null,
+  "gold": -1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Les électeurs n'ont jamais choisi les décisions de Bruxelles",
+  "proposition": "L'Union européenne n'a pas de légitimité démocratique",
+  "extracted": null,
+  "gold": 1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Avec la proportionnelle tout le monde serait enfin représenté",
+  "proposition": "Une assemblée à la proportionnelle représenterait enfin tout le monde",
+  "extracted": null,
+  "gold": 1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Le nucléaire, voilà ce qui règle le problème climatique",
+  "proposition": "Le nucléaire est la vraie réponse au climat",
+  "extracted": null,
+  "gold": 1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Sans l'euro on aurait eu des dévaluations à répétition",
+  "proposition": "L'euro a évité des dévaluations en chaîne entre les pays membres.",
+  "extracted": null,
+  "gold": 1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Il faut absolument régulariser ceux qui travaillent déjà ici",
+  "proposition": "Régulariser les travailleurs étrangers déjà employés est une mesure de bon sens",
+  "extracted": null,
+  "gold": 1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Taxer les plus riches c'est le seul moyen de payer les services publics",
+  "proposition": "Taxer les grosses fortunes permet de financer les services publics",
+  "extracted": null,
+  "gold": 1,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Je ne sais pas trop quoi penser du nucléaire, il y a du pour et du contre",
+  "proposition": "Le nucléaire est la vraie réponse au climat",
+  "extracted": null,
+  "gold": 0,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Franchement ça dépend des situations, je ne tranche pas",
+  "proposition": "Régulariser les migrants encourage l'immigration clandestine.",
+  "extracted": null,
+  "gold": 0,
+  "origin": "écrit à la main"
+ },
+ {
+  "id": null,
+  "quote": "Je suis partagé sur la question de l'armée européenne",
+  "proposition": "Une armée européenne renforcerait l'autonomie des pays membres par rapport aux États-Unis.",
+  "extracted": null,
+  "gold": 0,
+  "origin": "écrit à la main"
+ }
+]

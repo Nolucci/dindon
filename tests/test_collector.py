@@ -1,41 +1,38 @@
-"""The watcher, against a fake Discord and a fake exporter: no token, no network, no real data."""
+"""The watcher, against a fake Discord (and Dindon's own exporter): no token, no network, no real data."""
 import dataclasses
 import json
-import shlex
-import sys
-from datetime import datetime, timedelta, timezone
+import re
+from datetime import datetime, timedelta, timezone, UTC
 from pathlib import Path
 
 import psycopg
 import pytest
 
 from dindon.collector.discord_api import DiscordAPI, DiscordError, RateLimited
-from dindon.collector.exporter import Exporter
 from dindon.collector.watch import Collector, snowflake_at
 from dindon.ingest.loader import ingest_file
 from fake_discord import FakeDiscord
 from make_demo_server import Channel, World, write_exports
 from synthetic import settings_for
 
-TOOLS = Path(__file__).resolve().parents[1] / "tools"
 TOKEN = "fake-account-token-1234"
 
 
 def exports_asked(fake: FakeDiscord) -> list[str]:
-    return [r for r in fake.requests if r.startswith("/_fake/export")]
+    """The channels whose messages were read: one entry per request of a page of messages, as « channel=ID&limit=100&after=ID »."""
+    return [f"channel={m[1]}&{m[2]}" for r in fake.requests if (m := re.fullmatch(r"/api/v10/channels/(\d+)/messages\?(.*)", r))]
 
 
 @pytest.fixture
 def world():
     w = World(seed=21, people=25)
-    w.generate(1500, days=30, end=datetime.now(timezone.utc) - timedelta(minutes=30))
+    w.generate(1500, days=30, end=datetime.now(UTC) - timedelta(minutes=30))
     return w
 
 
 @pytest.fixture
-def fake(world, monkeypatch):
+def fake(world):
     server = FakeDiscord(world, token=TOKEN).start()
-    monkeypatch.setenv("FAKE_DISCORD_URL", server.base_url)
     yield server
     server.stop()
 
@@ -44,8 +41,17 @@ def fake(world, monkeypatch):
 def collector(fake, world, ingest_url, tmp_path):
     settings = dataclasses.replace(
         settings_for(ingest_url, tmp_path), discord_api_url=fake.api_url, discord_token=TOKEN, guild_ids=(world.guild_id,),
-        exporter_path=f"{shlex.quote(sys.executable)} {shlex.quote(str(TOOLS / 'fake_exporter.py'))}", poll_seconds=0.2)
-    return Collector(settings)
+        poll_seconds=0.2)
+    collector = Collector(settings)
+    quick(collector)
+    return collector
+
+
+def quick(collector: Collector) -> Collector:
+    """No real waiting between two tries of a failing request: the tests would take minutes."""
+    collector.exporter.client._sleep = lambda seconds: None
+    collector.exporter.client.limiter._sleep = lambda seconds: None
+    return collector
 
 
 def connection(url: str) -> psycopg.Connection:
@@ -149,13 +155,13 @@ def test_a_channel_created_after_the_first_import_is_exported_entirely_an_old_un
     for path in sorted(folder.glob("*.json")):
         ingest_file(ingest_db, path)
     unknown = world.channels[0]
-    newcomer = Channel(world._flake(datetime.now(timezone.utc)), "nouveau", "Détente", unknown.category_id, None)
+    newcomer = Channel(world._flake(datetime.now(UTC)), "nouveau", "Détente", unknown.category_id, None)
     world.channels.append(newcomer)
     fake.post(newcomer, world.people[0], "premier message du nouveau salon")
     fake.requests.clear()
     assert collector.poll(ingest_db) == 1
     asked = exports_asked(fake)
-    assert len(asked) == 1 and f"channel={newcomer.id}" in asked[0] and "after=" not in asked[0]  # all of it
+    assert len(asked) == 1 and f"channel={newcomer.id}" in asked[0] and "after=0" in asked[0]  # all of it, from the very first message
     assert ingest_db.execute("SELECT count(*) FROM messages WHERE channel_id = %s", (unknown.id,)).fetchone() == (0,)  # left to `backfill`
     collector.backfill(lambda: connection(ingest_url), world.guild_id, parallel=1, progress=lambda _: None)
     assert ingest_db.execute("SELECT count(*) FROM messages WHERE channel_id = %s", (unknown.id,)).fetchone()[0] == len(unknown.messages)
@@ -180,11 +186,11 @@ def test_a_rate_limit_stops_everything_for_as_long_as_discord_asks(collector, fa
 def test_a_failing_channel_is_left_alone_for_a_while_then_tried_again(collector, fake, imported, ingest_db, world, monkeypatch):
     channel = world.channels[0]
     fake.post(channel, world.people[0], "bonjour")
-    monkeypatch.setenv("FAKE_EXPORTER_FAIL", "1")
+    fake.fail_next(50, 500)                                                    # Discord keeps failing: after its retries, the channel is given up for a while
     assert collector.poll(ingest_db) == 0
     status = collector.status()
-    assert status["failing_channels"] == 1 and "exporter stopped" in status["last_error"] and TOKEN not in status["last_error"]
-    monkeypatch.delenv("FAKE_EXPORTER_FAIL")
+    assert status["failing_channels"] == 1 and "a répondu une erreur (500)" in status["last_error"] and TOKEN not in status["last_error"]
+    fake.fail_next(0)
     fake.requests.clear()
     assert collector.poll(ingest_db) == 0 and exports_asked(fake) == []  # backing off: not asked again right away
     count, _ = collector._failures[channel.id]
@@ -201,21 +207,13 @@ def test_a_wrong_token_is_reported_without_the_token(fake, world, tmp_path, inge
     assert "not-the-token" not in str(error.value)
 
 
-def test_the_token_goes_to_the_exporter_by_the_environment_not_the_command_line(fake, tmp_path, monkeypatch, world):
-    seen = {}
-    import subprocess
-
-    real_popen = subprocess.Popen
-
-    def spy(args, **kwargs):
-        seen["args"], seen["env_token"] = args, kwargs["env"].get("DISCORD_TOKEN")
-        return real_popen(args, **kwargs)
-
-    monkeypatch.setattr(subprocess, "Popen", spy)
-    exporter = Exporter(f"{shlex.quote(sys.executable)} {shlex.quote(str(TOOLS / 'fake_exporter.py'))}", TOKEN)
-    out = tmp_path / "out"
-    files = exporter.export(world.channels[0].id, out)
-    assert files and seen["env_token"] == TOKEN and TOKEN not in " ".join(seen["args"])
+def test_the_token_is_in_no_file_and_in_no_error(collector, fake, tmp_path, world):
+    files = collector.exporter.export(world.channels[0].id, tmp_path / "out")
+    assert files and all(TOKEN not in f.read_text(encoding="utf-8") for f in files)
+    fake.fail_next(50, 500)
+    with pytest.raises(Exception) as error:
+        collector.exporter.export(world.channels[0].id, tmp_path / "failed")
+    assert TOKEN not in str(error.value) and TOKEN not in repr(error.value)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -224,7 +222,7 @@ def test_the_token_goes_to_the_exporter_by_the_environment_not_the_command_line(
 
 
 def test_an_account_token_and_a_bot_token_are_told_apart(world):
-    thread = Channel(world._flake(datetime.now(timezone.utc)), "un fil", "Politique", world.channels[0].category_id, None,
+    thread = Channel(world._flake(datetime.now(UTC)), "un fil", "Politique", world.channels[0].category_id, None,
                      parent_id=world.channels[0].id, type="GuildPublicThread")
     world.channels.append(thread)
     fake_threads = {}
@@ -249,7 +247,7 @@ def test_an_account_token_and_a_bot_token_are_told_apart(world):
 
 
 def test_the_catch_up_applies_edits_and_deletions_of_the_last_days(collector, fake, imported, ingest_db, world):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     since = snowflake_at(now - timedelta(days=7))
     channel = max(world.channels, key=lambda c: sum(1 for m in c.messages if int(m["id"]) > since))
     window = [m for m in channel.messages if int(m["id"]) > since]
@@ -327,3 +325,84 @@ def test_the_watcher_does_not_see_a_gap_left_by_the_bot_only_the_nightly_catch_u
     collector.catchup(ingest_db)
     ids = {r[0] for r in ingest_db.execute("SELECT id FROM messages WHERE channel_id = %s", (channel.id,))}
     assert {int(m["id"]) for m in missed} <= ids                                  # the catch-up does
+
+
+def test_in_catch_up_only_mode_discord_is_not_polled_and_the_gap_of_the_bot_is_filled(collector, fake, imported, ingest_db, world):
+    """DINDON_COLLECTOR=catchup is the companion of the live bot: it never polls (the bot brings the new messages), and once a day it
+    exports the last days again, which fills what a Gateway reconnection missed."""
+    channel = max(world.channels, key=lambda c: len(c.messages))
+    missed = fake.post(channel, world.people[0], "manqué pendant une reconnexion")
+    seen = fake.post(channel, world.people[0], "vu par le bot")
+    import hashlib
+
+    from dindon.ingest.loader import ingest_document
+
+    document = json.loads(world.export_document(channel, after_id=int(seen["id"]) - 1))
+    ingest_document(ingest_db, document, "gateway", hashlib.sha256(json.dumps(document).encode()).hexdigest(), only_new=True)
+    quiet = Collector(dataclasses.replace(collector.settings, collector_catchup_only=True, catchup_hour_utc=0))
+    fake.requests.clear()
+    quiet.tick(ingest_db)
+    assert quiet._state["last_poll_at"] is None                                                                  # no polling
+    ids = {r[0] for r in ingest_db.execute("SELECT id FROM messages WHERE channel_id = %s", (channel.id,))}
+    assert int(missed["id"]) in ids                                                                              # but the catch-up ran
+    assert quiet.status()["mode"] == "catchup" and quiet.status()["last_catchup_at"]
+    fake.requests.clear()
+    quiet.tick(ingest_db)
+    assert fake.requests == []                                                                                   # once a day, and nothing else
+
+
+def test_in_catch_up_only_mode_an_error_that_is_over_goes_away_and_the_token_kind_is_known(collector, fake, imported, ingest_db, world):
+    quiet = Collector(dataclasses.replace(collector.settings, collector_catchup_only=True, catchup_hour_utc=0))
+    quiet._state["last_error"] = "a channel failed"
+    quiet.tick(ingest_db)                                                          # the catch-up runs and nothing fails
+    assert quiet._state["last_error"] is None and quiet.api.token_kind is not None
+
+
+
+def test_a_restart_of_the_application_does_not_make_another_catch_up_the_same_day(collector, fake, imported, ingest_db):
+    first = Collector(dataclasses.replace(collector.settings, collector_catchup_only=True, catchup_hour_utc=0))
+    first.tick(ingest_db)                                                                                        # the catch-up of the day
+    assert first.status()["last_catchup_at"]
+    restarted = Collector(dataclasses.replace(collector.settings, collector_catchup_only=True, catchup_hour_utc=0))   # a new process: it knows nothing but the database
+    fake.requests.clear()
+    restarted.tick(ingest_db)
+    assert not [r for r in fake.requests if "/messages" in r]                                                    # no messages asked again
+    assert restarted.status()["last_catchup_at"] == first.status()["last_catchup_at"]
+
+
+def put_bot(ingest_db, started_at, gaps):
+    ingest_db.execute("INSERT INTO service_status (name, updated_at, data) VALUES ('bot', now(), %s::jsonb) ON CONFLICT (name) DO UPDATE SET data = excluded.data, updated_at = now()",
+                      (json.dumps({"started_at": started_at, "gaps": gaps, "connected": True}),))
+
+
+def test_a_new_session_of_the_bot_makes_a_round_of_the_watcher_to_bring_what_it_missed(collector, fake, imported, ingest_db, world):
+    channel = max(world.channels, key=lambda c: len(c.messages))
+    quiet = Collector(dataclasses.replace(collector.settings, collector_catchup_only=True, catchup_hour_utc=24))   # (no nightly catch-up in this test)
+    put_bot(ingest_db, "2026-10-05T10:00:00+00:00", 0)
+    quiet.tick(ingest_db)                                                                  # the first look: nothing to compare with, nothing done
+    missed = fake.post(channel, world.people[0], "écrit pendant que le bot était coupé")
+    fake.requests.clear()
+    quiet.tick(ingest_db)
+    assert not [r for r in fake.requests if "/messages" in r]                              # the bot did not change: no round
+    put_bot(ingest_db, "2026-10-05T10:00:00+00:00", 1)                                     # Discord gave the bot a new session: a gap
+    quiet.tick(ingest_db)
+    assert int(missed["id"]) in {r[0] for r in ingest_db.execute("SELECT id FROM messages WHERE channel_id = %s", (channel.id,))}
+    fake.requests.clear()
+    quiet.tick(ingest_db)
+    assert not [r for r in fake.requests if "/messages" in r]                              # once per gap, and not again
+
+
+def test_a_restart_of_the_bot_is_a_gap_too_and_a_round_is_not_repeated_in_a_loop(collector, fake, imported, ingest_db, world):
+    quiet = Collector(dataclasses.replace(collector.settings, collector_catchup_only=True, catchup_hour_utc=24))
+    put_bot(ingest_db, "2026-10-05T10:00:00+00:00", 0)
+    quiet.tick(ingest_db)
+    channel = max(world.channels, key=lambda c: len(c.messages))
+    fake.post(channel, world.people[0], "pendant que le bot redémarrait")
+    put_bot(ingest_db, "2026-10-05T10:05:00+00:00", 0)                                     # another start of the process
+    quiet.tick(ingest_db)
+    assert quiet._state["exports"] >= 1
+    fake.post(channel, world.people[0], "et encore")
+    put_bot(ingest_db, "2026-10-05T10:06:00+00:00", 0)                                     # it restarts again at once: too soon for another round
+    fake.requests.clear()
+    quiet.tick(ingest_db)
+    assert not [r for r in fake.requests if "/messages" in r]

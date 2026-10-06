@@ -1,47 +1,45 @@
 """The routes of the map: servers, graph, people, state. Everything here needs the session cookie.
 
-Names go through one expression (LABEL), so that a pseudonymized mode can replace them in a single place.
-Roles of age or gender are never read: the only roles that leave this file are those that say an ideology.
+Names go through one expression (api/common.py: LABEL), so that a pseudonymized mode can replace them in a single place.
+Roles of age or gender never come out: the only roles that leave this file are those that say an ideology (and a color never comes from an age or gender role).
 """
-from datetime import datetime, timezone
+import re
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from dindon.api.auth import require_session
+from dindon.api.common import LABEL, iso, resolve_guild
+from dindon.clock import utc_now
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_session)])
 
-# The name shown for a person: nickname, otherwise display name, otherwise username, with fancy Unicode letters
-# turned into plain ones (a name made of "mathematical" letters is unreadable on a map). Needs u (users), m (members).
-LABEL = "normalize(COALESCE(m.nickname, u.global_name, u.name), NFKC)"
-
 # How much each kind of link says about a tie between two people (a reply is a conversation, a reaction a nod)
 KIND_FACTOR = {"reply": 1.0, "mention": 0.6, "reaction": 0.25}
+
+# The color of a person's name in Discord: the highest role of theirs that has a color (black is Discord's "no color"), except the
+# roles of age and gender (their color would say what the role says, and those roles never come out). Only from roles that can be
+# classified: the color that an export gives for a member is the one of their highest colored role *whatever it is*, so it is not
+# used. Needs a guild id and a list of user ids.
+MEMBER_COLORS = """
+    SELECT m.user_id AS id,
+           (SELECT r.color FROM member_roles mr JOIN roles r ON r.id = mr.role_id JOIN classified_roles cr ON cr.role_id = r.id
+             WHERE mr.guild_id = m.guild_id AND mr.user_id = m.user_id AND r.color IS NOT NULL AND upper(r.color) <> '#000000'
+               AND cr.kind NOT IN ('age', 'genre')
+             ORDER BY r.position DESC, r.id LIMIT 1) AS color
+    FROM members m WHERE m.guild_id = %s AND m.user_id = ANY(%s)"""
+_HEX_COLOR = re.compile(r"#[0-9A-Fa-f]{6}")
 
 HALF_LIFE = "86400 * COALESCE((SELECT value FROM scoring_settings WHERE key = 'edge_half_life_days'), 90)::double precision"
 
 
 def _utc(value: datetime | None) -> datetime | None:
-    return value if value is None or value.tzinfo else value.replace(tzinfo=timezone.utc)
+    return value if value is None or value.tzinfo else value.replace(tzinfo=UTC)
 
 
-def _iso(value: datetime | None) -> str | None:
-    return value.astimezone(timezone.utc).isoformat() if value else None
-
-
-def _guild(conn, guild: int | None) -> int:
-    """The server asked for, or the one that was imported most recently."""
-    if guild is not None:
-        if conn.execute("SELECT 1 FROM guilds WHERE id = %s", (guild,)).fetchone() is None:
-            raise HTTPException(status_code=404, detail="unknown server")
-        return guild
-    row = conn.execute(
-        """SELECT g.id FROM guilds g
-           ORDER BY (SELECT max(r.imported_at) FROM ingest_runs r WHERE r.guild_id = g.id) DESC NULLS LAST LIMIT 1"""
-    ).fetchone()
-    if row is None:
-        raise HTTPException(status_code=404, detail="no server yet: import an export first")
-    return row["id"]
+def _color(value: str | None) -> str | None:
+    """A color as #RRGGBB, or nothing: the text comes from an export file, and no color (black) is Discord's default."""
+    return value.upper() if value and _HEX_COLOR.fullmatch(value) and value != "#000000" else None
 
 
 @router.get("/guilds")
@@ -55,7 +53,7 @@ def guilds(request: Request) -> list[dict]:
                       (SELECT max(m.sent_at) FROM messages m JOIN channels c ON c.id = m.channel_id WHERE c.guild_id = g.id) AS last_message_at
                FROM guilds g ORDER BY g.name"""
         ).fetchall()
-    return [{**r, "id": str(r["id"]), "last_message_at": _iso(r["last_message_at"])} for r in rows]
+    return [{**r, "id": str(r["id"]), "last_message_at": iso(r["last_message_at"])} for r in rows]
 
 
 _GRAPH = f"""
@@ -111,15 +109,15 @@ def graph(
 ) -> dict:
     kind_list = [k for k in kinds.split(",") if k in KIND_FACTOR]
     if not kind_list:
-        raise HTTPException(status_code=422, detail="kinds: reply, mention, reaction")
+        raise HTTPException(status_code=422, detail="Types d'échanges : reply, mention ou reaction.")
     since, until = _utc(since), _utc(until)
     period = since is not None or until is not None
     with request.app.state.pool.connection() as conn:
-        guild_id = _guild(conn, guild)
-        now = datetime.now(timezone.utc)
+        guild_id = resolve_guild(conn, guild)
+        now = utc_now()
         params = {"guild": guild_id, "kinds": kind_list, "bots": bots, "min_weight": min_weight, "limit": limit,
                   "max_edges": max_edges, "ref": min(until, now) if until else now,
-                  "since": since or datetime(1970, 1, 1, tzinfo=timezone.utc), "until": until or datetime(2200, 1, 1, tzinfo=timezone.utc)}
+                  "since": since or datetime(1970, 1, 1, tzinfo=UTC), "until": until or datetime(2200, 1, 1, tzinfo=UTC)}
         rows = conn.execute(_GRAPH.replace("{source}", _PERIOD if period else _ALL_TIME), params).fetchall()
         node_ids = sorted({r["a"] for r in rows} | {r["b"] for r in rows})
         # Points without a link: whoever ever wrote in this server (not only during the period) and is not on the map. Linked
@@ -134,13 +132,17 @@ def graph(
                    GROUP BY m.author_id ORDER BY count(*) DESC, m.author_id""", params) if r["id"] not in on_map]
             loners_total = len(candidates)
             loners = candidates[:max(limit - len(node_ids), 0)]
-        labels, stats = {}, {}
+        labels, colors, stats = {}, {}, {}
         label_ids = node_ids + [r["id"] for r in loners]
+        pictured = {r["user_id"] for r in conn.execute(                    # the people with a photo that can be shown (not the ones who asked not to be recorded)
+            """SELECT m.user_id FROM members m WHERE m.guild_id = %s AND m.user_id = ANY(%s) AND m.avatar_url IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM privacy_subjects s WHERE s.user_id = m.user_id)""", (guild_id, label_ids))} if label_ids else set()
         if label_ids:
             for r in conn.execute(
                 f"""SELECT u.id, {LABEL} AS label FROM users u LEFT JOIN members m ON m.guild_id = %s AND m.user_id = u.id
                     WHERE u.id = ANY(%s)""", (guild_id, label_ids)):
                 labels[r["id"]] = r["label"]
+            colors = {r["id"]: _color(r["color"]) for r in conn.execute(MEMBER_COLORS, (guild_id, label_ids))}
         if node_ids:
             for r in conn.execute(
                 """SELECT m.author_id, count(*) AS messages, max(m.sent_at) AS last_at
@@ -155,31 +157,47 @@ def graph(
         influence[r["a"]] = influence.get(r["a"], 0) + r["weight"]
         influence[r["b"]] = influence.get(r["b"], 0) + r["weight"]
         edges.append({"source": str(r["a"]), "target": str(r["b"]), "weight": round(r["weight"], 4), "n": int(r["n"]),
-                      "last_at": _iso(r["last_at"]),
+                      "last_at": iso(r["last_at"]),
                       "kinds": {k: round(r[k], 4) for k in KIND_FACTOR if r[k]}})
-    nodes = [{"id": str(uid), "label": labels.get(uid, str(uid)), "influence": round(influence[uid], 4),
+    nodes = [{"id": str(uid), "label": labels.get(uid, str(uid)), "color": colors.get(uid), "influence": round(influence[uid], 4),
               "messages": stats[uid]["messages"] if uid in stats else 0,
-              "last_message_at": _iso(stats[uid]["last_at"]) if uid in stats else None,
+              "last_message_at": iso(stats[uid]["last_at"]) if uid in stats else None,
               "community": None,  # filled in by the community detection (phase 5)
-              "isolated": False}
+              "isolated": False, "avatar": f"/api/avatar/{uid}?guild={guild_id}" if uid in pictured else None}
              for uid in sorted(node_ids, key=lambda u: -influence[u])]
-    nodes += [{"id": str(r["id"]), "label": labels.get(r["id"], str(r["id"])), "influence": 0, "messages": r["messages"],
-               "last_message_at": _iso(r["last_at"]), "community": None, "isolated": True} for r in loners]
+    nodes += [{"id": str(r["id"]), "label": labels.get(r["id"], str(r["id"])), "color": colors.get(r["id"]), "influence": 0, "messages": r["messages"],
+               "last_message_at": iso(r["last_at"]), "community": None, "isolated": True,
+               "avatar": f"/api/avatar/{r['id']}?guild={guild_id}" if r["id"] in pictured else None} for r in loners]
     nodes_total = rows[0]["nodes_total"] if rows else 0
     edges_total = rows[0]["edges_total"] if rows else 0
-    return {"meta": {"guild": str(guild_id), "period": {"since": _iso(since), "until": _iso(until)} if period else None,
+    return {"meta": {"guild": str(guild_id), "period": {"since": iso(since), "until": iso(until)} if period else None,
                      "half_life_days": float(half_life_days["value"]) if half_life_days else 90, "kind_factor": KIND_FACTOR,
                      "nodes_total": nodes_total, "nodes_shown": len(nodes), "nodes_hidden": nodes_total - len(node_ids),
                      "isolated_shown": len(loners), "isolated_hidden": loners_total - len(loners),
-                     "edges_shown": len(edges), "edges_hidden": edges_total - len(edges), "generated_at": _iso(datetime.now(timezone.utc))},
+                     "edges_shown": len(edges), "edges_hidden": edges_total - len(edges), "generated_at": iso(utc_now())},
             "nodes": nodes, "edges": edges}
+
+
+@router.get("/avatar/{user_id}")
+def avatar(request: Request, user_id: int, guild: int | None = None) -> Response:
+    """The photo of a person, fetched from Discord's CDN by the server and kept in memory (the page may only load what the application serves). Nothing for somebody who asked not to be recorded."""
+    from dindon.api.activity import cached_picture
+
+    with request.app.state.pool.connection() as conn:
+        guild_id = resolve_guild(conn, guild)
+        row = conn.execute("""SELECT m.avatar_url FROM members m WHERE m.guild_id = %s AND m.user_id = %s
+                              AND NOT EXISTS (SELECT 1 FROM privacy_subjects s WHERE s.user_id = m.user_id)""", (guild_id, user_id)).fetchone()
+    if row is None or not row["avatar_url"]:
+        raise HTTPException(status_code=404, detail="Pas de photo.")
+    body, kind = cached_picture(guild_id, user_id, row["avatar_url"])
+    return Response(body, media_type=kind, headers={"Cache-Control": "private, max-age=3600"})
 
 
 @router.get("/people")
 def people(request: Request, q: str = Query("", max_length=100), guild: int | None = None, limit: int = Query(15, ge=1, le=50)) -> list[dict]:
     """Search by name, ignoring case, accents and fancy letters; the most active first."""
     with request.app.state.pool.connection() as conn:
-        guild_id = _guild(conn, guild)
+        guild_id = resolve_guild(conn, guild)
         rows = conn.execute(
             f"""SELECT u.id, {LABEL} AS label, s.message_count
                 FROM users u
@@ -194,12 +212,12 @@ def people(request: Request, q: str = Query("", max_length=100), guild: int | No
 def person(request: Request, user_id: int, guild: int | None = None) -> dict:
     """The simple card of a person: who they are in this server, what they do, who they talk to."""
     with request.app.state.pool.connection() as conn:
-        guild_id = _guild(conn, guild)
+        guild_id = resolve_guild(conn, guild)
         who = conn.execute(
             f"""SELECT u.id, {LABEL} AS label, u.name, u.global_name, m.nickname, u.is_bot FROM users u
                 LEFT JOIN members m ON m.guild_id = %s AND m.user_id = u.id WHERE u.id = %s""", (guild_id, user_id)).fetchone()
         if who is None:
-            raise HTTPException(status_code=404, detail="unknown person")
+            raise HTTPException(status_code=404, detail="Personne inconnue.")
         activity = conn.execute(
             """SELECT count(*) AS messages, min(m.sent_at) AS first_at, max(m.sent_at) AS last_at,
                       count(DISTINCT (m.sent_at AT TIME ZONE 'UTC')::date) AS active_days, round(avg(length(m.content))) AS avg_length,
@@ -213,6 +231,7 @@ def person(request: Request, user_id: int, guild: int | None = None) -> dict:
         top_channels = conn.execute(
             """SELECT c.name, count(*) AS messages FROM messages m JOIN channels c ON c.id = m.channel_id
                WHERE m.author_id = %s AND c.guild_id = %s GROUP BY c.name ORDER BY 2 DESC LIMIT 5""", (user_id, guild_id)).fetchall()
+        color = next((_color(r["color"]) for r in conn.execute(MEMBER_COLORS, (guild_id, [user_id]))), None)
         names = conn.execute(
             """SELECT value FROM identity_history WHERE user_id = %s AND guild_id IN (0, %s) ORDER BY last_seen_at DESC LIMIT 20""",
             (user_id, guild_id)).fetchall()
@@ -246,10 +265,10 @@ def person(request: Request, user_id: int, guild: int | None = None) -> dict:
                 partner_labels[r["id"]] = r["label"]
     days = max(activity["active_days"], 1)
     return {
-        "id": str(who["id"]), "label": who["label"], "is_bot": who["is_bot"],
+        "id": str(who["id"]), "label": who["label"], "is_bot": who["is_bot"], "color": color,
         "names": {"username": who["name"], "display": who["global_name"], "nickname": who["nickname"],
                   "seen_as": sorted({n["value"] for n in names})},
-        "activity": {"messages": activity["messages"], "first_message_at": _iso(activity["first_at"]), "last_message_at": _iso(activity["last_at"]),
+        "activity": {"messages": activity["messages"], "first_message_at": iso(activity["first_at"]), "last_message_at": iso(activity["last_at"]),
                      "active_days": activity["active_days"], "messages_per_active_day": round(activity["messages"] / days, 1),
                      "average_length": int(activity["avg_length"] or 0), "channels": activity["channels"],
                      "replies_sent": activity["replies_sent"], "edited": activity["edited"],
@@ -275,7 +294,7 @@ def status(request: Request) -> dict:
     collector = state.collector.status() if state.collector else {"enabled": False}
     return {
         "inbox": {"pending": pending, "failed": failed},
-        "ingest": {"files": runs["runs"], "last_at": _iso(runs["last_at"])},
+        "ingest": {"files": runs["runs"], "last_at": iso(runs["last_at"])},
         "jobs": {r["kind"]: r["n"] for r in queued},
         "collector": collector,
         # Shown by the interface: continuous automation of a personal account is against Discord's terms of service

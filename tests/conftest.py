@@ -64,8 +64,17 @@ def ingest_url(migrated_url):
 
     name = "dindon_t_" + uuid.uuid4().hex[:8]
     base, _, _ = migrated_url.rpartition("/")
-    with psycopg.connect(migrated_url, autocommit=True) as admin:
-        admin.execute(f'CREATE DATABASE "{name}" TEMPLATE dindon')
+    for attempt in range(40):                      # a copy needs that nobody else is connected to the original: a connection of the test before may still be closing
+        try:
+            with psycopg.connect(migrated_url, autocommit=True) as admin:
+                admin.execute(f'CREATE DATABASE "{name}" TEMPLATE dindon')
+            break
+        except psycopg.errors.ObjectInUse:
+            if attempt == 39:
+                raise
+            import time
+
+            time.sleep(0.25)
     try:
         yield f"{base}/{name}"
     finally:
@@ -148,3 +157,21 @@ def no_test_tried_to_leave_this_machine():
     BLOCKED.clear()
     yield
     assert not BLOCKED, f"this test tried to reach: {sorted(set(BLOCKED))}"
+
+
+@pytest.fixture(autouse=True)
+def fake_cdn(monkeypatch):
+    """Discord's CDN is a fake that answers a real (tiny) picture: the server fetches the photos of the people on the map (the Activity, the picture of `/dindon map`, the interface).
+    No test reaches the real one. The list is what was asked."""
+    import io
+
+    from PIL import Image
+
+    from dindon.api import activity
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (64, 64), (200, 120, 90)).save(buffer, "PNG")
+    fetched = []
+    monkeypatch.setattr(activity, "_fetch_image", lambda url: (fetched.append(url), (buffer.getvalue(), "image/png"))[1])
+    activity._avatars.clear()
+    return fetched

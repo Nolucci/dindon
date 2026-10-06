@@ -1,9 +1,20 @@
 <script>
   import { onMount, tick } from 'svelte';
-  import { api, AuthError, openEvents } from '../lib/api.js';
+  import { api, makeGuard, openEvents } from '../lib/api.js';
   import { MapGraph } from '../lib/mapgraph.js';
+  import { imageProgram, pictureLoader } from '../lib/pictures.js';
+  import { plural, ago as agoOf } from '../lib/format.js';
+  import Navbar from './Navbar.svelte';
+  import FilterBar from './FilterBar.svelte';
   import PersonCard from './PersonCard.svelte';
   import ImportPanel from './ImportPanel.svelte';
+  import InvitePanel from './InvitePanel.svelte';
+  import Themes from './Themes.svelte';
+  import System from './System.svelte';
+  import Privacy from './Privacy.svelte';
+  import Debates from './Debates.svelte';
+  import Positions from './Positions.svelte';
+  import Coherence from './Coherence.svelte';
 
   let { onLogout } = $props();
 
@@ -22,6 +33,7 @@
   const RELOAD_EVERY_MS = 8000;
 
   let container;
+  let pictures = null;           // the photos of the people on the map (lib/pictures.js)
   let map = null;
   let guilds = $state([]);
   let guild = $state('');
@@ -31,6 +43,9 @@
   let kinds = $state({ reply: true, mention: true, reaction: true });
   let density = $state('2500'); // how many links to draw at most: the strongest ones first
   let showImport = $state(false); // the window to import a part of the server
+  let showInvite = $state(false); // the window to invite the bot to a server
+  let view = $state('map');       // 'map', 'themes', 'positions', 'coherence', 'system', 'debates' or 'privacy': the map is kept alive (hidden) while another page is shown
+  let stale = false;              // something happened to the map while it was hidden: it is brought up to date when it comes back
   let showIsolated = $state(true); // also the people who wrote and have no link on the map (points on their own)
   let lastExchange = $state(null);
   let exchangeTimer;
@@ -57,16 +72,11 @@
   let pendingFlashes = [];
 
   const fmt = new Intl.NumberFormat('fr-FR');
-  const ago = (iso) => {
-    if (!iso) return '—';
-    const seconds = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-    if (seconds < 90) return `il y a ${seconds} s`;
-    if (seconds < 5400) return `il y a ${Math.round(seconds / 60)} min`;
-    return `il y a ${Math.round(seconds / 3600)} h`;
-  };
+  const ago = (iso) => agoOf(iso, now);
 
   // A page that shows the present can be updated live; a page that shows a past period cannot
   let showsPresent = $derived(preset !== 'custom' || !until);
+  let noKind = $derived(!KINDS.some((k) => kinds[k.id]));
 
   function graphParams() {
     const params = { guild, kinds: KINDS.filter((k) => kinds[k.id]).map((k) => k.id).join(','), max_edges: density, isolated: showIsolated };
@@ -79,21 +89,22 @@
     return params;
   }
 
-  async function guard(action) {
-    try {
-      return await action();
-    } catch (error) {
-      if (error instanceof AuthError) onLogout();
-      else problem = error.message;
-      return undefined;
-    }
-  }
+  const guard = makeGuard(() => onLogout(), (message) => (problem = message));
 
   async function reload() {
     clearTimeout(reloadTimer);
     reloadTimer = null;
     if (!guild || !map) return;
-    if (!KINDS.some((k) => kinds[k.id])) return;
+    if (noKind) {                                            // nothing to draw: the map is emptied, and the page says why
+      map.load({ nodes: [], edges: [] });
+      meta = null;
+      loading = false;
+      return;
+    }
+    if (view !== 'map') {                                    // hidden: nothing to draw now
+      stale = true;
+      return;
+    }
     const data = await guard(() => api.graph(graphParams()));
     loading = false;
     if (!data) return;
@@ -101,8 +112,15 @@
     lastReload = Date.now();
     meta = data.meta;
     map.load(data);
+    pictures?.show(data.nodes);
     if (selectedId && !map.has(selectedId)) map.select(null);
     for (const event of pendingFlashes.splice(0)) map.flash(event); // exchanges that arrived while the person was not yet on the map
+  }
+
+  // What the person just asked for (a filter, a server) shows at once; a few quick clicks make one reload
+  function reloadSoon() {
+    clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(reload, 120);
   }
 
   // At most one reload every few seconds, however many events arrive
@@ -116,6 +134,11 @@
     if (event.type === 'hello') return;
     lastEventAt = new Date().toISOString();
     if (event.guild && event.guild !== guild) return;
+    if (view !== 'map') {                                    // the map is hidden: no light to show, it is reloaded when it comes back
+      if (event.type !== 'messages') stale = true;
+      else newMessages += event.count;
+      return;
+    }
     if (event.type === 'edge' && showsPresent && kinds[event.kind]) {
       const label = (id) => map?.labelOf(id) ?? id;
       lastExchange = `${label(event.from)} → ${label(event.to)} · ${{ reply: 'réponse', mention: 'mention', reaction: 'réaction' }[event.kind]}`;
@@ -185,7 +208,9 @@
     map = new MapGraph(container, {
       onSelect: (id) => selectPerson(id),
       onHover: () => {},
+      imageProgram,
     });
+    pictures = pictureLoader(map, (path) => fetch(path));       // the session cookie goes with it
     const stopEvents = openEvents(onEvent, (open) => (live = open));
     const tick = setInterval(() => (now = Date.now()), 1000);
     const statusTimer = setInterval(refreshStatus, 15000);
@@ -214,7 +239,7 @@
   function filterChanged() {
     selectedId = null;
     card = null;
-    scheduleReload(0);
+    reloadSoon();
   }
 
   // Once the window of the import is closed, the map shows what it brought (also when no server was there before)
@@ -234,157 +259,350 @@
     card = null;
     reload();
   }
+
+  // Escape closes the person's card (a window that is open has the Escape for itself, and so does the box of the search)
+  function escape(event) {
+    if (event.key === 'Escape' && selectedId && !showImport && !showInvite && !event.defaultPrevented) selectPerson(null);
+  }
+
+  // The page of the left bar. The map is only hidden: coming back, it takes its size again
+  function showView(name) {
+    view = name;
+    if (name === 'map') {
+      tick().then(() => {
+        map?.resized();
+        if (stale) {
+          stale = false;
+          reload();
+        }
+      });
+    }
+  }
+
+  // Another server was picked in the left bar: its map is shown
+  function guildPicked(id) {
+    guild = id;
+    filterChanged();
+  }
 </script>
 
-<div class="app">
-  <header>
-    <strong class="brand">Dindon</strong>
-    {#if guilds.length > 1}
-      <select bind:value={guild} onchange={filterChanged} aria-label="Serveur">
-        {#each guilds as g}<option value={g.id}>{g.name}</option>{/each}
-      </select>
-    {:else if guilds.length === 1}
-      <span class="muted">{guilds[0].name}</span>
-    {/if}
+<svelte:window onkeydown={escape} />
 
-    <div class="group" role="group" aria-label="Période">
-      {#each PRESETS as p}
-        <button aria-pressed={preset === p.id} onclick={() => { preset = p.id; filterChanged(); }}>{p.label}</button>
-      {/each}
-    </div>
-    {#if preset === 'custom'}
-      <input type="date" bind:value={since} onchange={filterChanged} aria-label="Du" />
-      <input type="date" bind:value={until} onchange={filterChanged} aria-label="Au" />
-    {/if}
+<div class="layout">
+  <Navbar {guilds} {guild} {view} onView={showView} onGuildChange={guildPicked} onImport={() => (showImport = true)} onInvite={() => (showInvite = true)} onLogout={logout} />
 
-    <div class="group" role="group" aria-label="Types d’échanges">
-      {#each KINDS as k}
-        <button aria-pressed={kinds[k.id]} onclick={() => { kinds[k.id] = !kinds[k.id]; filterChanged(); }}>{k.label}</button>
-      {/each}
-    </div>
+  <div class="mainContent">
+    <div class="mapView" class:hidden={view !== 'map'}>
+      <FilterBar
+        bind:query
+        {suggestions}
+        bind:preset
+        bind:since
+        bind:until
+        bind:kinds
+        bind:density
+        bind:showIsolated
+        presets={PRESETS}
+        kindList={KINDS}
+        onSearch={search}
+        onChoose={choose}
+        onChange={filterChanged}
+        onIsolated={isolatedChanged}
+        onFit={() => map?.resetView()}
+      />
 
-    <select bind:value={density} onchange={filterChanged} aria-label="Nombre de liens affichés">
-      <option value="800">Liens : essentiels</option>
-      <option value="2500">Liens : lisibles</option>
-      <option value="8000">Liens : détaillés</option>
-      <option value="20000">Liens : tous (lent)</option>
-    </select>
-    <label class="check" title="Les personnes qui ont déjà écrit mais n’ont aucun lien affiché, quelle que soit la période">
-      <input type="checkbox" bind:checked={showIsolated} onchange={isolatedChanged} /> Personnes sans lien
-    </label>
-    <button onclick={() => map?.resetView()} title="Revenir à la vue d’ensemble">Tout voir</button>
-
-    <div class="search">
-      <input type="search" placeholder="Chercher une personne…" bind:value={query} oninput={search} aria-label="Chercher une personne" />
-      {#if suggestions.length}
-        <ul role="listbox">
-          {#each suggestions as person}
-            <li><button role="option" aria-selected="false" onclick={() => choose(person)}>{person.label} <span class="muted">{fmt.format(person.messages)}</span></button></li>
-          {/each}
-        </ul>
-      {/if}
-    </div>
-
-    <button onclick={() => (showImport = true)} title="Importer l’historique de certains salons, de certaines personnes, d’une période">Importer…</button>
-    <button class="quiet" onclick={logout}>Quitter</button>
-  </header>
-
-  <div class="banners">
-  {#if status?.warnings?.includes('account_token')}
-    <p class="banner" role="alert">
-      Attention : un <strong>compte personnel</strong> est utilisé en continu pour la collecte. Discord l’interdit et peut fermer ce compte.
-      Un bot est recommandé (voir le README).
-    </p>
-  {/if}
-  {#if status?.collector?.needs_backfill?.length}
-    <p class="banner info">Le premier import du serveur n’est pas fait : lancez <code>dindon backfill</code>. La surveillance n’exporte rien avant.</p>
-  {/if}
-  {#if problem}<p class="banner" role="alert">{problem}</p>{/if}
-  </div>
-
-  <main>
-    <div class="canvas" class:with-card={selectedId} bind:this={container} aria-label="Carte des échanges"></div>
-
-    {#if !loading && !guilds.length}
-      <div class="empty">
-        <h2>Aucun serveur importé</h2>
-        <p class="muted">Déposez un export JSON dans le dossier <code>inbox/</code>, ou lancez <code>dindon backfill</code> avec un jeton.</p>
+      <div class="banners">
+        {#if status?.warnings?.includes('account_token')}
+          <p class="banner" role="alert">
+            Attention : un <strong>compte personnel</strong> est utilisé en continu pour la collecte. Discord l’interdit et peut fermer ce compte.
+            Un bot est recommandé (voir le README).
+          </p>
+        {/if}
+        {#if status?.collector?.needs_backfill?.length}
+          <p class="banner info">Le premier import du serveur n’est pas fait : lancez <code>dindon backfill</code>. La surveillance n’exporte rien avant.</p>
+        {/if}
+        {#if problem}<p class="banner" role="alert">{problem}</p>{/if}
       </div>
-    {:else if !loading && meta && meta.nodes_shown === 0}
-      <div class="empty"><h2>Aucun échange sur cette période</h2><p class="muted">Changez de période ou de types d’échanges.</p></div>
-    {/if}
-    {#if loading}<div class="empty"><p class="muted">Chargement de la carte…</p></div>{/if}
 
-    {#if selectedId}
-      <PersonCard {card} loading={cardLoading} error={cardError} onClose={() => { selectPerson(null); }} onPick={pick} />
-    {/if}
+      <main>
+        <div class="canvas" class:with-card={selectedId} bind:this={container} aria-label="Carte des échanges"></div>
 
-    <div class="legend" aria-hidden="true">
-      <div><span class="dot big"></span> Taille : poids des échanges (les plus petits points n’ont aucun lien affiché) · couleur : activité récente (clair) ou ancienne (sombre)</div>
-      <div><span class="bar"></span> Les liens se révèlent en <strong>survolant</strong> ou en <strong>cliquant</strong> une personne ; leur épaisseur est le poids de l’échange{#if meta && !meta.period}&nbsp;(les échanges récents comptent plus, demi-vie {meta.half_life_days} j){/if}</div>
+        {#if !loading && !guilds.length}
+          <div class="empty">
+            <h2>Aucun serveur importé</h2>
+            <p>Déposez un export JSON dans le dossier <code>inbox/</code>, ou lancez <code>dindon backfill</code> avec un jeton.</p>
+          </div>
+        {:else if !loading && noKind}
+          <div class="empty"><h2>Aucun type d’échange choisi</h2><p>Activez au moins un des trois : réponses, mentions ou réactions.</p></div>
+      {:else if !loading && meta && meta.nodes_shown === 0}
+          <div class="empty"><h2>Aucun échange sur cette période</h2><p>Changez de période ou de types d’échanges.</p></div>
+        {/if}
+        {#if loading}<div class="empty"><p>Chargement de la carte…</p></div>{/if}
+
+        {#if selectedId}
+          <PersonCard {card} {guild} loading={cardLoading} error={cardError} onClose={() => { selectPerson(null); }} onPick={pick} />
+        {/if}
+
+        <div class="legend" aria-hidden="true">
+          <div><span class="dot big"></span> Taille : poids des échanges (les plus petits points n’ont aucun lien affiché) · couleur : celle de la personne sur Discord (son rôle le plus haut qui a une couleur)</div>
+          <div><span class="bar"></span> Les liens se révèlent en <strong>survolant</strong> ou en <strong>cliquant</strong> une personne ; leur épaisseur est le poids de l’échange{#if meta && !meta.period}&nbsp;(les échanges récents comptent plus, demi-vie {meta.half_life_days} j){/if}</div>
+        </div>
+      </main>
+
+      <footer>
+        <span class="live" class:on={live}><i></i>{live ? 'En direct' : 'Hors ligne'}</span>
+        {#if meta}
+          <span>{fmt.format(meta.nodes_shown)} {plural(meta.nodes_shown, 'personne', 'personnes')}{#if meta.isolated_shown > 0}&nbsp;(dont {fmt.format(meta.isolated_shown)} sans lien{#if meta.isolated_hidden > 0}, + {fmt.format(meta.isolated_hidden)} masquées{/if}){/if}{#if meta.nodes_hidden > 0}&nbsp;(+ {fmt.format(meta.nodes_hidden)} moins connectées, masquées){/if}</span>
+          <span>{fmt.format(meta.edges_shown)} {plural(meta.edges_shown, 'lien', 'liens')}{#if meta.edges_hidden > 0}&nbsp;(+ {fmt.format(meta.edges_hidden)} plus faibles, masqués){/if}</span>
+        {/if}
+        {#if newMessages}<span>{fmt.format(newMessages)} nouveaux messages depuis l’ouverture</span>{/if}
+        {#if lastExchange}<span class="exchange" aria-live="polite">{lastExchange}</span>{/if}
+        {#if lastEventAt}<span class="muted">dernier événement {ago(lastEventAt)}</span>{/if}
+        <span class="spacer"></span>
+        {#if status?.collector?.enabled && status.collector.mode === 'catchup'}
+          <span class="muted">rattrapage nocturne : {status.collector.last_catchup_at ? `dernier ${ago(status.collector.last_catchup_at)}` : 'pas encore fait'} (le bot reçoit le direct){#if status.collector.last_error}&nbsp;· <span class="warn">{status.collector.last_error}</span>{/if}</span>
+        {:else if status?.collector?.enabled}
+          <span class="muted">surveillance : relevé {ago(status.collector.last_poll_at)}{#if status.collector.last_error}&nbsp;· <span class="warn">{status.collector.last_error}</span>{/if}</span>
+        {:else if status}
+          <span class="muted">pas de surveillance : seuls les exports déposés dans inbox/ sont lus</span>
+        {/if}
+        {#if status?.inbox?.failed}<span class="warn">{status.inbox.failed} fichier(s) illisible(s) dans inbox/failed</span>{/if}
+      </footer>
     </div>
-  </main>
+
+    {#if view === 'themes'}
+      <Themes {guild} onAuthLost={onLogout} />
+    {:else if view === 'coherence'}
+      <Coherence {guild} onAuthLost={onLogout} />
+    {:else if view === 'positions'}
+      <Positions {guild} onAuthLost={onLogout} />
+    {:else if view === 'system'}
+      <System onAuthLost={onLogout} />
+    {:else if view === 'debates'}
+      <Debates onAuthLost={onLogout} />
+    {:else if view === 'privacy'}
+      <Privacy onAuthLost={onLogout} />
+    {/if}
+  </div>
 
   {#if showImport}
     <ImportPanel onClose={importClosed} onAuthLost={onLogout} />
   {/if}
 
-  <footer>
-    <span class="live" class:on={live}><i></i>{live ? 'En direct' : 'Hors ligne'}</span>
-    {#if meta}
-      <span>{fmt.format(meta.nodes_shown)} personnes{#if meta.isolated_shown > 0}&nbsp;(dont {fmt.format(meta.isolated_shown)} sans lien{#if meta.isolated_hidden > 0}, + {fmt.format(meta.isolated_hidden)} masquées{/if}){/if}{#if meta.nodes_hidden > 0}&nbsp;(+ {fmt.format(meta.nodes_hidden)} moins connectées, masquées){/if}</span>
-      <span>{fmt.format(meta.edges_shown)} liens{#if meta.edges_hidden > 0}&nbsp;(+ {fmt.format(meta.edges_hidden)} plus faibles, masqués){/if}</span>
-    {/if}
-    {#if newMessages}<span>{fmt.format(newMessages)} nouveaux messages depuis l’ouverture</span>{/if}
-    {#if lastExchange}<span class="exchange" aria-live="polite">{lastExchange}</span>{/if}
-    {#if lastEventAt}<span class="muted">dernier événement {ago(lastEventAt)}</span>{/if}
-    <span class="spacer"></span>
-    {#if status?.collector?.enabled}
-      <span class="muted">surveillance : relevé {ago(status.collector.last_poll_at)}{#if status.collector.last_error}&nbsp;· <span class="warn">{status.collector.last_error}</span>{/if}</span>
-    {:else if status}
-      <span class="muted">pas de surveillance : seuls les exports déposés dans inbox/ sont lus</span>
-    {/if}
-    {#if status?.inbox?.failed}<span class="warn">{status.inbox.failed} fichier(s) illisible(s) dans inbox/failed</span>{/if}
-  </footer>
+  {#if showInvite}
+    <InvitePanel onClose={() => (showInvite = false)} onAuthLost={onLogout} />
+  {/if}
 </div>
 
 <style>
-  .app { height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; } /* header, banners (maybe none), map, status */
-  header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
-  .brand { font-size: 18px; letter-spacing: 0.5px; margin-right: 2px; }
-  header select { padding: 5px 8px; }
-  .group { display: inline-flex; gap: 0; }
-  .group button { border-radius: 0; margin-left: -1px; padding: 5px 10px; }
-  .group button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
-  .group button:last-child { border-radius: 0 6px 6px 0; }
-  .quiet { background: none; margin-left: auto; color: var(--muted); }
-  .check { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; cursor: pointer; user-select: none; }
-  .check input { accent-color: #4f8fd1; margin: 0; cursor: pointer; }
-  .search { position: relative; }
-  .search input { width: 168px; }
-  .search ul { position: absolute; top: 100%; left: 0; right: 0; margin: 4px 0 0; padding: 4px; list-style: none; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; z-index: 20; }
-  .search li button { width: 100%; text-align: left; background: none; border: none; padding: 5px 8px; display: flex; justify-content: space-between; gap: 8px; }
-  .search li button:hover { background: #1d3550; }
-  .banner { margin: 0; padding: 8px 14px; background: #3a2a14; color: #f1c79a; border-bottom: 1px solid #5a4020; font-size: 14px; }
-  .banner.info { background: #14283a; color: #a9cdea; border-color: #204666; }
-  main { position: relative; min-height: 0; }
-  .canvas { position: absolute; inset: 0; }
-  .canvas.with-card { right: min(360px, 100%); } /* the map stays whole, next to the card */
-  .empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; padding: 20px; }
-  .empty h2 { margin: 0 0 6px; }
-  .legend { position: absolute; left: 14px; bottom: 12px; font-size: 12.5px; color: var(--muted); display: grid; gap: 4px; pointer-events: none; background: rgba(11, 15, 20, 0.72); padding: 8px 10px; border-radius: 8px; max-width: min(420px, 60vw); }
-  .dot { display: inline-block; border-radius: 50%; background: hsl(208, 62%, 70%); vertical-align: middle; }
-  .dot.big { width: 12px; height: 12px; }
-  .dot.bright { width: 9px; height: 9px; background: hsl(208, 62%, 70%); }
-  .dot.dim { width: 9px; height: 9px; background: hsl(208, 62%, 36%); }
-  .bar { display: inline-block; width: 22px; height: 3px; background: rgba(138, 154, 176, 0.6); vertical-align: middle; border-radius: 2px; }
-  footer { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; padding: 6px 14px; background: var(--panel); border-top: 1px solid var(--line); font-size: 13px; }
-  .spacer { flex: 1; }
-  .warn { color: var(--warn); }
-  .exchange { color: #ffe28a; }
-  .live { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
-  .live i { width: 8px; height: 8px; border-radius: 50%; background: #6b3b3b; }
-  .live.on { color: var(--ok); }
-  .live.on i { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
-  code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
+  /* app/layout.module.css: the left bar, then the content */
+  .layout {
+    display: flex;
+    height: 100dvh;
+    width: 100%;
+    overflow: clip;
+    background: var(--bg-tertiary);
+  }
+
+  .mainContent {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-primary);
+  }
+
+  .mapView {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mapView.hidden {
+    display: none;
+  }
+
+  .banners {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .banners:not(:empty) {
+    padding: 0.625rem 1rem 0;
+  }
+
+  /* The map, in the same look as the Activity on Discord: the golden frame of the background hugs the page (stretched, so that it never moves when the map is zoomed: it is
+     behind the map, not in it), and the map and the card are dark translucent panels inside it, dark enough that the names stay readable over the ornaments */
+  main {
+    --frame: clamp(0.75rem, 3.6vmin, 2.75rem);
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    background: #050b1d url('/activity-background.webp') center / 100% 100% no-repeat;
+  }
+
+  .canvas {
+    position: absolute;
+    inset: var(--frame);
+    overflow: hidden;
+    background: rgba(5, 10, 28, 0.68);
+    border: 1px solid rgba(214, 165, 90, 0.28);
+    border-radius: 10px;
+  }
+
+  .canvas.with-card {
+    right: calc(min(22.5rem, 100%) + var(--frame) * 1.5); /* the map stays whole, next to the card */
+  }
+
+  /* ui.module.css .emptyState */
+  .empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: var(--space-3);
+    text-align: center;
+    pointer-events: none;
+    padding: var(--space-6);
+    color: var(--text-secondary);
+  }
+
+  .empty h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .empty p {
+    max-width: 44ch;
+  }
+
+  .legend {
+    position: absolute;
+    left: calc(var(--frame) + 0.875rem);        /* inside the panel of the map, not over the golden frame */
+    bottom: calc(var(--frame) + 0.75rem);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    display: grid;
+    gap: 0.375rem;
+    pointer-events: none;
+    background: var(--bg-glass);
+    backdrop-filter: blur(0.75rem);
+    -webkit-backdrop-filter: blur(0.75rem);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-md);
+    padding: 0.625rem 0.75rem;
+    border-radius: var(--radius-md);
+    max-width: min(26.25rem, 60vw);
+  }
+
+  .legend strong {
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  /* The colors of the points and lines are in lib/mapgraph.js: a point is the color of its person in Discord */
+  .dot {
+    display: inline-block;
+    border-radius: 50%;
+    background: conic-gradient(#e74c3c, #f1c40f, #2ecc71, #3498db, #9b59b6, #e74c3c);
+    vertical-align: middle;
+  }
+
+  .dot.big {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+
+  .bar {
+    display: inline-block;
+    width: 1.375rem;
+    height: 0.1875rem;
+    background: rgba(181, 186, 193, 0.6);
+    vertical-align: middle;
+    border-radius: 0.125rem;
+  }
+
+  /* The status line: the bar of the filters, upside down */
+  footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-subtle);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+
+  .spacer {
+    flex: 1;
+  }
+
+  .warn {
+    color: #ffb3b8;
+  }
+
+  .exchange {
+    color: #f0b232;
+    font-weight: 600;
+  }
+
+  .live {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.125rem 0.625rem;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-strong);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .live i {
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border-radius: 50%;
+    background: var(--text-muted);
+  }
+
+  .live.on {
+    color: #9de7b7;
+    background: rgba(35, 165, 90, 0.14);
+    border-color: rgba(35, 165, 90, 0.3);
+  }
+
+  .live.on i {
+    background: var(--success);
+    box-shadow: 0 0 0.375rem var(--success);
+  }
+
+  @media (max-width: 720px) {
+    .mainContent {
+      padding-top: calc(3.75rem + env(safe-area-inset-top));
+    }
+  }
+
+  /* On a phone the legend only keeps its first line: there is nothing to hover with a finger */
+  @media (max-width: 608px) {
+    .legend {
+      font-size: 0.6875rem;
+      max-width: calc(100% - 1.75rem);
+    }
+
+    .legend div:nth-child(2) {
+      display: none;
+    }
+  }
 </style>

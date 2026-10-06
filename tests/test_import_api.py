@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from dindon.api.main import create_app
 from dindon.collector.watch import Collector
 from synthetic import settings_for
-from test_collector import TOKEN, TOOLS, fake, message_count, world  # noqa: F401 (fixtures)
+from test_collector import TOKEN, fake, message_count, world  # noqa: F401 (fixtures)
 from test_import_selection import connection, ids_in, largest
 
 PASSWORD = "correct horse"
@@ -25,7 +25,7 @@ PASSWORD = "correct horse"
 def settings(fake, world, ingest_url, tmp_path):
     return dataclasses.replace(
         settings_for(ingest_url, tmp_path, PASSWORD), discord_api_url=fake.api_url, discord_token=TOKEN, guild_ids=(world.guild_id,),
-        exporter_path=f"{shlex.quote(sys.executable)} {shlex.quote(str(TOOLS / 'fake_exporter.py'))}", poll_seconds=0.2)
+        poll_seconds=0.2)
 
 
 @pytest.fixture
@@ -133,7 +133,7 @@ def test_the_channels_only_are_imported_completely_and_the_next_import_can_start
 
 
 def test_only_one_import_at_a_time_and_a_running_one_can_be_stopped(me, fake, world, ingest_url, monkeypatch):
-    monkeypatch.setenv("FAKE_EXPORTER_DELAY", "4")                                    # each channel takes a while
+    fake.latency = 0.6                                                                # each channel takes a while
     names = [c.name for c in world.channels[:3]]
     assert me.post("/api/import", json=body(world, channels=names)).status_code == 200
     time.sleep(0.8)
@@ -144,11 +144,11 @@ def test_only_one_import_at_a_time_and_a_running_one_can_be_stopped(me, fake, wo
     started = time.monotonic()
     assert me.post("/api/import/cancel").json()["state"] == "cancelling"
     status = wait_until_finished(me)
-    assert time.monotonic() - started < 12                                            # the exporters were ended, not waited for
+    assert time.monotonic() - started < 12                                            # the requests were ended, not waited for
     assert status["state"] == "cancelled" and status["cancelled"] == 3 and status["done"] == 0 and status["error"] is None
     with connection(ingest_url) as conn:
         assert message_count(conn) == 0                                               # what was not finished was not imported
-    monkeypatch.delenv("FAKE_EXPORTER_DELAY")
+    fake.latency = 0
     assert me.post("/api/import", json=body(world, channels=names[:1])).status_code == 200   # and a new one can start
     assert wait_until_finished(me)["state"] == "done"
 

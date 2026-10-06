@@ -2,7 +2,7 @@
 import socket
 import threading
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 
 import pytest
 import uvicorn
@@ -22,7 +22,7 @@ def snowflake_at(when: datetime) -> int:
 
 
 def test_the_time_carried_by_an_id_is_read_back():
-    when = datetime(2026, 10, 2, 21, 43, 16, 229000, tzinfo=timezone.utc)
+    when = datetime(2026, 10, 2, 21, 43, 16, 229000, tzinfo=UTC)
     assert snowflake_time(snowflake_at(when)) == pytest.approx(when.timestamp(), abs=0.001)
 
 
@@ -48,7 +48,7 @@ def test_a_message_written_two_seconds_ago_is_measured_at_two_seconds_and_nothin
     """An exchange gives an 'edge' event and a 'messages' event: both are dated from the message, as Discord dated it."""
     base = f"http://127.0.0.1:{port}"
     cookie = login(base, PASSWORD)
-    written = datetime.now(timezone.utc) - timedelta(seconds=2)
+    written = datetime.now(UTC) - timedelta(seconds=2)
     directory = Directory([GUILD])
     directory.apply("GUILD_CREATE", guild_create())
     alice_says = message_create(snowflake_at(written - timedelta(seconds=5)), "secret one", ALICE,
@@ -56,7 +56,7 @@ def test_a_message_written_two_seconds_ago_is_measured_at_two_seconds_and_nothin
     bob_replies = message_create(snowflake_at(written), "secret two", BOB, reply_to=alice_says, timestamp=written.isoformat())
     document = build_document(directory, GUILD, GENERAL, [alice_says, bob_replies])
     found: list = []
-    thread = threading.Thread(target=lambda: found.extend(listen(base, cookie, 2, 20, on_event=lambda *a: print(*a))), daemon=True)
+    thread = threading.Thread(target=lambda: found.extend(listen(base, cookie, 2, 20, on_event=print)), daemon=True)
     thread.start()
     time.sleep(1)  # the listener is connected before the exchange arrives
     ingest_document(ingest_db, document, GATEWAY_SOURCE, digest(document), only_new=True)

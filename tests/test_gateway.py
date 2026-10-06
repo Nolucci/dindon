@@ -52,7 +52,7 @@ class Harness:
                 raise AssertionError(f"the event never came (seen: {[(e.kind, e.type) for e in self.seen]}, source stopped with: {error!r})")
             try:
                 event = await asyncio.wait_for(self.source.events.get(), min(left, 0.5))
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             self.seen.append(event)
             if wanted(event):

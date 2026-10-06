@@ -88,10 +88,9 @@ with sync_playwright() as p:
         post(channel, b, "Je ne suis pas d'accord, voilà pourquoi…", first["id"])
         while time.monotonic() < started + 30 and int(page.get_attribute(".canvas", "data-flashes") or 0) <= before:
             time.sleep(0.02)
-        else:
-            if int(page.get_attribute(".canvas", "data-flashes") or 0) <= before:
-                failures.append("a line never lit up")
-                break
+        if int(page.get_attribute(".canvas", "data-flashes") or 0) <= before:
+            failures.append("a line never lit up")
+            break
         delays.append(time.monotonic() - started)
         if i == 0:
             time.sleep(0.3)

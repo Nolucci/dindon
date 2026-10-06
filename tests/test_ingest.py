@@ -5,7 +5,7 @@ Everything is invented (tools/make_demo_server.py). The database is a copy of th
 import hashlib
 import json
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from pathlib import Path
 
 import psycopg
@@ -139,7 +139,7 @@ def test_a_new_export_of_the_same_messages_changes_nothing(ingest_db, world, tmp
     """The same channel exported again later (other exportedAt, so another file): no duplicate, no double count."""
     conn = ingest_db
     channel = max(world.channels, key=lambda c: len(c.messages))
-    when = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    when = datetime(2026, 10, 1, tzinfo=UTC)
     ingest_file(conn, write_doc(tmp_path / "a.json", json.loads(world.export_document(channel, exported_at=when))))
     before, edges_before = counts(conn), edges_snapshot(conn)
     result = ingest_file(conn, write_doc(tmp_path / "b.json", json.loads(world.export_document(channel, exported_at=when + timedelta(hours=1)))))
@@ -154,7 +154,7 @@ def test_overlapping_exports_leave_no_duplicates(ingest_db, world, tmp_path):
     channel = max(world.channels, key=lambda c: len(c.messages))
     ids = [int(m["id"]) for m in channel.messages]
     first, second = ids[len(ids) // 3], ids[len(ids) // 3 * 2]
-    when = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    when = datetime(2026, 10, 1, tzinfo=UTC)
     docs = [world.export_document(channel, before_id=second, exported_at=when),                    # the beginning
             world.export_document(channel, after_id=first - 1, exported_at=when + timedelta(hours=1))]  # the end, overlapping
     for number, text in enumerate(docs):
@@ -192,7 +192,7 @@ def _document_of(world, channel, when):
 def test_an_edited_message_is_updated_and_its_children_replaced(ingest_db, world, tmp_path):
     conn = ingest_db
     channel = max(world.channels, key=lambda c: len(c.messages))
-    when = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    when = datetime(2026, 10, 1, tzinfo=UTC)
     ingest_file(conn, write_doc(tmp_path / "old.json", _document_of(world, channel, when)))
 
     document = _document_of(world, channel, when + timedelta(days=1))
@@ -209,7 +209,7 @@ def test_an_edited_message_is_updated_and_its_children_replaced(ingest_db, world
 
     mid = int(target["id"])
     assert conn.execute("SELECT content, edited_at FROM messages WHERE id = %s", (mid,)).fetchone() == (
-        "contenu corrigé", datetime(2026, 10, 1, 10, tzinfo=timezone.utc))
+        "contenu corrigé", datetime(2026, 10, 1, 10, tzinfo=UTC))
     assert conn.execute("SELECT user_id FROM mentions WHERE message_id = %s", (mid,)).fetchall() == [(int(other_user["id"]),)]
     assert conn.execute("SELECT emoji_key, count FROM reactions WHERE message_id = %s", (mid,)).fetchall() == [("👍", 2)]
     assert conn.execute("SELECT user_id FROM reaction_users WHERE message_id = %s ORDER BY user_id", (mid,)).fetchall() == sorted(
@@ -220,7 +220,7 @@ def test_an_edited_message_is_updated_and_its_children_replaced(ingest_db, world
 def test_an_older_export_never_overwrites_a_newer_one(ingest_db, world, tmp_path):
     conn = ingest_db
     channel = max(world.channels, key=lambda c: len(c.messages))
-    when = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    when = datetime(2026, 10, 1, tzinfo=UTC)
     newer = _document_of(world, channel, when + timedelta(days=1))
     target = newer["messages"][3]
     target["content"] = "version récente"
@@ -240,7 +240,7 @@ def test_an_older_export_never_overwrites_a_newer_one(ingest_db, world, tmp_path
 def test_someone_who_left_keeps_the_nickname_and_roles_known(ingest_db, world, tmp_path):
     conn = ingest_db
     channel = max(world.channels, key=lambda c: len(c.messages))
-    when = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    when = datetime(2026, 10, 1, tzinfo=UTC)
     full = _document_of(world, channel, when)
     person = next(u for u in full["users"] if u.get("roleIds") and u.get("nickname"))
     ingest_file(conn, write_doc(tmp_path / "full.json", full))
@@ -259,7 +259,7 @@ def test_someone_who_left_keeps_the_nickname_and_roles_known(ingest_db, world, t
 def test_names_are_kept_in_the_history(ingest_db, world, tmp_path):
     conn = ingest_db
     channel = max(world.channels, key=lambda c: len(c.messages))
-    when = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    when = datetime(2026, 10, 1, tzinfo=UTC)
     first = _document_of(world, channel, when)
     person = next(u for u in first["users"] if u.get("nickname"))
     ingest_file(conn, write_doc(tmp_path / "1.json", first))
@@ -282,7 +282,7 @@ def test_names_are_kept_in_the_history(ingest_db, world, tmp_path):
 def test_the_nightly_catch_up_removes_deleted_messages(ingest_db, world, tmp_path):
     conn = ingest_db
     channel = max(world.channels, key=lambda c: len(c.messages))
-    when = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    when = datetime(2026, 10, 1, tzinfo=UTC)
     ingest_file(conn, write_doc(tmp_path / "all.json", _document_of(world, channel, when)))
     edges_before = sum(w[1] for w in edges_snapshot(conn).values())
 
@@ -308,6 +308,35 @@ def test_the_nightly_catch_up_removes_deleted_messages(ingest_db, world, tmp_pat
 # ---------------------------------------------------------------------------------------------
 # Interruptions
 # ---------------------------------------------------------------------------------------------
+
+
+def test_the_nightly_catch_up_also_makes_a_debate_forget_the_messages_that_it_found_deleted(ingest_db, world, tmp_path):
+    conn = ingest_db
+    channel = max(world.channels, key=lambda c: len(c.messages))
+    when = datetime(2026, 10, 1, tzinfo=UTC)
+    ingest_file(conn, write_doc(tmp_path / "all.json", _document_of(world, channel, when)))
+
+    ids = [int(m["id"]) for m in channel.messages]
+    window_start = ids[len(ids) * 2 // 3]
+    document = json.loads(world.export_document(channel, after_id=window_start, exported_at=when + timedelta(days=1)))
+    victims = [m for m in document["messages"][1:-1] if m.get("reference") or m.get("reactions")][:3]
+    assert victims
+    document["messages"] = [m for m in document["messages"] if m not in victims]
+    document["messageCount"] = len(document["messages"])
+    # An export that is not a complete window (manual, maybe filtered) never deletes anything
+    ingest_file(conn, write_doc(tmp_path / "manual.json", document))
+    assert conn.execute("SELECT count(*) FROM messages WHERE id = ANY(%s)", ([int(v["id"]) for v in victims],)).fetchone() == (3,)
+
+    [(debate,)] = conn.execute("INSERT INTO debates (guild_id, channel_id, topic) VALUES (1, 2, 'Un sujet') RETURNING id").fetchall()
+    kept = next(int(m["id"]) for m in document["messages"][1:-1] if m not in victims)
+    for message_id in [int(v["id"]) for v in victims] + [kept]:
+        conn.execute("INSERT INTO debate_messages (debate_id, message_id, author_id, sent_at) VALUES (%s, %s, 1, now())", (debate, message_id))
+        conn.execute("INSERT INTO debate_claims (debate_id, message_id, author_id, claim, said, verdict) VALUES (%s, %s, 1, 'Une affirmation', 'une affirmation', 'confirmed')", (debate, message_id))
+    document["exportedAt"] = "2026-10-02T01:00:00.000Z"  # a different file for the catch-up run
+    result = ingest_file(conn, write_doc(tmp_path / "catch-up.json", document), prune=True)
+    assert result.messages_removed == 3
+    assert [r[0] for r in conn.execute("SELECT message_id FROM debate_messages WHERE debate_id = %s", (debate,))] == [kept]        # the debate forgot exactly those
+    assert [r[0] for r in conn.execute("SELECT message_id FROM debate_claims WHERE debate_id = %s", (debate,))] == [kept]          # and what it had read in them
 
 
 def test_a_failing_file_leaves_nothing_and_the_import_can_be_resumed(ingest_db, files, tmp_path):
@@ -348,12 +377,12 @@ def test_an_ingestion_notifies_the_links_that_gained_an_exchange(ingest_db, inge
     conn = ingest_db
     channel = world.channels[0]
     alice, bob = world.people[0], world.people[1]
-    first = world.post(channel, alice, "bonjour", datetime(2026, 10, 1, 8, tzinfo=timezone.utc))
-    ingest_file(conn, write_doc(tmp_path / "1.json", json.loads(world.export_document(channel, exported_at=datetime(2026, 10, 1, 9, tzinfo=timezone.utc)))))
+    first = world.post(channel, alice, "bonjour", datetime(2026, 10, 1, 8, tzinfo=UTC))
+    ingest_file(conn, write_doc(tmp_path / "1.json", json.loads(world.export_document(channel, exported_at=datetime(2026, 10, 1, 9, tzinfo=UTC)))))
     listener = psycopg.connect(ingest_url, autocommit=True)
     listener.execute("LISTEN dindon")
-    reply = world.post(channel, bob, "salut !", datetime(2026, 10, 1, 8, 5, tzinfo=timezone.utc), reply_to=first)
-    document = json.loads(world.export_document(channel, after_id=int(first["id"]), exported_at=datetime(2026, 10, 1, 9, 5, tzinfo=timezone.utc)))
+    reply = world.post(channel, bob, "salut !", datetime(2026, 10, 1, 8, 5, tzinfo=UTC), reply_to=first)
+    document = json.loads(world.export_document(channel, after_id=int(first["id"]), exported_at=datetime(2026, 10, 1, 9, 5, tzinfo=UTC)))
     result = ingest_file(conn, write_doc(tmp_path / "2.json", document))
     assert result.messages_new == 1
     events = [json.loads(n.payload) for n in listener.notifies(timeout=2, stop_after=2)]
@@ -381,7 +410,7 @@ def test_a_catch_up_that_seems_to_lack_most_of_a_window_deletes_nothing(ingest_d
     """A broken export must not wipe what is known: more than 30% of a window missing is not believed."""
     conn = ingest_db
     channel = max(world.channels, key=lambda c: len(c.messages))
-    when = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    when = datetime(2026, 10, 1, tzinfo=UTC)
     ingest_file(conn, write_doc(tmp_path / "all.json", _document_of(world, channel, when)))
     ids = [int(m["id"]) for m in channel.messages]
     document = json.loads(world.export_document(channel, after_id=ids[len(ids) // 4], exported_at=when + timedelta(days=1)))
@@ -415,7 +444,7 @@ def small_world():
 def test_a_document_in_memory_and_the_same_file_share_one_ledger(ingest_db, small_world, tmp_path):
     conn = ingest_db
     channel = max(small_world.channels, key=lambda c: len(c.messages))
-    text = small_world.export_document(channel, exported_at=datetime(2026, 10, 1, tzinfo=timezone.utc))
+    text = small_world.export_document(channel, exported_at=datetime(2026, 10, 1, tzinfo=UTC))
     sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
     first = ingest_document(conn, json.loads(text), "from memory", sha)
     assert first.status == "imported" and first.messages_new == len(channel.messages)
@@ -450,7 +479,7 @@ def test_only_new_adds_the_new_message_and_leaves_every_other_one_untouched(inge
     conn = ingest_db
     world, channel = small_world, max(small_world.channels, key=lambda c: len(c.messages))
     alice, bob = world.people[0], world.people[1]
-    t0 = datetime(2026, 10, 1, 9, tzinfo=timezone.utc)
+    t0 = datetime(2026, 10, 1, 9, tzinfo=UTC)
     first = world.post(channel, alice, "bonjour tout le monde", t0 - timedelta(hours=1))
     ingest_document(conn, json.loads(world.export_document(channel, exported_at=t0)), "export", "a" * 64)
     reactions_before = conn.execute("SELECT count(*) FROM reaction_users").fetchone()[0]
@@ -480,7 +509,7 @@ def test_the_same_new_message_announced_twice_counts_once(ingest_db, small_world
     conn = ingest_db
     world, channel = small_world, max(small_world.channels, key=lambda c: len(c.messages))
     alice, bob = world.people[0], world.people[1]
-    t0 = datetime(2026, 10, 1, 9, tzinfo=timezone.utc)
+    t0 = datetime(2026, 10, 1, 9, tzinfo=UTC)
     first = world.post(channel, alice, "bonjour", t0 - timedelta(hours=1))
     ingest_document(conn, json.loads(world.export_document(channel, exported_at=t0)), "export", "b" * 64)
     world.post(channel, bob, "salut", t0 + timedelta(minutes=1), reply_to=first)
@@ -504,7 +533,7 @@ def test_a_failed_attempt_leaves_the_document_intact_so_that_it_can_be_sent_agai
     """The bot retries the very same document after a database error: it must still have its messages."""
     conn = ingest_db
     channel = max(small_world.channels, key=lambda c: len(c.messages))
-    document = json.loads(small_world.export_document(channel, exported_at=datetime(2026, 10, 1, tzinfo=timezone.utc)))
+    document = json.loads(small_world.export_document(channel, exported_at=datetime(2026, 10, 1, tzinfo=UTC)))
     expected = len(document["messages"])
     broken = {**document, "messages": [*document["messages"], {"id": "9" * 15}]}  # one message lacks its fields: the file fails
     with pytest.raises(InvalidExport):

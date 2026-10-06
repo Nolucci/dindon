@@ -1,4 +1,4 @@
-"""The watcher: finds out what is new on Discord, has the exporter fetch it, and imports it.
+"""The watcher: finds out what is new on Discord, has Dindon's exporter (export/) fetch it, and imports it.
 
 Every `poll_seconds` (30 to 60): one request per server reads the latest message id of each channel. A channel
 whose latest message is newer than the newest one in the database is exported with `--after <that id>`, which
@@ -17,25 +17,30 @@ import logging
 import tempfile
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Callable
 
 import psycopg
+from psycopg.types.json import Jsonb
 
+from dindon.clock import utc_iso, utc_now
 from dindon.collector.discord_api import DiscordAPI, DiscordError, RateLimited, Watched
-from dindon.collector.exporter import Exporter, ExporterCancelled, ExporterError
 from dindon.collector.selection import ImportSelection, resolve_channels
 from dindon.collector.snowflake import DISCORD_EPOCH_MS, created_at, snowflake_at  # noqa: F401 (also read from here)
 from dindon.config import Settings
 from dindon.db import connect
+from dindon.export import Exporter, ExporterCancelled, ExporterError
 from dindon.ingest.inbox import archive_file
 from dindon.ingest.loader import GATEWAY_SOURCE, InvalidExport, ingest_file
 
 log = logging.getLogger("dindon.collector")
 
+CATCHUP_KEY = "collector.last_catchup"  # in runtime_settings: when the last catch-up was made
+BOT_SEEN_KEY = "collector.bot_seen"      # in runtime_settings: which start and session of the bot the gaps were last looked at for
+GAP_FILL_MIN_SECONDS = 600               # a bot that restarts in a loop does not make a round of the watcher every time
 BACKFILL_PARTITION = 50_000  # messages per file in a first import: each file is complete, so progress is kept
 
 
@@ -50,17 +55,21 @@ class Collector:
     def __init__(self, settings: Settings, api: DiscordAPI | None = None, exporter: Exporter | None = None):
         self.settings = settings
         self.api = api or DiscordAPI(settings.discord_api_url, settings.discord_token)
-        self.exporter = exporter or Exporter(settings.exporter_path, settings.discord_token)
+        self.exporter = exporter or Exporter.from_settings(settings)
         self._exported_up_to: dict[int, int] = {}      # latest message id seen when a channel was last exported
         self._failures: dict[int, tuple[int, float]] = {}  # channel -> (failures in a row, do not retry before)
         self._last_catchup_day = None
+        self._bot_seen: dict | None = None                 # the start and the session count of the bot when its gaps were last looked at
+        self._last_gap_fill = float("-inf")
+        self._catchup_recalled = False                     # the day of the last catch-up is read from the database once (it survives a restart)
         self._state: dict = {"last_poll_at": None, "last_error": None, "exports": 0, "last_export_at": None, "last_catchup_at": None}
         self._needs_backfill: set[int] = set()
 
     # --- what the interface shows ------------------------------------------------------------------
 
     def status(self) -> dict:
-        return {"enabled": True, "token_kind": self.api.token_kind, "guilds": [str(g) for g in self.settings.guild_ids],
+        return {"enabled": True, "mode": "catchup" if self.settings.collector_catchup_only else "poll", "token_kind": self.api.token_kind,
+                "guilds": [str(g) for g in self.settings.followed()],
                 "needs_backfill": sorted(str(g) for g in self._needs_backfill), "failing_channels": len(self._failures), **self._state}
 
     # --- what is known ------------------------------------------------------------------------------
@@ -112,7 +121,7 @@ class Collector:
                 for path in self.exporter.export(channel.id, Path(tmp), after=after, threads=threads, partition=partition, before=before,
                                                  message_filter=message_filter, cancel=cancel):
                     if path.stat().st_size == 0:
-                        continue  # an empty channel, or nothing new: the exporter leaves an empty file
+                        continue  # (a file that is empty: nothing to import)
                     result = ingest_file(conn, path, prune=prune, partial=partial)
                     if result.prune_skipped:
                         log.warning("channel %s: %d messages seem deleted but it is too many to be believed: kept", channel.id, result.prune_skipped)
@@ -127,7 +136,7 @@ class Collector:
             self._exported_up_to[channel.id] = channel.last_message_id or 0
         self._failures.pop(channel.id, None)
         self._state["exports"] += 1
-        self._state["last_export_at"] = datetime.now(timezone.utc).isoformat()
+        self._state["last_export_at"] = utc_iso()
         return ExportOutcome(True, new)
 
     # --- watching -----------------------------------------------------------------------------------
@@ -138,9 +147,9 @@ class Collector:
     def poll(self, conn: psycopg.Connection) -> int:
         """One round: returns how many channels were exported."""
         self.api.resolve_kind()
-        self._state["last_poll_at"] = datetime.now(timezone.utc).isoformat()
+        self._state["last_poll_at"] = utc_iso()
         exports = 0
-        for guild_id in self.settings.guild_ids:
+        for guild_id in self.settings.followed():
             channels = self._channels_of(guild_id)
             # The first import is an import of a complete history: what the live bot writes, or a narrowed import, does not count
             first_import = conn.execute("SELECT min(imported_at) FROM ingest_runs WHERE guild_id = %s AND source_file IS DISTINCT FROM %s "
@@ -168,16 +177,25 @@ class Collector:
             self._state["last_error"] = None
         return exports
 
+    def _recall_catchup(self, conn: psycopg.Connection) -> None:
+        """The day of the last catch-up, from the database: without it every restart of the application (a new image, a reboot) made a catch-up of its own."""
+        self._catchup_recalled = True
+        row = conn.execute("SELECT value FROM runtime_settings WHERE key = %s", (CATCHUP_KEY,)).fetchone()
+        if row and (at := row[0].get("at")):
+            when = datetime.fromisoformat(at)
+            self._last_catchup_day = when.date()
+            self._state["last_catchup_at"] = at
+
     def catchup_due(self, now: datetime) -> bool:
         return now.hour >= self.settings.catchup_hour_utc and self._last_catchup_day != now.date()
 
     def catchup(self, conn: psycopg.Connection, now: datetime | None = None) -> int:
         """Exports the last days again, to see what was edited or deleted since. Returns how many channels."""
-        now = now or datetime.now(timezone.utc)
+        now = now or utc_now()
         since = now - timedelta(days=self.settings.catchup_days)
         channels = [r[0] for r in conn.execute(
             """SELECT DISTINCT m.channel_id FROM messages m JOIN channels c ON c.id = m.channel_id
-               WHERE c.guild_id = ANY(%s) AND m.sent_at > %s""", (list(self.settings.guild_ids), since))]
+               WHERE c.guild_id = ANY(%s) AND m.sent_at > %s""", (list(self.settings.followed()), since))]
         done = 0
         for channel_id in channels:
             if self._backing_off(channel_id):
@@ -186,11 +204,50 @@ class Collector:
             done += outcome.ok
         self._last_catchup_day = now.date()
         self._state["last_catchup_at"] = now.isoformat()
+        conn.execute("INSERT INTO runtime_settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = now()",
+                     (CATCHUP_KEY, Jsonb({"at": now.isoformat()})))
+        if not self._failures:  # what failed has worked again: the error is over (it stays on display while a channel still fails)
+            self._state["last_error"] = None
         return done
 
-    def tick(self, conn: psycopg.Connection) -> None:
+    def _fill_bot_gaps(self, conn: psycopg.Connection) -> bool:
+        """The messages that the live bot could not receive: it was restarted, or Discord gave it a new session (its sign of life says so: `started_at`, `gaps`).
+        One round of the watcher then brings what is new in the channels that it already has, without waiting for the night. Rare: at most one such round
+        every GAP_FILL_MIN_SECONDS, and none the first time (nothing to compare with). Returns whether a round was made."""
+        row = conn.execute("SELECT data FROM service_status WHERE name = 'bot'").fetchone()
+        if row is None:
+            return False
+        current = {"started_at": row[0].get("started_at"), "gaps": row[0].get("gaps", 0)}
+        if self._bot_seen is None:
+            recalled = conn.execute("SELECT value FROM runtime_settings WHERE key = %s", (BOT_SEEN_KEY,)).fetchone()
+            self._bot_seen = recalled[0] if recalled else current
+        if current == self._bot_seen or time.monotonic() - self._last_gap_fill < GAP_FILL_MIN_SECONDS:
+            return False
+        log.info("the bot was restarted or reconnected with a new session: looking for what it could not receive")
+        self._last_gap_fill = time.monotonic()
         self.poll(conn)
-        if self.catchup_due(datetime.now(timezone.utc)):
+        self._bot_seen = current
+        conn.execute("INSERT INTO runtime_settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = now()",
+                     (BOT_SEEN_KEY, Jsonb(current)))
+        return True
+
+    def _note_backfill(self, conn: psycopg.Connection) -> None:
+        """Which followed servers have no first import yet (from the database alone: nothing is asked of Discord)."""
+        for guild_id in self.settings.followed():
+            first = conn.execute("SELECT min(imported_at) FROM ingest_runs WHERE guild_id = %s AND source_file IS DISTINCT FROM %s "
+                                 "AND NOT is_partial", (guild_id, GATEWAY_SOURCE)).fetchone()[0]
+            (self._needs_backfill.add if first is None else self._needs_backfill.discard)(guild_id)
+
+    def tick(self, conn: psycopg.Connection) -> None:
+        if self.settings.collector_catchup_only:             # the live bot brings the new messages: no polling, only the night's catch-up (and a round after a gap)
+            self.api.resolve_kind()                         # bot or account (the interface warns about an account), and a wrong token is told
+            self._note_backfill(conn)
+            self._fill_bot_gaps(conn)
+        else:
+            self.poll(conn)
+        if not self._catchup_recalled:
+            self._recall_catchup(conn)
+        if self.catchup_due(utc_now()):
             self.catchup(conn)
 
     async def run(self) -> None:

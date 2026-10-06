@@ -10,8 +10,9 @@
 --
 -- Nine more axes cover what the 12 do not: Europe, ecology, method of change, and six more that
 -- matter in French political debate (social protection and taxes, trust in institutions, gender,
--- animals, alliances, direct democracy). They are all present but inactive: they are not scored
--- until you have reviewed them and activated them (UPDATE axes SET is_active = true ...).
+-- animals, alliances, direct democracy). All 21 are active (decided on 2026-10-04: measured on 55
+-- statements, the model puts far fewer statements on a wrong axis when it can see Europe, ecology...).
+-- To switch one off: UPDATE axes SET is_active = false WHERE code = '...'.
 -- AXES.md lists everything in a readable way; it is generated from the database.
 --
 -- Scores go from -1 to +1. The poles are not "good" or "bad": what matters is that the question is
@@ -25,8 +26,8 @@
 INSERT INTO scoring_settings (key, value, description) VALUES
     ('prior_weight',       1,    'Amount of doubt (a score of 0) added to the evidence, so that one remark never gives a firm score'),
     ('uncertainty_floor',  0.35, 'Smallest possible uncertainty, for the errors that an analysis cannot avoid (sarcasm, quotes...)'),
-    ('min_propositions',   3,    'Fewest positions needed on an axis before a claimed ideology can be checked against it'),
-    ('min_evidence_weight',1.5,  'Least confidence-weighted evidence needed on an axis before it can be checked')
+    ('min_propositions',   1,    'Fewest positions needed on an axis before a claimed ideology can be checked against it'),
+    ('min_evidence_weight',0.5,  'Least confidence-weighted evidence needed on an axis before it can be checked')
 ON CONFLICT (key) DO NOTHING;
 
 -- ---------------------------------------------------------------------------------------------
@@ -99,47 +100,47 @@ INSERT INTO axes (code, name, question, negative_pole, positive_pole, definition
  'Faut-il plus de pouvoir national ou plus d''intégration européenne ?',
  'Souveraineté nationale', 'Intégration européenne',
  'Place de l''Union européenne, de l''euro et des traités par rapport aux décisions nationales.',
- 'Le commerce mondial en général (axe commerce) et la structure interne de l''État (axe structure).', 13, false, 'custom'),
+ 'Le commerce mondial en général (axe commerce) et la structure interne de l''État (axe structure).', 13, true, 'custom'),
 ('ecologie', 'Écologie',
  'Faut-il subordonner l''économie à l''environnement ?',
  'Productivisme', 'Écologie',
  'Climat, énergie, biodiversité, sobriété, croissance, contraintes environnementales, condition animale.',
- 'La prudence envers la technologie (axe technologie), le rôle de l''État (axes economie et controle) et la condition animale (axe animaux).', 14, false, 'custom'),
+ 'La prudence envers la technologie (axe technologie), le rôle de l''État (axes economie et controle) et la condition animale (axe animaux).', 14, true, 'custom'),
 ('rupture', 'Méthode de changement',
  'Faut-il changer la société par la réforme ou par la rupture ?',
  'Réforme', 'Rupture',
  'La façon de changer les choses, quelle que soit la direction : compromis et réformes graduelles, ou changement radical du système.',
- 'La direction du changement (tous les autres axes).', 15, false, 'custom'),
+ 'La direction du changement (tous les autres axes).', 15, true, 'custom'),
 ('redistribution', 'Protection sociale et fiscalité',
  'Faut-il réduire les inégalités par l''impôt et la protection sociale, ou laisser chacun responsable de ses revenus ?',
  'Redistribution', 'Mérite individuel',
  'Impôts, prestations sociales, retraites, assurance chômage, droit du travail et lutte contre les inégalités, face à la responsabilité individuelle, à la baisse des prélèvements et à la flexibilité.',
- 'La propriété des entreprises (axe economie) et la planification (axe controle).', 16, false, 'custom'),
+ 'La propriété des entreprises (axe economie) et la planification (axe controle).', 16, true, 'custom'),
 ('confiance', 'Confiance dans les institutions et les experts',
  'Faut-il faire confiance aux institutions, aux experts et aux médias établis, ou s''en défier ?',
  'Confiance', 'Défiance',
  'Confiance dans les institutions, la science, les experts, la justice et les grands médias, face à la défiance envers les élites et les versions officielles.',
- 'Le régime politique (axe representation) et les opinions sur un sujet précis (qui relèvent des autres axes).', 17, false, 'custom'),
+ 'Le régime politique (axe representation) et les opinions sur un sujet précis (qui relèvent des autres axes).', 17, true, 'custom'),
 ('genre', 'Genre et égalité des sexes',
  'Faut-il aller vers plus d''égalité et de fluidité des genres, ou maintenir des rôles et des identités traditionnels ?',
  'Égalité des genres', 'Rôles traditionnels',
  'Égalité entre les sexes, féminisme, identités de genre, droits des personnes LGBT, face aux rôles et aux différences traditionnels entre hommes et femmes.',
- 'La famille et les mœurs en général (axe morale).', 18, false, 'custom'),
+ 'La famille et les mœurs en général (axe morale).', 18, true, 'custom'),
 ('animaux', 'Condition animale',
  'Faut-il reconnaître des droits aux animaux ou conserver leur usage par l''humain ?',
  'Droits des animaux', 'Usage humain des animaux',
  'Élevage, chasse, corrida, expérimentation animale, alimentation carnée, statut juridique de l''animal.',
- 'Les politiques environnementales en général (axe ecologie).', 19, false, 'custom'),
+ 'Les politiques environnementales en général (axe ecologie).', 19, true, 'custom'),
 ('alliances', 'Alliances et blocs',
  'Faut-il rester arrimé au bloc occidental ou rester non-aligné ?',
  'Non-alignement', 'Atlantisme',
  'OTAN, alliance avec les États-Unis, appartenance au bloc occidental, rapport à la Russie et à la Chine, face à l''indépendance et au non-alignement.',
- 'L''usage de la force en soi (axe diplomatie) et l''ouverture aux échanges (axe commerce).', 20, false, 'custom'),
+ 'L''usage de la force en soi (axe diplomatie) et l''ouverture aux échanges (axe commerce).', 20, true, 'custom'),
 ('participation', 'Démocratie directe ou représentative',
  'Les citoyens doivent-ils décider directement, ou par l''intermédiaire d''élus ?',
  'Démocratie directe', 'Démocratie représentative',
  'Référendum d''initiative citoyenne, tirage au sort, assemblées citoyennes et consultation permanente, face à la délégation du pouvoir à des élus et à un exécutif stable.',
- 'Le fait d''être démocratique ou non (axe representation).', 21, false, 'custom')
+ 'Le fait d''être démocratique ou non (axe representation).', 21, true, 'custom')
 ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO axis_anchors (axis_id, value, description)

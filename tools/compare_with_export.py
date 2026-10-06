@@ -4,7 +4,7 @@ The bot builds its documents itself, and the exporter is the reference: the same
 author, time, who it replied to, who it mentions). This is the check, on a real server, that the bot writes what the exporter
 would have written. Messages that were edited after the bot saw them are counted apart: the bot does not apply edits yet.
 
-    docker compose exec app sh -c '/opt/exporter/DiscordChatExporter.Cli export -c CHANNEL_ID -f Json -o /tmp/parity/'
+    docker compose exec app dindon export CHANNEL_ID --out /tmp/parity --reactions none
     docker compose cp app:/tmp/parity ./parity
     .venv/bin/python tools/compare_with_export.py parity/*.json            # which fields differ, without showing any text
     .venv/bin/python tools/compare_with_export.py --show parity/*.json     # and the two values (cut at 80 characters)

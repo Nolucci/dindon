@@ -36,3 +36,12 @@ def ollama_report(base_url: str) -> dict:
         return {"reachable": True, "models": models}
     except Exception:
         return {"reachable": False, "models": []}
+
+
+BOT_SILENT_AFTER = 120  # seconds without a sign of life from the bot (it gives one every 30): the same limit as the page « Système »
+
+
+def bot_is_alive(conn: psycopg.Connection, max_age: int = BOT_SILENT_AFTER) -> bool:
+    """Did the bot give a sign of life lately, and is it connected to Discord? (What `dindon bot-health` answers: the check of its container, which has no web port.)"""
+    row = conn.execute("SELECT extract(epoch FROM now() - updated_at), coalesce((data->>'connected')::boolean, false) FROM service_status WHERE name = 'bot'").fetchone()
+    return row is not None and row[0] <= max_age and row[1]

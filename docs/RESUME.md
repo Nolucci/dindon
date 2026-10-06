@@ -1,6 +1,6 @@
 # Dindon en résumé
 
-> Mise à jour : 2 octobre 2026. Vue d'ensemble de l'application, de la collecte Discord (le « bot ») et de l'architecture. Les détails sont dans les pages listées à la fin.
+> Mise à jour : 4 octobre 2026. Vue d'ensemble de l'application, de la collecte Discord (le « bot ») et de l'architecture. Les détails sont dans les pages listées à la fin ; **l'état pièce par pièce, avec le niveau de preuve de chaque affirmation, est dans [RAPPORT-COMPLET.md](RAPPORT-COMPLET.md)**.
 
 ## 1. L'idée
 
@@ -14,19 +14,21 @@ Il est fait pour une seule personne (francophone), sur un serveur dont on est me
 | --- | --- | --- |
 | 0. Socle | base PostgreSQL, migrations, `/health`, tests | **fait** |
 | 1. Carte des échanges, sans IA | import, surveillance, liens du graphe, API, direct, interface, démonstration | **fait** |
-| 2. Découverte des thèmes | banc d'essai du modèle, vecteurs, regroupement, validation | à faire (Ollama pas installé) |
-| 3. Affirmations et preuves | extraction par l'IA, propositions, citations cliquables | à faire |
-| 4. Classement et vérification | scores sur les axes, vérification avec les rôles, file « à revoir » | à faire (le calcul existe déjà en SQL) |
-| 5. Finitions | rejeu dans le temps, cartes de divertissement, pseudonymes, effacement, bot en direct | à faire |
+| 2. Découverte des thèmes | conversations, tri, vecteurs, regroupement, noms par un modèle local, **validation par vous** (page Thèmes) | **fait**, testé avec un faux Ollama et **mesuré** avec les vrais modèles sur des données inventées ; jamais lancé sur un vrai serveur ([ANALYSE.md](ANALYSE.md)) |
+| 3. Affirmations et preuves | extraction par l'IA (avec la citation exacte, sinon refusée), propositions, citations cliquables (page Positions) | **fait**, **mesuré** sur données inventées ; jamais lancé sur un vrai serveur |
+| 4. Classement et vérification | 21 axes, scores par personne, vérification des rôles d'idées (page Cohérence), validation des poids par une personne | **fait**, **mesuré** sur données inventées ([VALIDATION-AXES.md](VALIDATION-AXES.md)) |
+| 5. Bot en direct, vie privée, exportateur, performance | bot Gateway, commandes `/dindon`, effacement, exportateur Python, limites de performance, lecture automatique | **fait** ; le bot et l'exportateur ont tourné sur le vrai Discord (en partie), le reste est testé avec des faux |
+| 6. Débats | `/dindon debat` : fil, positions, minuteur, vote, statistiques, **vérification des affirmations sur Internet** (lecture à l'aveugle, sources de confiance, citations vérifiées), **corrections publiques** verrouillées par une précision mesurée, page Débats ([DEBAT.md](DEBAT.md)) | **fait**, testé avec un Discord, un modèle et un Internet simulés ; **lecture mesurée** avec le vrai modèle ; jamais sur un vrai Discord |
+| À faire | modifications/suppressions/réactions en direct, rattrapage des trous après reconnexion, consentement préalable, pseudonymisation, rejeu dans le temps | voir [RAPPORT-COMPLET.md](RAPPORT-COMPLET.md) §16 |
 
-« Fait » veut dire construit et testé (78 tests) **avec un faux Discord** : **rien n'a encore tourné contre le vrai Discord** (pas de jeton). Tout ce travail est dans `dindon/`, un dépôt Git local sans aucun dépôt distant ; la dernière étape (interface, documentation, outils) n'est pas encore commitée.
+« Fait » veut dire construit et testé (872 tests) avec des **faux** (Discord, Gateway, Ollama). **Sur le vrai Discord** ont tourné : la connexion du bot, la lecture de deux serveurs, l'ingestion de leurs messages, la lecture REST de l'exportateur et le rattrapage nocturne. **Jamais sur du vrai** : l'analyse par l'IA, les commandes `/dindon` utilisées par un membre, la fenêtre « Importer », un gros salon. Tout ce travail est dans `dindon/`, un dépôt Git local sans aucun dépôt distant ; la plus grande partie n'est pas commitée.
 
 ## 3. L'application
 
 ### Ce qu'on voit
 
 - **La carte** : un point par personne (taille : poids de ses échanges ; couleur : activité récente), une ligne par paire de personnes qui se parlent. Une case **« Personnes sans lien »** (cochée au départ) ajoute toutes celles qui ont déjà écrit mais n'ont aucun lien affiché, en petits points, quelle que soit la période. Les noms sont lisibles ; les liens forment une toile discrète qui devient nette, avec le nom des interlocuteurs principaux, quand on **survole ou clique** une personne. Quand un nouvel échange arrive, **son lien s'illumine**.
-- **La fiche d'une personne** (au clic) : activité, échanges envoyés et reçus, liens principaux, salons les plus fréquentés, et les rôles d'idéologie qu'elle s'est donnés (présentés comme **non vérifiés**). Les positions sur les idées et leur vérification arrivent avec les phases 3 et 4.
+- **La fiche d'une personne** (au clic) : activité, échanges envoyés et reçus, liens principaux, salons les plus fréquentés, et les rôles d'idéologie qu'elle s'est donnés (présentés comme **non vérifiés**). Ses **positions sur les idées** (avec la citation), **une barre par axe** (21 axes) avec la marge d'incertitude et ce qu'attendent les rôles qu'elle s'est donnés, ses thèmes et **avec qui elle en a parlé** (d'accord ou non).
 - **Filtres** : période (tout, 90 / 30 / 7 jours, dates), types d'échanges (réponses, mentions, réactions), nombre de liens affichés, recherche d'une personne.
 - **Bandeau et bas de page** : un **bandeau d'avertissement** en haut si un compte personnel est automatisé ; en bas, l'état du direct, le nombre de personnes et de liens, le dernier échange et l'état de la surveillance.
 
@@ -37,19 +39,21 @@ Il est fait pour une seule personne (francophone), sur un serveur dont on est me
 | Essayer tout de suite, sans Discord | `make setup && make web && make demo`, puis http://127.0.0.1:8011 (mot de passe : `demo`) |
 | Lancer pour de bon | `cp .env.example .env` (choisir les deux mots de passe), `docker compose up -d --build`, puis http://127.0.0.1:8000 |
 | Importer des exports à la main | les déposer dans `inbox/` (importés, puis rangés dans `archive/`) |
-| Importer seulement une partie de l'historique | bouton **Importer…** de la page, ou `dindon backfill --channel … --from … --mentioning … --after … --before …` ([COLLECTE.md](COLLECTE.md)) : salons, personnes (par identifiant), période. Un import restreint par personnes ou par période est **partiel** : il ne compte pas comme un premier import. Testé avec un faux Discord |
+| Importer seulement une partie de l'historique | entrée **Importer** de la barre de gauche, ou `dindon backfill --channel … --from … --mentioning … --after … --before …` ([COLLECTE.md](COLLECTE.md)) : salons, personnes (par identifiant), période. Un import restreint par personnes ou par période est **partiel** : il ne compte pas comme un premier import. Testé avec un faux Discord |
+| Inviter le bot sur un serveur | entrée **Inviter le bot** de l'interface : lien d'invitation (voir les salons, lire l'historique, rien d'autre) et serveurs où le bot est, suivis ou non. Inviter n'enregistre rien : seuls les serveurs de `DINDON_GUILD_IDS` sont suivis. Testé avec un faux Discord, jamais sur le vrai |
+| Voir l'état de tout (bot, collecte, base, IA, serveurs suivis) | page **Système** : ce qui va bien, ce qui mérite un coup d'œil et le geste à faire. Le bot donne un signe de vie toutes les 30 s. Testé avec données simulées |
 | Lancer les tests | `make test` |
 | Vérifier la page dans un vrai navigateur | `make check-ui` (facultatif, demande Playwright) |
 
 ## 4. Le « bot » : comment les messages arrivent
 
-**Le bot en direct existe mais n'a jamais tourné sur le vrai Discord.** Les messages arrivent par trois portes qui mènent à la **même ingestion** :
+**Le bot en direct tourne** (connecté à deux serveurs, il enregistre les nouveaux messages). Il n'a jamais été éprouvé en conditions réelles de charge ni de reconnexion. Les messages arrivent par trois portes qui mènent à la **même ingestion** :
 
 | Mode | Fonctionnement | Délai | État |
 | --- | --- | --- | --- |
-| **A. À la main** | on dépose des exports JSON dans `inbox/` (par exemple faits avec l'application graphique de l'exportateur) | à la demande | fait |
-| **B. Surveillance** | l'application regarde ce qui a bougé et lance l'exportateur pour ces seuls salons | environ la moitié de l'intervalle de relevé (15 s par défaut) | fait, testé contre un faux Discord |
-| **C. Bot en direct** | un bot reçoit chaque nouveau message au moment où il est écrit (accès « Gateway »). Modifications, suppressions et réactions : **pas encore appliquées** | moins d'une seconde | écrit, **testé avec un faux Gateway seulement** ; jamais essayé sur le vrai Discord ([COLLECTE.md](COLLECTE.md)) |
+| **A. À la main** | on dépose des exports JSON dans `inbox/` (par exemple faits par `dindon export`) | à la demande | fait |
+| **B. Surveillance** | l'application regarde ce qui a bougé et fait lire ces seuls salons par l'exportateur de Dindon | environ la moitié de l'intervalle de relevé (15 s par défaut) | fait, testé contre un faux Discord |
+| **C. Bot en direct** | un bot reçoit chaque nouveau message au moment où il est écrit (accès « Gateway »). Modifications et suppressions : **appliquées en direct** ; les réactions viennent au rattrapage nocturne | moins d'une seconde | fait ; **vrai Discord** : connexion, deux serveurs, un message ingéré en 69 ms ; charge **mesurée** avec un faux Gateway (300 messages/s sans perte) ([COLLECTE.md](COLLECTE.md)) |
 
 ### La surveillance (mode B)
 
@@ -61,29 +65,29 @@ Il est fait pour une seule personne (francophone), sur un serveur dont on est me
 ### Jeton : bot ou compte personnel
 
 - Un **bot** est recommandé (il faut qu'un administrateur l'ajoute au serveur et active l'accès au contenu des messages).
-- Un **compte personnel** fonctionne aussi, mais **Discord l'interdit en automatique** et peut fermer le compte. Dindon détecte le type de jeton comme l'exportateur et **affiche un bandeau d'avertissement** tant qu'un compte est utilisé.
-- Le jeton et l'identifiant du serveur vont dans **`.env`** (`DISCORD_TOKEN`, `DINDON_GUILD_IDS`), jamais dans Git. Le jeton passe à l'exportateur par l'environnement, jamais sur la ligne de commande, et n'apparaît dans aucun journal.
+- Un **compte personnel** fonctionne aussi, mais **Discord l'interdit en automatique** et peut fermer le compte. Dindon détecte le type de jeton et **affiche un bandeau d'avertissement** tant qu'un compte est utilisé.
+- Le jeton et l'identifiant du serveur vont dans **`.env`** (`DISCORD_TOKEN`, `DINDON_GUILD_IDS`), jamais dans Git. Le jeton ne part que dans l'en-tête des requêtes à Discord, et n'apparaît dans aucun journal.
 
-### Le bot en direct (mode C), plus tard
+### Le bot en direct (mode C)
 
-L'ingestion est faite pour le recevoir : elle prend des messages décrits dans le format JSON version 2 et met à jour la base, les liens et les notifications de la même façon quelle que soit l'origine. Le bot n'est **pas** écrit, et il n'y a pas encore de classe `Source` dédiée : il faudra qu'il produise les mêmes écritures, sans toucher à l'ingestion.
+`app/dindon/bot/` : `gateway.py` (le seul fichier qui importe `discord.py`), `adapter.py` (un message du Gateway devient le même JSON v2 que celui de l'exportateur), `runner.py` (lots, signe de vie toutes les 30 s), `privacy_commands.py` (les commandes `/dindon`). Il suit les serveurs de `DINDON_GUILD_IDS`, ou **tous** ceux où il se trouve avec `DINDON_GUILD_IDS=all`. Modifications, suppressions et réactions ne sont pas reçues en direct : le rattrapage nocturne les corrige sur 7 jours ([COLLECTE.md](COLLECTE.md)).
 
 ### Limites connues
 
 - **Fils de discussion avec un compte** : un compte ne peut pas les lister d'un coup ; ils sont exportés avec leur salon parent et par le rattrapage nocturne. Avec un bot, ils sont surveillés un par un.
-- **Rien n'a tourné contre le vrai Discord.** L'exportateur a été compilé pour Linux ARM64 : il démarre dans l'image et accepte les arguments de la surveillance, rien de plus n'est vérifié.
+- **L'exportateur de Dindon (Python, `app/dindon/export/`)** : testé contre un faux Discord qui répond comme l'API REST, et **essayé en lecture seule sur 474 messages réels** (identiques à ce que l'ancien exportateur avait écrit, à de petites lacunes connues près) ; jamais sur un gros serveur ([EXPORTATEUR.md](EXPORTATEUR.md)).
 
 ## 5. L'architecture
 
 ```
  Discord ──(A) export à la main ───────────► inbox/ ──┐
-         ──(B) surveillance ─► exportateur ───────────┼─► ingestion ─► PostgreSQL 17 (+ pgvector)
-         ──(C) bot en direct  (à faire) ──────────────┘                  │         ▲
+         ──(B) surveillance ─► exportateur Dindon ──┼─► ingestion ─► PostgreSQL 17 (+ pgvector)
+         ──(C) bot en direct ─────────────────────────┘                  │         ▲
                                                                           │ NOTIFY  │ lectures
                                                                           ▼         │
                                                        API FastAPI + flux en direct (SSE) ──► carte web (Svelte + Sigma.js)
 
-   (à faire, phases 2 à 5)   ouvriers d'analyse ⇄ Ollama (modèle de langue + vecteurs) ◄──► PostgreSQL
+   analyse (conversations, thèmes, positions, axes)   ouvriers d'analyse ⇄ Ollama (hôte) ◄──► PostgreSQL
 ```
 
 **Cinq principes**
@@ -98,11 +102,11 @@ L'ingestion est faite pour le recevoir : elle prend des messages décrits dans l
 
 | Pièce | Rôle |
 | --- | --- |
-| `db` (PostgreSQL 17 + pgvector) | toute la donnée : 37 tables et 9 vues du kit de départ, dont 21 axes (12 actifs) et leurs idéologies |
+| `db` (PostgreSQL 17 + pgvector) | toute la donnée : 52 tables (37 du kit de départ, 2 de l'analyse, 1 des services, 2 de la vie privée, 1 des réglages, 8 des débats) et 9 vues, dont 21 axes (tous actifs) et leurs idéologies |
 | `app` (Python, FastAPI) | un seul processus : ingestion, boîte `inbox/`, surveillance, API, flux en direct, et service de l'interface |
-| exportateur (programme C#) | lit Discord et écrit les fichiers JSON ; monté depuis `exporter/bin/` |
+| exportateur de Dindon (`app/dindon/export/`, Python) | lit Discord et écrit les fichiers JSON v2, dans le même processus que l'application |
 | interface (Svelte 5, Vite, Sigma.js, graphology) | carte WebGL, placement des points (ForceAtlas2) dans un thread à part |
-| `ollama` (profil optionnel) | l'IA locale ; pas encore utilisée |
+| `ollama` (profil optionnel) | l'IA locale pour un serveur Linux ; sur un Mac, Ollama tourne directement sur la machine (GPU) et l'application le joint par `host.docker.internal` |
 
 **Ce que fait l'ingestion** (`app/dindon/ingest/`) : un fichier = une transaction ; **idempotente** (un fichier déjà importé est ignoré, deux exports qui se chevauchent ne créent aucun doublon) ; un message modifié est mis à jour avec ses pièces jointes, mentions, émojis et réactions ; un export plus ancien que ce que la base sait n'écrase jamais rien ; l'identité d'une personne est son **identifiant**, jamais son nom.
 
@@ -119,14 +123,13 @@ dindon/
   web/             interface (Svelte + Sigma.js)
   contracts/       le contrat de données (JSON version 2)
   tools/           démonstration, faux Discord, vérification de la page, mesures
-  tests/           78 tests, données inventées uniquement
-  exporter/        l'exportateur (binaire non versionné)
+  tests/           872 tests, données inventées uniquement
   docs/            la documentation, en français
 ```
 
-## 6. L'analyse par IA (prévue, phases 2 à 5)
+## 6. L'analyse par IA (étapes 1 à 7 faites, jamais lancées sur de vraies données)
 
-L'IA ne lit pas tout : c'est une **cascade** qui garde le coûteux pour la fin.
+L'IA ne lit pas tout : c'est une **cascade** qui garde le coûteux pour la fin. **Les étapes 1 à 7 sont faites** et mesurées sur des données inventées : voir [ANALYSE.md](ANALYSE.md) pour l'installation, l'usage et les mesures, et [VALIDATION-AXES.md](VALIDATION-AXES.md) pour les axes. L'étape 6 (nature des réponses : accord, désaccord…) est remplacée par le calcul « avec qui elle en a parlé et d'accord ou non » à partir des positions.
 
 1. **Conversations** (SQL) : regrouper les messages en discussions (coupure après 20 min de silence, 40 messages au plus).
 2. **Tri** (SQL) : écarter robots, messages vides, « mdr » ; noter l'importance.
@@ -136,7 +139,7 @@ L'IA ne lit pas tout : c'est une **cascade** qui garde le coûteux pour la fin.
 6. **Relations** : nature de chaque réponse (accord, désaccord, soutien, moquerie, information).
 7. **Scores** par axe, calculés en SQL (déjà fait et testé), puis **vérification avec les rôles** : verdict par axe, puis par rôle (concordant, discordant, non vérifiable). « Discordant » est une alerte à regarder, pas une accusation.
 
-**Les axes** : les 12 axes du modèle « 12 Axes » sont actifs ; 9 axes ajoutés restent inactifs tant que l'utilisateur ne les a pas relus ([AXES.md](AXES.md)). Les axes, idéologies, plages et règles de rôles sont à relire par l'utilisateur : le code ne les modifie jamais.
+**Les axes** : les 21 axes (12 du modèle « 12 Axes » + 9 ajoutés) sont **tous actifs** depuis le 4 octobre 2026 ([AXES.md](AXES.md) ; mesuré : l'IA range 37 % des phrases sur un mauvais axe avec 12 axes, 13 % avec 21). Les axes, idéologies, plages et règles de rôles sont à relire par l'utilisateur : le code ne les modifie jamais.
 
 **Les modèles « System One »** (Laya, Kev, mini-jev…) répondent à des questions à choix en une seule passe. Mon avis : **utiles plus tard** pour les étapes à choix fermé et très nombreuses (nature d'une réponse, position, thème), **pas** pour l'extraction ni les résumés, et **pas maintenant**. Test sur ce Mac, 52 exemples français écrits à la main (petit jeu, sans réglage) : Laya multilingue réussit 66 % de la prise de position (33 % au hasard) et 60 % de la nature d'une réponse (20 % au hasard), à 20-26 ms par décision. Trop peu fiable sans réglage ; Kev est en anglais seulement. Plan : d'abord la chaîne avec le modèle de langue, puis comparer sur 200 exemples annotés.
 
@@ -146,7 +149,7 @@ L'IA ne lit pas tout : c'est une **cascade** qui garde le coûteux pour la fin.
 - **Âge et genre écartés** partout (les rôles de ces types sont reconnus pour être ignorés ; un test vérifie qu'aucune fiche ne les montre).
 - **Aucune inférence indirecte** (style, horaires, fréquentations) ; étiquettes toujours avec preuves et incertitude.
 - Aucune donnée réelle dans le dépôt ; les tests n'utilisent que des données inventées.
-- **À faire (phase 5)** : mode pseudonymisé, et effacement durable : `forget_user()` supprime une personne, mais un export ultérieur la réimporterait ; il faudra une liste de personnes oubliées.
+- **Effacement durable : fait** (registre des personnes qui ont demandé l'arrêt : un export ultérieur ne les réimporte pas ; commandes `/dindon`, page « Vie privée », [CONFORMITE.md](CONFORMITE.md)). **À faire** : mode pseudonymisé, consentement préalable.
 - Rappel : un usage strictement personnel est hors du champ du RGPD, **plus dès que les fiches sont montrées à d'autres**.
 
 ## 8. Chiffres mesurés
@@ -165,10 +168,11 @@ Mac M4 Pro 24 Go, PostgreSQL dans Docker, données inventées ([MESURES.md](MESU
 
 ## 9. Ce qui vient ensuite
 
-1. Fournir un jeton et l'identifiant du serveur pour un premier essai réel (voir la section « Collecter » du [README](../README.md)).
-2. Installer Ollama et comparer deux ou trois modèles (phase 2). Le téléchargement de Laya (1,3 Go) a pris 21 minutes : prévoir plusieurs heures pour des modèles de 5 à 9 Go.
-3. Relire les axes et idéologies ([AXES.md](AXES.md)) : c'est ce qui décide le plus de la qualité du classement.
-4. Phases 3 à 5, puis le bot en direct.
+1. **Renseigner le contact, la durée de conservation et les serveurs suivis** (`.env`), informer les membres : voir [RAPPORT-COMPLET.md](RAPPORT-COMPLET.md) §0 et §16.
+2. Valider les fourchettes d'idéologie ([AXES.md](AXES.md)) : c'est ce qui décide le plus de la qualité de la vérification des rôles.
+3. Lancer l'analyse sur un serveur dont les membres sont informés, puis **valider les poids des axes** avant de lire les scores.
+4. **Essayer les débats** sur un serveur de test avec des participants informés : voir « Comment l'activer » dans [DEBAT.md](DEBAT.md) (réinviter le bot, un service de recherche, `DINDON_DEBATE_CHECKS=observe`), puis mesurer avec `tools/measure_claims.py` avant tout `live`.
+5. Appliquer aussi les réactions en direct (le reste, modifications, suppressions et tour du relevé après une coupure, est fait).
 
 ## 10. Pour en savoir plus
 
@@ -180,4 +184,7 @@ Mac M4 Pro 24 Go, PostgreSQL dans Docker, données inventées ([MESURES.md](MESU
 | [DECISIONS.md](DECISIONS.md) | chaque choix, et pourquoi |
 | [MESURES.md](MESURES.md) | ce qui est mesuré et ce qui est estimé |
 | [AXES.md](AXES.md) | les axes et idéologies à relire |
-| [../exporter/README.md](../exporter/README.md) | obtenir l'exportateur |
+| [EXPORTATEUR.md](EXPORTATEUR.md) | l'exportateur de Dindon : ce qu'il fait, ses réglages, le premier essai réel |
+| [DEBAT.md](DEBAT.md) | `/dindon debat` : le débat encadré (fil, positions, minuteur, vote de fin, vérification des faits) : décisions, règles, état par fonction |
+| [RAPPORT-COMPLET.md](RAPPORT-COMPLET.md) | l'état de chaque pièce, avec le niveau de preuve |
+| [VALIDATION-AXES.md](VALIDATION-AXES.md) | les axes de l'IA : mesures, validation, ce qui reste |

@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 
 from dindon.collector.discord_api import Watched
 from dindon.collector.snowflake import snowflake_at
@@ -30,10 +30,10 @@ class SelectionError(ValueError):
 def _ids(values, what: str) -> tuple[int, ...]:
     found: list[int] = []
     for raw in values or ():
-        for token in re.split(r"[\s,;]+", str(raw).strip()):
-            if not token:
+        for word in re.split(r"[\s,;]+", str(raw).strip()):
+            if not word:
                 continue
-            token = (_MENTION.fullmatch(token) or [None, token])[1]
+            token = (_MENTION.fullmatch(word) or [None, word])[1]
             if not re.fullmatch(r"[0-9]{1,20}", token):
                 raise SelectionError(f"{what} : « {token} » n'est pas un identifiant Discord (des chiffres seulement).")
             if int(token) not in found:
@@ -67,7 +67,7 @@ class ImportSelection:
     before: date | None = None         # last day included (UTC)
 
     @classmethod
-    def parse(cls, channels=(), authors=(), mentions=(), after=None, before=None) -> "ImportSelection":
+    def parse(cls, channels=(), authors=(), mentions=(), after=None, before=None) -> ImportSelection:
         names = tuple(dict.fromkeys(t for raw in channels or () for t in re.split(r"[\n,;]+", str(raw)) if t.strip()))
         selection = cls(tuple(n.strip() for n in names), _ids(authors, "Auteurs"), _ids(mentions, "Personnes mentionnées"),
                         _day(after, "Du"), _day(before, "Au"))
@@ -86,11 +86,11 @@ class ImportSelection:
         return " ".join(groups) or None
 
     def after_id(self) -> int | None:
-        return snowflake_at(datetime.combine(self.after, time.min, timezone.utc)) if self.after else None
+        return snowflake_at(datetime.combine(self.after, time.min, UTC)) if self.after else None
 
     def before_id(self) -> int | None:
         """The last day is included: messages are wanted up to the start of the next one."""
-        return snowflake_at(datetime.combine(self.before + timedelta(days=1), time.min, timezone.utc)) if self.before else None
+        return snowflake_at(datetime.combine(self.before + timedelta(days=1), time.min, UTC)) if self.before else None
 
     def describe(self) -> dict:
         return {"channels": list(self.channels), "authors": [str(i) for i in self.authors], "mentions": [str(i) for i in self.mentions],
@@ -102,8 +102,8 @@ def resolve_channels(wanted: tuple[str, ...], available: list[Watched]) -> list[
     """The channels of the server that were asked for, by id or by name (case and accents do not matter)."""
     by_id = {c.id: c for c in available}
     chosen: dict[int, Watched] = {}
-    for token in wanted:
-        token = token.strip().lstrip("#").strip()
+    for entry in wanted:
+        token = entry.strip().lstrip("#").strip()
         if token.isdigit():
             if int(token) not in by_id:
                 raise SelectionError(f"Salon {token} : inconnu, ou pas visible pour le bot.")

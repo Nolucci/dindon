@@ -8,7 +8,7 @@ import os
 import socket
 import threading
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from pathlib import Path
 
 import pytest
@@ -34,7 +34,7 @@ def squeeze(text: str) -> str:
 def app_port(ingest_db, ingest_url, tmp_path):
     directory = Directory([GUILD])
     directory.apply("GUILD_CREATE", guild_create())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     carol_says = message_create(3_000_000_000_000_000_001, "on y va ?", CAROL, timestamp=(now - timedelta(hours=2)).isoformat())
     messages = [
         carol_says,
@@ -72,13 +72,13 @@ def test_people_without_a_link_can_be_shown_hidden_searched_and_opened(app_port)
         page.goto(base)
         page.fill("#password", PASSWORD)
         page.click("button[type=submit]")
-        page.wait_for_selector("footer span:has-text('personnes')", timeout=20000)
+        page.wait_for_selector("footer span:has-text('personne')", timeout=20000)
 
         box = page.get_by_label("Personnes sans lien")
         assert box.is_checked()                                                         # on by default
         page.wait_for_selector("footer span:has-text('sans lien')")
         assert "3 personnes (dont 1 sans lien)" in squeeze(page.inner_text("footer"))   # Bob and Carol linked, Alice alone
-        assert "2 liens" not in squeeze(page.inner_text("footer")) and "1 liens" in squeeze(page.inner_text("footer"))
+        assert "2 liens" not in squeeze(page.inner_text("footer")) and "1 lien" in squeeze(page.inner_text("footer")) and "1 liens" not in squeeze(page.inner_text("footer"))
         time.sleep(2)  # the points find their places
         if os.environ.get("DINDON_SHOTS"):
             Path(os.environ["DINDON_SHOTS"]).mkdir(parents=True, exist_ok=True)

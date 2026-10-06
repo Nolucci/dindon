@@ -9,13 +9,12 @@ import sys
 import threading
 import time
 from collections import Counter
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone, UTC
 from pathlib import Path
 
 import pytest
 
 from dindon.collector.discord_api import Watched
-from dindon.collector.exporter import Exporter, ExporterCancelled, ExporterError
 from dindon.collector.selection import ImportSelection, SelectionError, resolve_channels
 from dindon.collector.snowflake import created_at
 from dindon.collector.watch import Collector
@@ -52,8 +51,8 @@ def test_dates_are_checked_and_the_period_is_the_right_way_round():
 
 def test_the_last_day_is_included_in_the_ids_given_to_the_exporter():
     selection = ImportSelection.parse(after="2025-03-01", before="2025-03-31")
-    assert created_at(selection.after_id()) == datetime(2025, 3, 1, tzinfo=timezone.utc)
-    assert created_at(selection.before_id()) == datetime(2025, 4, 1, tzinfo=timezone.utc)   # up to the start of the next day
+    assert created_at(selection.after_id()) == datetime(2025, 3, 1, tzinfo=UTC)
+    assert created_at(selection.before_id()) == datetime(2025, 4, 1, tzinfo=UTC)   # up to the start of the next day
     assert ImportSelection().after_id() is None and ImportSelection().before_id() is None
 
 
@@ -81,71 +80,6 @@ def test_channels_are_read_by_name_or_id_ignoring_case_accents_and_the_hash():
         resolve_channels(("sqll",), channels)
     with pytest.raises(SelectionError, match="Salon 99 : inconnu"):
         resolve_channels(("99",), channels)
-
-
-# ---------------------------------------------------------------------------------------------
-# The exporter: arguments, and stopping it
-# ---------------------------------------------------------------------------------------------
-
-RECORDER = """
-import json, os, sys, time
-from pathlib import Path
-argv = sys.argv[1:]
-Path(os.environ["REC_DIR"], "argv.json").write_text(json.dumps(argv))
-Path(os.environ["REC_DIR"], "pid").write_text(str(os.getpid()))
-out = Path(argv[argv.index("-o") + 1]); out.mkdir(parents=True, exist_ok=True)
-if os.environ.get("REC_SLEEP"):
-    time.sleep(float(os.environ["REC_SLEEP"]))
-(out / "channel.json").write_text("{}")
-"""
-
-
-@pytest.fixture
-def recorder(tmp_path, monkeypatch):
-    script = tmp_path / "recorder.py"
-    script.write_text(RECORDER)
-    monkeypatch.setenv("REC_DIR", str(tmp_path))
-    return Exporter(f"{sys.executable} {script}", "secret-token-123", timeout=30), tmp_path
-
-
-def test_the_exporter_is_given_the_window_and_the_filter_and_never_the_token(recorder):
-    exporter, folder = recorder
-    exporter.export(5, folder / "out", after=111, before=222, message_filter="(from:1 | from:2) (mentions:3)")
-    argv = json.loads((folder / "argv.json").read_text())
-    assert argv[argv.index("--after") + 1] == "111" and argv[argv.index("--before") + 1] == "222"
-    assert argv[argv.index("--filter") + 1] == "(from:1 | from:2) (mentions:3)"
-    assert "secret-token-123" not in " ".join(argv)
-    exporter.export(5, folder / "out2")
-    plain = json.loads((folder / "argv.json").read_text())
-    assert "--before" not in plain and "--filter" not in plain and "--after" not in plain
-
-
-def test_stopping_ends_the_exporter_quickly_and_leaves_no_process(recorder, monkeypatch):
-    exporter, folder = recorder
-    monkeypatch.setenv("REC_SLEEP", "60")
-    cancel = threading.Event()
-    threading.Timer(0.7, cancel.set).start()
-    started = time.monotonic()
-    with pytest.raises(ExporterCancelled):
-        exporter.export(5, folder / "out", cancel=cancel)
-    assert time.monotonic() - started < 6
-    pid = int((folder / "pid").read_text())
-    time.sleep(0.3)
-    with pytest.raises(ProcessLookupError):
-        os.kill(pid, 0)                                                            # it is really gone
-
-
-def test_an_exporter_that_takes_too_long_is_ended_with_the_same_message_as_before(recorder, monkeypatch):
-    exporter, folder = recorder
-    exporter.timeout = 1
-    monkeypatch.setenv("REC_SLEEP", "60")
-    with pytest.raises(ExporterError, match="took more than 1s"):
-        exporter.export(5, folder / "out")
-
-
-def test_a_missing_exporter_is_reported_as_before(tmp_path):
-    with pytest.raises(ExporterError, match="was not found"):
-        Exporter(str(tmp_path / "nothing-here"), "t").export(5, tmp_path / "out")
 
 
 # ---------------------------------------------------------------------------------------------
@@ -190,7 +124,7 @@ def test_only_the_messages_of_the_chosen_people_are_imported_and_it_is_recorded_
         assert ids_in(conn) == expected
         assert {r[0] for r in conn.execute("SELECT DISTINCT author_id FROM messages")} == {int(author)}
         assert all(r[0] for r in conn.execute("SELECT is_partial FROM ingest_runs")) and conn.execute("SELECT count(*) FROM ingest_runs").fetchone()[0] >= 1
-    assert "filter=" in " ".join(exports_asked(fake))
+    assert exports_asked(fake)                                                                       # (the filter is applied before anything else is fetched: see test_exporter.py)
 
 
 def test_the_mentioned_people_and_the_two_kinds_of_filter_together(collector, fake, world, ingest_url):

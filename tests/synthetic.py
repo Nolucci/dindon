@@ -1,12 +1,12 @@
 """Builds small invented worlds in the database, for the tests. No real data, ever."""
 import itertools
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 from dindon.config import Settings
 
 _ids = itertools.count(1_000_000)
-NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
+NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 class World:
@@ -114,5 +114,5 @@ def settings_for(database_url: str, tmp_path: Path, password: str = "correct hor
     return Settings(database_url=database_url, db_dir=Path(__file__).resolve().parents[1] / "db", host="127.0.0.1", port=8000,
                     ollama_url="http://127.0.0.1:9",  # nothing listens there
                     password=password, inbox_dir=tmp_path / "inbox", archive_dir=tmp_path / "archive", discord_token="", guild_ids=(),
-                    discord_api_url="http://127.0.0.1:9", exporter_path="", exporter_threads="active", poll_seconds=1,
+                    discord_api_url="http://127.0.0.1:9", exporter_threads="active", poll_seconds=1,
                     catchup_hour_utc=3, catchup_days=7, web_dir=tmp_path / "no-web")

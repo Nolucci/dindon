@@ -11,6 +11,10 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.30",
     "psycopg[binary,pool]>=3.2",
+    # Grouping conversations by the direction of their vectors (1024 numbers each): see app/dindon/analysis/themes.py
+    "numpy>=2",
+    # The picture of `/dindon map` on Discord: see app/dindon/discord_map.py
+    "pillow>=10.1",
     # The Gateway connection of the bot (heartbeat, resume, rate limits), and nothing more: see app/dindon/bot/gateway.py
     "discord.py>=2.5",
 ]
@@ -18,6 +22,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8",
+    "ruff",  # make lint
     "httpx2",
     "jsonschema",  # to check every document that the bot builds against contracts/JSON-format.schema.json
 ]
@@ -30,6 +35,31 @@ dindon = "dindon.__main__:main"
 [tool.setuptools.packages.find]
 where = ["app"]
 
+# The font and the background of the picture of `/dindon map` (app/dindon/discord_map.py) travel with the package: the Docker image installs it, it does not run from the sources
+[tool.setuptools.package-data]
+dindon = ["fonts/*", "assets/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 180        # the code is written with long, commented lines on purpose: what matters is that a line says one thing
+extend-exclude = ["web", "political"]
+
+[tool.ruff.lint]
+# pyflakes (unused, undefined), bugbear (likely bugs), pyupgrade (current idioms), simplify, "return" consistency, unnecessary placeholders, pylint warnings
+select = ["E4", "E7", "E9", "F", "B", "UP", "SIM", "RET", "PIE", "PLW"]
+ignore = [
+    "SIM108",   # a plain if/else is clearer than a ternary once the lines are long
+    "RET504",   # `x = ...; return x` is fine when it gives the value a name
+    "PLW0603",  # a few modules keep a cached value on purpose
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["F811", "F401"]     # a fixture that is imported is « redefined » by the test that asks for it: that is how pytest works
+"tools/*" = ["B007", "B905", "RET503", "SIM115", "PLW1510", "PLW2901"]   # scripts for a person to run, not the product
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12

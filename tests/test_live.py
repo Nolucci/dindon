@@ -3,17 +3,16 @@
 A fake Discord and a fake exporter stand in for Discord; everything else is the real thing: the watcher, the exporter
 process, the ingestion, PostgreSQL's NOTIFY, and the Server-Sent Events that the page listens to.
 """
+import contextlib
 import dataclasses
 import http.client
 import json
 import queue
-import shlex
 import socket
-import sys
 import threading
 import time
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from pathlib import Path
 
 import pytest
@@ -25,7 +24,6 @@ from fake_discord import FakeDiscord
 from make_demo_server import World, write_exports
 from synthetic import settings_for
 
-TOOLS = Path(__file__).resolve().parents[1] / "tools"
 TOKEN = "fake-account-token-1234"
 PASSWORD = "correct horse"
 POLL_SECONDS = 1.0
@@ -39,7 +37,7 @@ class Page:
                                          headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(request) as response:
             self.cookie = response.headers["Set-Cookie"].split(";")[0]
-        self.events: "queue.Queue[tuple[float, dict]]" = queue.Queue()
+        self.events: queue.Queue[tuple[float, dict]] = queue.Queue()
         self._connection = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
         self._connection.request("GET", "/events", headers={"Cookie": self.cookie})
         self._response = self._connection.getresponse()
@@ -67,10 +65,8 @@ class Page:
         return None
 
     def close(self):
-        try:
+        with contextlib.suppress(OSError):
             self._connection.sock.shutdown(socket.SHUT_RDWR)  # as a closing tab does: the server sees it at once
-        except OSError:
-            pass
         self._connection.close()
 
 
@@ -78,14 +74,13 @@ class Page:
 def system(ingest_db, ingest_url, tmp_path, monkeypatch):
     """The whole thing, running: a fake Discord, and Dindon (watcher, inbox, API) in front of a database that holds the first import."""
     world = World(seed=31, people=25)
-    world.generate(1200, days=20, end=datetime.now(timezone.utc) - timedelta(minutes=30))
+    world.generate(1200, days=20, end=datetime.now(UTC) - timedelta(minutes=30))
     for path in write_exports(world, tmp_path / "first-import"):
         ingest_file(ingest_db, path)
     fake = FakeDiscord(world, token=TOKEN).start()
-    monkeypatch.setenv("FAKE_DISCORD_URL", fake.base_url)
     settings = dataclasses.replace(
         settings_for(ingest_url, tmp_path, PASSWORD), discord_api_url=fake.api_url, discord_token=TOKEN, guild_ids=(world.guild_id,),
-        exporter_path=f"{shlex.quote(sys.executable)} {shlex.quote(str(TOOLS / 'fake_exporter.py'))}", poll_seconds=POLL_SECONDS)
+        poll_seconds=POLL_SECONDS)
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
         port = probe.getsockname()[1]
@@ -131,7 +126,7 @@ def test_a_new_exchange_lights_up_the_link_within_seconds(system, capsys):
 def test_a_file_dropped_in_the_inbox_is_imported_archived_and_announced(system):
     world, fake, page, port, tmp_path = system
     other = World(seed=99, people=10)
-    other.generate(80, days=5, end=datetime.now(timezone.utc) - timedelta(hours=2))
+    other.generate(80, days=5, end=datetime.now(UTC) - timedelta(hours=2))
     channel = max(other.channels, key=lambda c: len(c.messages))
     inbox = tmp_path / "inbox"
     inbox.mkdir(exist_ok=True)
@@ -139,6 +134,9 @@ def test_a_file_dropped_in_the_inbox_is_imported_archived_and_announced(system):
     (inbox / name).write_text(other.export_document(channel), encoding="utf-8")
     found = page.wait(lambda e: e["type"] == "messages" and e["channel"] == str(channel.id), 15)
     assert found and found[1]["count"] == len(channel.messages)
+    deadline = time.monotonic() + 5                                                                      # the event is sent when the import commits, the file is moved a few milliseconds after
+    while (inbox / name).exists() and time.monotonic() < deadline:
+        time.sleep(0.02)
     assert not (inbox / name).exists() and list((tmp_path / "archive").glob(f"*/*-{name}"))
 
 
