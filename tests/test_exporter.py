@@ -6,6 +6,7 @@ import math
 import re
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone, UTC
 from pathlib import Path
 
@@ -156,6 +157,38 @@ def test_a_bot_token_and_an_account_token_are_both_understood(world):
             assert DiscordClient(server.api_url, "Bot tok" if bot else "tok").get("/users/@me")["id"]          # the prefix of a bot token is accepted as given
         finally:
             server.stop()
+
+
+def test_parallel_requests_wait_until_the_bot_token_kind_is_verified(monkeypatch):
+    client = DiscordClient("https://discord.invalid/api/v10", "tok")
+    probing = threading.Event()
+    continue_probe = threading.Event()
+    used = []
+
+    def once(method, path, params, route, cancel, *, authorization=None):
+        auth = authorization if authorization is not None else client._authorization()
+        if path == "/users/@me" and auth == "tok":
+            probing.set()
+            assert continue_probe.wait(timeout=3)
+            return 401, {}, None
+        if path == "/users/@me":
+            assert auth == "Bot tok"
+            return 200, {"id": "1"}, None
+        used.append(auth)
+        return (200 if auth == "Bot tok" else 401), {"ok": True}, None
+
+    monkeypatch.setattr(client, "_once", once)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(client.get, "/channels/1")
+        assert probing.wait(timeout=3)
+        try:
+            assert client.kind is None  # the account probe must not be visible to another worker
+            second = pool.submit(client.get, "/channels/2")
+        finally:
+            continue_probe.set()
+        assert first.result(timeout=3) == {"ok": True}
+        assert second.result(timeout=3) == {"ok": True}
+    assert used == ["Bot tok", "Bot tok"]
 
 
 def test_a_server_error_is_tried_again_then_reported(fake, world):

@@ -142,22 +142,27 @@ class DiscordClient:
             if self.kind is not None:
                 return
             for kind in ("account", "bot"):
-                self.kind = kind
-                status, _, _ = self._once("GET", "/users/@me", None, "GET /users/@me", cancel)
+                authorization = self._token if kind == "account" else f"Bot {self._token}"
+                status, _, _ = self._once("GET", "/users/@me", None, "GET /users/@me", cancel,
+                                          authorization=authorization)
                 if status != 401:
+                    # Publish the kind only after it is verified. Other export workers
+                    # must wait for the probe, rather than use its provisional value.
+                    self.kind = kind
                     return
-            self.kind = None
             raise Unauthorized(401, "Le jeton Discord n'est pas valide (jeton absent, périmé ou mal recopié dans .env).")
 
     # --- requests ---------------------------------------------------------------------------------------------
 
-    def _once(self, method: str, path: str, params: dict | None, route: str, cancel: Callable[[], bool]) -> tuple[int, Any, Any]:
+    def _once(self, method: str, path: str, params: dict | None, route: str, cancel: Callable[[], bool],
+              *, authorization: str | None = None) -> tuple[int, Any, Any]:
         """One request, with its rate limit. Returns (status, body, headers); the body is None when it is not JSON."""
         self.limiter.wait(route, cancel)
         if cancel():
             raise ExporterCancelled()
         url = f"{self._prefix}{path}" + (f"?{urllib.parse.urlencode(params)}" if params else "")
-        headers = {"Authorization": self._authorization(), "User-Agent": "Dindon (local exporter)", "Accept": "application/json"}
+        headers = {"Authorization": authorization if authorization is not None else self._authorization(),
+                   "User-Agent": "Dindon (local exporter)", "Accept": "application/json"}
         with self._count_lock:
             self.requests += 1
         connection = self._connection()
