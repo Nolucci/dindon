@@ -42,7 +42,7 @@ SYSTEM = (
     "Tu lis une conversation d'un salon Discord. Les participants sont P1, P2, etc. Tu notes les POSITIONS que chaque participant prend dans ses propres "
     "messages, jamais d'après ce que les autres disent de lui. Ne note QUE les positions sur des sujets politiques, économiques, sociaux ou de société "
     "(institutions, économie, Europe, immigration, écologie, sécurité, laïcité, défense, droits, technologie et société). Ne note PAS les goûts personnels, la météo, "
-    "les jeux, les films, la cuisine, les questions, les demandes de source, les remarques sans position, les salutations.\n"
+    "les jeux, les films, la cuisine, la promotion d'un serveur Discord, d'une chaîne ou d'une célébrité, les questions, les demandes de source, les remarques sans position, les salutations.\n"
     "Pour chaque position :\n"
     "- `proposition` : une affirmation générale, comprise sans la conversation, formulée dans le sens POSITIF d'un changement ou d'une thèse "
     "(par exemple « L'État doit augmenter le SMIC », jamais « Il ne faut pas augmenter le SMIC »), en 15 mots au plus ; ce n'est PAS une copie du message, "
@@ -200,7 +200,9 @@ _VAGUE = re.compile(r"^(?:il|elle|ils|elles|tu|vous|on|ça|ca|c'|c’est|c'est|j
 def substantial_evidence(quote: str) -> bool:
     """A short assent cannot support an independently worded political claim."""
     words = re.findall(r"[\wÀ-ÿ]+", quote.casefold())
-    return len(words) >= 5 and not _VAGUE.fullmatch(quote.strip()) and not quote.strip().endswith("?")
+    # A call to promote a Discord server is not an ideological position, however many words a mention adds to the quote.
+    promotion = re.search(r"\b(?:boost|booster|rejoins?|promouvoi\w*|partage\w*)\b.{0,60}\b(?:serv|serveur|chaine|chaîne)\b", quote, re.I)
+    return len(words) >= 5 and not promotion and not _VAGUE.fullmatch(quote.strip()) and not quote.strip().endswith("?")
 
 
 def _proposition_ids(conn: psycopg.Connection, client: Ollama, embed_model: str, texts: list[str], model: str) -> dict[str, int]:
@@ -210,8 +212,9 @@ def _proposition_ids(conn: psycopg.Connection, client: Ollama, embed_model: str,
     vectors = client.embed(embed_model, unique) if unique else []
     for text, vector in zip(unique, vectors, strict=True):
         literal = vector_literal(vector)
-        near = conn.execute("""SELECT proposition_id, 1 - (embedding <=> %s::vector) FROM proposition_embeddings WHERE model = %s
-                               ORDER BY embedding <=> %s::vector LIMIT 1""", (literal, embed_model, literal)).fetchone()
+        near = conn.execute("""SELECT e.proposition_id, 1 - (e.embedding <=> %s::vector) FROM proposition_embeddings e
+                               JOIN propositions p ON p.id = e.proposition_id WHERE e.model = %s AND p.status NOT IN ('rejected', 'merged')
+                               ORDER BY e.embedding <=> %s::vector LIMIT 1""", (literal, embed_model, literal)).fetchone()
         if near is not None and near[1] >= SAME_PROPOSITION:
             out[text] = near[0]
             continue

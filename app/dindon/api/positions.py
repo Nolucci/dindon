@@ -37,7 +37,8 @@ def _evidence(conn, claim_ids: list[int]) -> dict[int, list[dict]]:
 
 @router.get("")
 def overview(request: Request, guild: int | None = None, limit: int = Query(250, ge=1, le=500), q: str = Query("", max_length=100),
-             theme: int | None = None, sort: str = Query("people", pattern="^(people|divided|recent)$"), stance: str = Query("", pattern="^(|for|against|nuanced)$")) -> dict:
+             theme: int | None = None, sort: str = Query("people", pattern="^(people|divided|recent)$"), stance: str = Query("", pattern="^(|for|against|nuanced)$"),
+             rejected: bool = False) -> dict:
     """How much was read, and the propositions with how many people are for, nuanced, against.
 
     Filters: `q` (words of the proposition, or the name of a person who takes a position on it), `theme`, `stance` (only the propositions where somebody is
@@ -66,8 +67,8 @@ def overview(request: Request, guild: int | None = None, limit: int = Query(250,
                    JOIN topic_assignments a ON a.conversation_id = c.conversation_id JOIN topics t ON t.id = a.topic_id
                    WHERE c.proposition_id = p.id GROUP BY 1 ORDER BY count(*) DESC, 1 LIMIT 1) th ON true
                LEFT JOIN topics tt ON tt.id = th.topic_id
-               WHERE s.guild_id = %(guild)s AND p.status NOT IN ('merged', 'rejected')
-               GROUP BY p.id, th.topic_id, tt.label""", {"guild": guild_id}).fetchall()
+               WHERE s.guild_id = %(guild)s AND p.status <> 'merged' AND (p.status <> 'rejected' OR %(rejected)s)
+               GROUP BY p.id, th.topic_id, tt.label""", {"guild": guild_id, "rejected": rejected}).fetchall()
         named: dict[str, set[int]] = {}
         if words:                                           # the people whose name has the word: the propositions they take a position on
             for w in set(words):
@@ -79,7 +80,7 @@ def overview(request: Request, guild: int | None = None, limit: int = Query(250,
         for r in props:
             t = themes_all.setdefault(r["topic_id"] or 0, {"id": r["topic_id"], "label": r["theme"] or "Sans thème", "propositions": 0})
             t["propositions"] += 1
-        n_props = conn.execute("SELECT count(DISTINCT proposition_id) AS n FROM current_stances WHERE guild_id = %s", (guild_id,)).fetchone()["n"]
+        n_props = len(props)
     def keep(r) -> bool:
         if theme is not None and (r["topic_id"] or 0) != theme:
             return False
@@ -109,6 +110,27 @@ def overview(request: Request, guild: int | None = None, limit: int = Query(250,
             "propositions_total": n_props,
             "propositions": [{"id": p["id"], "text": p["text"], "status": p["status"], "people": p["people"], "for": p["pour"], "nuanced": p["nuance"],
                               "against": p["contre"], "theme": p["theme"], "theme_id": p["topic_id"]} for p in props]}
+
+
+class PropositionReview(BaseModel):
+    rejected: bool
+
+
+@router.patch("/proposition/{proposition_id}")
+def review_proposition(request: Request, proposition_id: int, body: PropositionReview, guild: int | None = None) -> dict:
+    """Keep a bad AI proposal out of the results and scores; allow a person to restore it."""
+    with request.app.state.pool.connection() as conn, conn.transaction():
+        guild_id = resolve_guild(conn, guild)
+        other = conn.execute("SELECT 1 FROM claims WHERE proposition_id = %s AND guild_id <> %s LIMIT 1", (proposition_id, guild_id)).fetchone()
+        if other is not None:
+            raise HTTPException(status_code=409, detail="Cette proposition est aussi utilisée par un autre serveur ; corrigez ses liens aux axes ici.")
+        row = conn.execute("""UPDATE propositions SET status = %s WHERE id = %s AND status IN ('proposed', 'rejected')
+                              AND EXISTS (SELECT 1 FROM claims WHERE guild_id = %s AND proposition_id = %s)
+                              RETURNING status""", ('rejected' if body.rejected else 'proposed', proposition_id, guild_id, proposition_id)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="proposition inconnue ou déjà validée")
+        conn.execute("SELECT refresh_person_axis_scores(%s)", (guild_id,))
+        return {"id": proposition_id, "status": row["status"]}
 
 
 def _links(conn, proposition_id: int) -> list[dict]:

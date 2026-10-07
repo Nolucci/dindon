@@ -25,6 +25,7 @@
   let stanceFilter = $state('');
   let sort = $state('people');
   let personQ = $state('');          // inside an open proposition: narrow the people
+  let showRejected = $state(false);
   let themes = $state([]);           // for the menu: all the themes, whatever the filter
   const filtering = $derived(q.trim() !== '' || themeFilter !== '' || stanceFilter !== '');
   let timer = null;
@@ -43,7 +44,8 @@
 
   const guard = makeGuard(() => onAuthLost(), (message) => (problem = message));
 
-  const filters = () => ({ q: q.trim() || undefined, theme: themeFilter || undefined, stance: stanceFilter || undefined, sort });
+  const filters = () => ({ q: q.trim() || undefined, theme: themeFilter || undefined, stance: stanceFilter || undefined, sort,
+    rejected: showRejected ? 'true' : undefined });
 
   async function load() {
     const [d, i] = await Promise.all([guard(() => api.positions(guild, filters())), guard(() => api.analysis(guild))]);
@@ -174,6 +176,15 @@
     if (answer) refreshCounts();
   }
 
+  async function review(rejected) {
+    if (!opened) return;
+    const answer = await guard(() => api.positionsReview(opened.id, guild, rejected));
+    if (answer) {
+      opened = null;
+      await load();
+    }
+  }
+
   async function refreshCounts() {
     const d = await guard(() => api.positions(guild, filters()));
     if (d) data = { ...data, axes_links: d.axes_links };
@@ -268,6 +279,7 @@
         {#if filtering}<button type="button" class="tool-btn reset" onclick={reset}>Effacer les filtres</button>{/if}
         <span class="found" aria-live="polite">{data?.matching ?? 0} proposition{(data?.matching ?? 0) > 1 ? 's' : ''}{filtering ? ` sur ${data?.propositions_total ?? 0}` : ''}</span>
       </div>
+      <label class="check"><input type="checkbox" bind:checked={showRejected} onchange={() => load()} /> Voir aussi les propositions écartées</label>
       {#if data && !data.propositions.length && filtering}
         <p class="muted empty">Aucune proposition ne correspond.</p>
       {:else if data && !data.propositions.length}
@@ -295,6 +307,14 @@
                 <div class="people">
                   {#if opened.loading}<p class="muted">Chargement…</p>{/if}
                   {#if !opened.loading}
+                    <div class="review">
+                      {#if p.status === 'rejected'}
+                        <span class="badge small">Écartée des résultats et des scores</span>
+                        <button type="button" class="btn" onclick={() => review(false)}>Rétablir</button>
+                      {:else if p.status === 'proposed'}
+                        <button type="button" class="btn btn-danger" onclick={() => review(true)}>Écarter cette proposition</button>
+                      {/if}
+                    </div>
                     <section class="links" aria-label="Axes de cette proposition">
                       <h4 class="eyebrow">Axes sur lesquels être d’accord avec cette proposition déplace quelqu’un</h4>
                       {#each opened.axes as l (l.axis)}

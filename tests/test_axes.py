@@ -89,6 +89,22 @@ def test_the_model_only_links_propositions_to_axes_whose_poles_it_names():
     assert len(validate(many, ids, poles)) == 2                                                            # two at most: a statement rarely takes sides on three
 
 
+def test_supporting_a_person_alone_does_not_imply_an_ideological_axis():
+    from dindon.analysis.axes import PERSON_ONLY
+    assert PERSON_ONLY.fullmatch("Il faut soutenir Squeezie.")
+    assert not PERSON_ONLY.fullmatch("Il faut soutenir les services publics.")
+
+
+def test_person_only_proposition_gets_no_automatic_axis(ingest_db, client, ollama):
+    debate(ingest_db)
+    pid = ingest_db.execute("INSERT INTO propositions (text, created_by) VALUES ('Il faut soutenir Squeezie.', 'test') RETURNING id").fetchone()[0]
+    takes(ingest_db, ALICE_ID, pid, 1)
+    result = assign_axes(ingest_db, client, "qwen3:14b", GUILD_ID)
+    assert result["done"] == 1 and result["links"] == 0
+    assert ingest_db.execute("SELECT axes_read_at IS NOT NULL FROM propositions WHERE id = %s", (pid,)).fetchone() == (True,)
+    assert not [request for request in ollama.requests if request[0] == "/api/chat"]
+
+
 def test_the_propositions_are_linked_to_the_axes_once_and_the_scores_follow(ingest_db, client, ollama):
     debate(ingest_db)
     p = proposition(ingest_db, "x", "economie", -1)                # one that was already read

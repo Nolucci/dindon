@@ -54,6 +54,8 @@ export const api = {
     request(`/api/privacy/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: String(user_id), reason: reason || '' }) }),
   positions: (guild, filters = {}) => request(`/api/positions${query({ guild, ...filters })}`),
   positionsProposition: (id, guild) => request(`/api/positions/proposition/${id}${query({ guild })}`),
+  positionsReview: (id, guild, rejected) =>
+    request(`/api/positions/proposition/${id}${query({ guild })}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rejected }) }),
   coherence: (guild) => request(`/api/positions/coherence${query({ guild })}`),
   positionsLinks: (id, guild, links) =>
     request(`/api/positions/proposition/${id}/axes${query({ guild })}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ links }) }),

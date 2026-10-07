@@ -15,6 +15,7 @@ one), and, once a person has decided the axes of enough propositions, the same q
 the next readings better.
 """
 import logging
+import re
 from collections.abc import Callable
 from functools import partial
 
@@ -29,6 +30,7 @@ MAX_AXES_PER_PROPOSITION = 2
 MIN_LOADING = 0.5
 FAILURES_IN_A_ROW = 3
 PROMPT_VERSION = "axes-4"
+PERSON_ONLY = re.compile(r"^(?:[Ii]l faut|[Nn]ous devons|[Oo]n doit)\s+soutenir\s+[A-ZÀÂÄÇÉÈÊËÎÏÔÖÙÛÜŸ][\w-]+(?:\s+[A-ZÀÂÄÇÉÈÊËÎÏÔÖÙÛÜŸ][\w-]+)*[.!?]?$", re.UNICODE)
 EXAMPLES = 6                    # validated propositions shown to the third reading
 MIN_EXAMPLES = 30               # the third reading exists once a person has decided the axes of this many propositions
 # How firmly a statement leans: the model says a word, the code turns it into a number. (Asking the model for a signed number made it give the same sign
@@ -43,7 +45,7 @@ SYSTEM = (
     "`strength` dit à quel point la phrase penche : `forte` si c'est son sujet même, `moyenne` si c'est un aspect net. "
     "Reste sobre : un seul axe suffit presque toujours ; n'en ajoute un deuxième (au plus 2) que si la phrase défend CLAIREMENT une idée sur celui-ci aussi, "
     "jamais parce qu'une personne qui pense cela pourrait penser autre chose. Si la phrase ne prend parti sur aucun axe (un goût, la météo, un fait), rends une liste vide. Respecte le champ « ne couvre pas » de chaque axe : "
-    "un sujet n'appartient qu'à un seul axe.\n\n"
+    "un sujet n'appartient qu'à un seul axe. Soutenir une personne, une célébrité ou un serveur ne situe pas quelqu'un sur un axe politique : rends une liste vide.\n\n"
     "Exemples (d'autres sujets que ceux de la conversation à traiter) :\n"
     "- « il faut abolir la monarchie et élire tous les chefs » → representation : Démocratie (forte)\n"
     "- « un chef fort décide plus vite qu'un parlement qui discute » → representation : Autocratie (moyenne)\n"
@@ -59,7 +61,7 @@ SYSTEM = (
 )
 
 
-SYSTEM_CAREFUL = """Tu relies une phrase politique à des axes. Un axe oppose deux pôles, chacun avec son nom (par exemple `economie` : Public ou Privé). Pour la phrase donnée, indique les axes (au plus 2) sur lesquels ELLE PREND PARTI, et pour chacun le pôle vers lequel penche l'idée que la phrase DÉFEND : `toward` est le nom exact d'un des deux pôles de cet axe. Une phrase qui critique une idée penche vers le pôle opposé à cette idée. `strength` dit à quel point la phrase penche : `forte` si c'est son sujet même, `moyenne` si c'est un aspect net. Reste sobre : un seul axe suffit presque toujours ; n'en ajoute un deuxième (au plus 2) que si la phrase défend CLAIREMENT une idée sur celui-ci aussi, jamais parce qu'une personne qui pense cela pourrait penser autre chose. Si la phrase ne prend parti sur aucun axe, rends une liste vide. C'est le cas d'un goût, de la météo, d'un simple fait, mais AUSSI de tout ce qui ne dit pas de quel côté l'auteur se range : une question, une demande de source ou de précision, « ça dépend des cas », « les deux côtés ont des arguments », un appel à nuancer ou à ne pas simplifier, une critique de la façon de débattre, un constat sans conclusion, une phrase qui cherche seulement un équilibre entre deux idées. En cas de doute, une liste vide vaut mieux qu'un axe douteux : ne choisis un axe que si, en lisant la phrase seule, on voit clairement de quel côté de cet axe son auteur se range. Respecte le champ « ne couvre pas » de chaque axe : un sujet n'appartient qu'à un seul axe.
+SYSTEM_CAREFUL = """Tu relies une phrase politique à des axes. Un axe oppose deux pôles, chacun avec son nom (par exemple `economie` : Public ou Privé). Pour la phrase donnée, indique les axes (au plus 2) sur lesquels ELLE PREND PARTI, et pour chacun le pôle vers lequel penche l'idée que la phrase DÉFEND : `toward` est le nom exact d'un des deux pôles de cet axe. Une phrase qui critique une idée penche vers le pôle opposé à cette idée. `strength` dit à quel point la phrase penche : `forte` si c'est son sujet même, `moyenne` si c'est un aspect net. Reste sobre : un seul axe suffit presque toujours ; n'en ajoute un deuxième (au plus 2) que si la phrase défend CLAIREMENT une idée sur celui-ci aussi, jamais parce qu'une personne qui pense cela pourrait penser autre chose. Si la phrase ne prend parti sur aucun axe, rends une liste vide. C'est le cas d'un goût, de la météo, d'un simple fait, mais AUSSI de tout ce qui ne dit pas de quel côté l'auteur se range : une question, une demande de source ou de précision, « ça dépend des cas », « les deux côtés ont des arguments », un appel à nuancer ou à ne pas simplifier, une critique de la façon de débattre, un constat sans conclusion, une phrase qui cherche seulement un équilibre entre deux idées. En cas de doute, une liste vide vaut mieux qu'un axe douteux : ne choisis un axe que si, en lisant la phrase seule, on voit clairement de quel côté de cet axe son auteur se range. Soutenir une personne, une célébrité ou un serveur ne situe pas quelqu'un sur un axe politique : rends une liste vide. Respecte le champ « ne couvre pas » de chaque axe : un sujet n'appartient qu'à un seul axe.
 
 Exemples (d'autres sujets que ceux de la conversation à traiter) :
 - « il faut abolir la monarchie et élire tous les chefs » → representation : Démocratie (forte)
@@ -224,6 +226,13 @@ def assign_axes(conn: psycopg.Connection, client: Ollama, model: str, guild_id: 
     for n, (pid, text) in enumerate(todo, 1):
         if cancelled():
             break
+        if PERSON_ONLY.fullmatch(text.strip()):
+            with conn.transaction():
+                conn.execute("UPDATE propositions SET axes_read_at = now() WHERE id = %s", (pid,))
+            done += 1
+            if progress:
+                progress(n, len(todo))
+            continue
         try:
             readings = [validate(client.chat_json(model, system, f"Phrase : {text}", schema), ids, poles) for system in systems]
             if decided >= MIN_EXAMPLES:

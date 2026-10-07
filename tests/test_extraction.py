@@ -108,6 +108,14 @@ def test_a_short_assent_does_not_become_a_political_position():
     assert kept == [] and refused == 1
 
 
+def test_promoting_a_discord_server_is_not_a_political_position():
+    quote = "@Gaius Julius Squeesar boost le serv stp"
+    read = prepare([(1, 10, quote, None)])
+    proposed = claim(proposition="Il faut soutenir Squeezie", evidence=((1, quote),), confidence=0.5)
+    kept, refused = validate({"claims": [proposed]}, read)
+    assert kept == [] and refused == 1
+
+
 def test_irony_and_questions_are_no_position(ingest_db, client, ollama):
     debate(ingest_db)
     answer = [claim(stance=1, kind="humour", evidence=((3, "comme si les patrons étaient des saints"),))]
@@ -270,6 +278,18 @@ def test_the_pages_show_the_positions_with_their_proof(web, ingest_db, client, o
     mine = web.get(f"/api/positions/person/{ALICE_ID}", params={"guild": GUILD}).json()
     assert [(p["proposition"], p["stance"]) for p in mine["positions"]] == [("L'État doit augmenter le salaire minimum", 1)]
     assert web.get("/api/positions/proposition/999999", params={"guild": GUILD}).status_code == 404
+
+
+def test_a_bad_proposition_can_be_excluded_from_results_and_restored(web, ingest_db, client, ollama):
+    debate(ingest_db)
+    read(ingest_db, client, ollama, GOOD)
+    pid = web.get("/api/positions", params={"guild": GUILD}).json()["propositions"][0]["id"]
+    route = f"/api/positions/proposition/{pid}"
+    assert web.patch(route, params={"guild": GUILD}, json={"rejected": True}).json()["status"] == "rejected"
+    assert web.get("/api/positions", params={"guild": GUILD}).json()["propositions"] == []
+    assert web.get("/api/positions", params={"guild": GUILD, "rejected": True}).json()["propositions"][0]["status"] == "rejected"
+    assert web.patch(route, params={"guild": GUILD}, json={"rejected": False}).json()["status"] == "proposed"
+    assert len(web.get("/api/positions", params={"guild": GUILD}).json()["propositions"]) == 1
 
 
 def test_the_latest_position_counts_and_the_change_is_shown(web, ingest_db, client, ollama):
