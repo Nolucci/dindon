@@ -200,7 +200,7 @@
         <label class="inline">Nombre de thèmes
           <input class="field-input small" type="number" min="2" max="80" placeholder="auto" bind:value={fixedTopics} aria-label="Nombre de thèmes" />
         </label>
-        <p class="muted hint">Laissez vide pour laisser l’analyse choisir. Modèles : <code>{info.models.embeddings}</code> (vecteurs), <code>{info.models.naming}</code> (noms). Rien ne sort de cette machine.
+        <p class="muted hint">Laissez vide pour laisser l’analyse choisir. Modèles : <code>{info.models.embeddings}</code> (vecteurs), <code>{info.models.naming}</code> (noms). Les ordinateurs d’analyse ajoutés dans Système peuvent recevoir le texte nécessaire au calcul.
           {#if info.last_run} Dernière recherche : {when(info.last_run.at)}, {info.last_run.k} thèmes.{/if}</p>
       </details>
 

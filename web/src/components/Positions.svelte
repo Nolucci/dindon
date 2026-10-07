@@ -244,7 +244,7 @@
               <option value="all">toutes ({fmt.format(remaining)})</option>
             </select>
           </label>
-          <p class="muted hint">Environ 15 s par conversation. {fmt.format(data.claims.refused)} position{data.claims.refused > 1 ? 's' : ''} refusée{data.claims.refused > 1 ? 's' : ''} faute de preuve. Modèle : <code>{info?.models.naming}</code>. Rien ne sort de cette machine.</p>
+          <p class="muted hint">Environ 15 s par conversation. {fmt.format(data.claims.refused)} position{data.claims.refused > 1 ? 's' : ''} refusée{data.claims.refused > 1 ? 's' : ''} faute de preuve. Modèle : <code>{info?.models.naming}</code>. Les ordinateurs d’analyse ajoutés dans Système peuvent recevoir le texte nécessaire au calcul.</p>
         </details>
         {#if job && job.state !== 'idle'}
           <div class="progress" aria-live="polite">

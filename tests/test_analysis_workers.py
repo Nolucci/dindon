@@ -1,11 +1,15 @@
 """Private helper configuration and two independent Ollama instances (synthetic data only)."""
+import threading
+import time
 import pytest
 from fastapi.testclient import TestClient
 
 from dindon.analysis import helpers
+from dindon.analysis import job as job_module
 from dindon.analysis.conversations import build_conversations
 from dindon.analysis.embeddings import embed_conversations
-from dindon.analysis.ollama import OllamaPool
+from dindon.analysis.job import AnalysisJobs
+from dindon.analysis.ollama import Ollama, OllamaPool
 from dindon.api.main import create_app
 from fake_ollama import FakeOllama
 from synthetic import settings_for
@@ -91,3 +95,55 @@ def test_a_different_embedding_build_is_not_mixed_with_the_server():
     finally:
         helper.stop()
         local.stop()
+
+
+def test_cancelling_interrupts_an_inflight_model_request():
+    server = FakeOllama().start()
+    server.chat_delay = 3
+    stopped = threading.Event()
+    client = Ollama(server.url, timeout=30)
+    client.cancelled = stopped.is_set
+    result = []
+    thread = threading.Thread(target=lambda: result.append(_cancel_result(client)), daemon=True)
+    try:
+        thread.start()
+        deadline = time.monotonic() + 2
+        while not any(path == "/api/chat" for path, _ in server.requests) and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert any(path == "/api/chat" for path, _ in server.requests)
+        stopped.set()
+        thread.join(1)
+        assert not thread.is_alive() and result == ["InterruptedError"]
+    finally:
+        stopped.set()
+        server.stop()
+
+
+def _cancel_result(client):
+    try:
+        client.chat_json("qwen3:14b", "system", "message", {})
+    except Exception as error:
+        return type(error).__name__
+    return "completed"
+
+
+def test_cancelling_interrupts_a_long_database_step(ingest_url, tmp_path, monkeypatch):
+    server = FakeOllama().start()
+    entered = threading.Event()
+
+    def slow_conversations(conn, guild_id, **_options):
+        entered.set()
+        conn.execute("SELECT pg_sleep(10)")
+        return {"made": 0, "messages": 0, "kept": 0, "total": 0}
+
+    monkeypatch.setattr(job_module, "build_conversations", slow_conversations)
+    jobs = AnalysisJobs(settings_for(ingest_url, tmp_path, "password"), client=Ollama(server.url))
+    try:
+        jobs.start(GUILD_ID, ("conversations",))
+        assert entered.wait(3)
+        time.sleep(0.2)  # let PostgreSQL enter pg_sleep before sending its cancel request
+        assert jobs.cancel()
+        jobs.wait(2)
+        assert jobs.status()["state"] == "cancelled"
+    finally:
+        server.stop()

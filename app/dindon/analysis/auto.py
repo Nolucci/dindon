@@ -45,7 +45,7 @@ async def cycle(jobs: AnalysisJobs, settings: Settings) -> dict:
             await asyncio.to_thread(jobs.wait)
             status = jobs.status()
             done.append({**entry, "state": status["state"], "error": status["error"], "lines": status["lines"][-3:]})
-            if status["state"] == "failed":
+            if status["state"] in ("failed", "cancelled"):
                 break
     finally:
         conn.close()

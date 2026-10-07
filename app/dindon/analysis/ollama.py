@@ -5,13 +5,14 @@ sent is the text of conversations, so helpers must be the administrator's own tr
 """
 import json
 import math
+import http.client
+import socket
 import threading
 import time
-import urllib.error
-import urllib.request
 from contextlib import suppress
 from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Callable
+from urllib.parse import urlsplit
 
 
 class OllamaError(Exception):
@@ -51,21 +52,56 @@ class Ollama:
             waited += step
 
     def _call(self, path: str, body: dict | None = None, timeout: float | None = None) -> dict:
-        data = None if body is None else json.dumps(body).encode()
-        request = urllib.request.Request(f"{self.base_url}{path}", data=data, headers={"Content-Type": "application/json"} if data else {})
+        """Close the HTTP socket when an analysis is cancelled, including during a model call."""
+        url = urlsplit(self.base_url)
+        if url.scheme not in ("http", "https") or not url.hostname:
+            raise OllamaError(f"Adresse Ollama invalide : {self.base_url}")
+        duration = timeout if timeout is not None else self.timeout
+        connection_type = http.client.HTTPSConnection if url.scheme == "https" else http.client.HTTPConnection
+        connection = connection_type(url.hostname, url.port, timeout=min(duration, 5))
+        finished = threading.Event()
+
+        def interrupt() -> None:
+            while not finished.wait(0.1):
+                if self.cancelled():
+                    with suppress(OSError):
+                        if connection.sock:
+                            connection.sock.shutdown(socket.SHUT_RDWR)
+                    connection.close()
+                    return
+
+        watcher = threading.Thread(target=interrupt, daemon=True, name="ollama-cancel")
+        watcher.start()
         try:
-            with urllib.request.urlopen(request, timeout=timeout or self.timeout) as response:
-                return json.load(response)
-        except urllib.error.HTTPError as error:
+            if self.cancelled():
+                raise InterruptedError("analyse annulée")
+            data = None if body is None else json.dumps(body).encode()
+            connection.request("POST" if data is not None else "GET", url.path.rstrip("/") + path, body=data,
+                               headers={"Content-Type": "application/json"} if data is not None else {})
+            if connection.sock:
+                connection.sock.settimeout(duration)
+            response = connection.getresponse()
+            raw = response.read()
+            if self.cancelled():
+                raise InterruptedError("analyse annulée")
+            if response.status >= 400:
+                try:
+                    detail = json.loads(raw).get("error", "")
+                except (ValueError, AttributeError):
+                    detail = ""
+                raise OllamaError(f"Ollama a refusé ({response.status}) : {detail or path}")
             try:
-                detail = json.load(error).get("error", "")
-            except Exception:
-                detail = ""
-            raise OllamaError(f"Ollama a refusé ({error.code}) : {detail or path}") from None
-        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as error:
+                return json.loads(raw)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                raise OllamaError("Ollama a répondu autre chose que du JSON") from None
+        except (http.client.HTTPException, TimeoutError, ConnectionError, OSError) as error:
+            if self.cancelled():
+                raise InterruptedError("analyse annulée") from None
             raise OllamaError(f"Ollama ne répond pas à {self.base_url} ({type(error).__name__})") from None
-        except json.JSONDecodeError:
-            raise OllamaError("Ollama a répondu autre chose que du JSON") from None
+        finally:
+            finished.set()
+            connection.close()
+            watcher.join(timeout=0.2)
 
     def models(self, timeout: float = 5) -> list[str]:
         """The names of the models that are installed (an empty list is a running Ollama with nothing in it)."""

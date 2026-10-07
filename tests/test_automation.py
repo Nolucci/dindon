@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from dindon import automation, privacy
+from dindon.analysis import auto
 from dindon.analysis.auto import cycle, tick
 from dindon.analysis.job import AnalysisJobs
 from dindon.analysis.ollama import Ollama
@@ -138,6 +139,29 @@ def test_a_busy_analysis_is_never_disturbed_and_a_missing_model_is_said(ingest_d
     assert asyncio.run(tick(jobs, settings)) is True
     result = automation.state(ingest_db)["last_result"]["servers"][0]
     assert result["state"] == "failed" and "ollama pull" in result["error"]            # said, and it waits for the next interval
+
+
+def test_cancelling_an_automatic_cycle_does_not_start_the_next_server(setup, monkeypatch):
+    settings, _ = setup
+    monkeypatch.setattr(auto, "_guilds", lambda _conn: [111, 222])
+    monkeypatch.setattr(automation, "pending", lambda *_args: {"new_messages": 1})
+    monkeypatch.setattr(automation, "stages_for", lambda *_args: ("conversations",))
+    started = []
+
+    class CancelledJobs:
+        embed_model = "bge-m3"
+
+        def start(self, guild, stages, limit=None):
+            started.append(guild)
+
+        def wait(self):
+            pass
+
+        def status(self):
+            return {"state": "cancelled", "error": None, "lines": []}
+
+    result = asyncio.run(cycle(CancelledJobs(), settings))
+    assert started == [111] and [server["state"] for server in result["servers"]] == ["cancelled"]
 
 
 # --- the interface ------------------------------------------------------------------------------------------------------------

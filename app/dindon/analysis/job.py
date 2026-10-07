@@ -43,8 +43,10 @@ class AnalysisJobs:
         self.embed_model, self.name_model = settings.embed_model, settings.naming_model
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
+        self._db_conn = None
         self._cancel = threading.Event()
         self._state = self._idle()
+        self._ready: dict | None = None
         self._lines: deque[str] = deque(maxlen=40)
 
     @staticmethod
@@ -54,12 +56,19 @@ class AnalysisJobs:
 
     def readiness(self) -> dict:
         """What the person needs to know before starting: is Ollama running, and are the two models installed."""
+        with self._lock:
+            if self._thread is not None and self._thread.is_alive() and self._ready is not None:
+                return self._ready
         try:
             installed = self.client.models()
         except OllamaError as error:
-            return {"ollama": False, "problem": str(error), "models": {self.embed_model: False, self.name_model: False}}
+            ready = {"ollama": False, "problem": str(error), "models": {self.embed_model: False, self.name_model: False}}
+            self._ready = ready
+            return ready
         have = lambda m: m in installed or f"{m}:latest" in installed  # noqa: E731
-        return {"ollama": True, "problem": None, "models": {self.embed_model: have(self.embed_model), self.name_model: have(self.name_model)}}
+        ready = {"ollama": True, "problem": None, "models": {self.embed_model: have(self.embed_model), self.name_model: have(self.name_model)}}
+        self._ready = ready
+        return ready
 
     def status(self) -> dict:
         with self._lock:
@@ -71,6 +80,7 @@ class AnalysisJobs:
             if self._thread is not None and self._thread.is_alive():
                 raise AnalysisBusy()
             self.client = OllamaPool(self._settings.ollama_url, urls) if urls else Ollama(self._settings.ollama_url)
+            self._ready = None
 
     def start(self, guild_id: int, stages: tuple[str, ...] = STAGES, *, topics: int | None = None, rebuild: bool = False, limit: int | None = None) -> None:
         """Checks that the models are there, then starts. Raises NotReady or AnalysisBusy, before anything is started."""
@@ -100,7 +110,17 @@ class AnalysisJobs:
                 return False
             self._cancel.set()
             self._state["state"] = "cancelling"
-            return True
+            conn = self._db_conn
+        if conn is not None:
+            # A large SQL statement (especially rebuilding conversations) must also be
+            # interrupted. PostgreSQL rolls the current transaction back on cancellation.
+            threading.Thread(target=self._cancel_query, args=(conn,), daemon=True, name="analysis-db-cancel").start()
+        return True
+
+    @staticmethod
+    def _cancel_query(conn) -> None:
+        with contextlib.suppress(Exception):
+            conn.cancel()
 
     def wait(self, timeout: float | None = None) -> None:
         thread = self._thread
@@ -149,6 +169,8 @@ class AnalysisJobs:
         try:
             with connect(self._settings.database_url, wait=5) as conn:
                 conn.autocommit = True
+                with self._lock:
+                    self._db_conn = conn
                 limits = self._limits(conn)
                 self.client.limits, self.client.cancelled = limits, cancel.is_set          # the limits of the machine, read again while this runs
                 now = limits()
@@ -191,11 +213,13 @@ class AnalysisJobs:
         except InterruptedError:
             pass
         except Exception as problem:                               # anything else: its kind only (its text could say too much)
-            error = f"erreur inattendue ({type(problem).__name__})"
+            if not cancel.is_set():
+                error = f"erreur inattendue ({type(problem).__name__})"
         self.client.limits, self.client.cancelled = None, lambda: False
         with self._lock:
+            self._db_conn = None
             if not error and not cancel.is_set() and self._state["stage"]:
                 self._state["completed_stages"] = [*self._state["completed_stages"], self._state["stage"]]
             self._state["finished_at"] = utc_iso()
             self._state["error"] = error
-            self._state["state"] = "failed" if error else "cancelled" if cancel.is_set() else "done"
+            self._state["state"] = "cancelled" if cancel.is_set() else "failed" if error else "done"
