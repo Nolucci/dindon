@@ -345,9 +345,6 @@
             Un bot est recommandé (voir le README).
           </p>
         {/if}
-        {#if status?.collector?.needs_backfill?.length}
-          <p class="banner info">Le premier import du serveur n’est pas fait : lancez <code>dindon backfill</code>. La surveillance n’exporte rien avant.</p>
-        {/if}
         {#if problem}<p class="banner" role="alert">{problem}</p>{/if}
       </div>
 
