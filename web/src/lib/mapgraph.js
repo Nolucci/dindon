@@ -8,6 +8,12 @@ import FA2Layout from 'graphology-layout-forceatlas2/worker';
 // How much each kind of exchange says about a tie (the same numbers as the API, which sends them in `meta.kind_factor`)
 const DEFAULT_FACTOR = { reply: 1, mention: 0.6, reaction: 0.25 };
 const FLASH_MS = 3200;
+const PULSE_MS = 2200;                // a message travelling from one person to the other, then the ripple where it lands
+const TRAVEL = 0.42;                  // the part of PULSE_MS that the message spends on its way
+// The color of a new exchange follows its kind: a reply is a conversation (yellow), a mention calls someone (blurple), a reaction is a nod (pink)
+const KIND_COLOR = { reply: [240, 178, 50], mention: [153, 160, 255], reaction: [255, 128, 176] };
+const CALM = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;   // no travelling light: the line and the points still glow
+const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2);
 // The colors of the Poulet dashboard (its tokens, see app.css): the map is drawn on --bg-primary, with the blurple accent
 const FLASH_COLOR = [240, 178, 50];   // Discord's yellow: a new exchange
 const BACKGROUND = [49, 51, 56];      // --bg-primary
@@ -178,6 +184,9 @@ export class MapGraph {
     this.labelBoxes = [];       // where the names were drawn the last time
     this.flashes = new Map(); // key of an edge -> when its light went on
     this.nodeFlashes = new Map();
+    this.nodeKinds = new Map();   // person -> color of their last exchange
+    this.flashKinds = new Map();  // key of an edge -> kind of its last exchange
+    this.pulses = [];             // the exchanges on their way: { from, to, kind, since }
     this.maxInfluence = 1;
     this.maxWeight = 1;
     this.edgeCount = 0;
@@ -217,7 +226,7 @@ export class MapGraph {
       .then(() => this.renderer?.refresh({ skipIndexation: true }))
       .catch(() => {});
     this.renderer.on('beforeRender', () => (this.labelBoxes = []));
-    this.renderer.on('afterRender', () => this.drawIslandNames());
+    this.renderer.on('afterRender', () => { this.drawIslandNames(); this.drawPulses(); });
     this.renderer.on('clickNode', ({ node }) => this.select(node, true));
     this.renderer.on('clickStage', () => this.select(this.labelHovered, true)); // a click on a name is a click on its point
     this.renderer.on('enterNode', ({ node }) => {
@@ -355,7 +364,7 @@ export class MapGraph {
     }
     const light = this.light(this.nodeFlashes.get(node));
     if (light > 0) {
-      result.color = css(mix(data.rgb, FLASH_COLOR, light));
+      result.color = css(mix(data.rgb, this.nodeKinds.get(node) ?? FLASH_COLOR, light));
       result.size = result.size * (1 + 0.9 * light);
       result.zIndex = 4;
     }
@@ -382,7 +391,7 @@ export class MapGraph {
     const light = this.light(this.flashes.get(edge));
     if (light > 0) {
       result.hidden = false;
-      result.color = faded(FLASH_COLOR, 0.55 + 0.45 * light);
+      result.color = faded(KIND_COLOR[this.flashKinds.get(edge)] ?? FLASH_COLOR, 0.55 + 0.45 * light);
       result.size = Math.max(result.size, data.size) + 3.5 * UI * light;
       result.zIndex = 4;
     }
@@ -602,8 +611,13 @@ export class MapGraph {
     this.focusStale = true;
     const now = performance.now();
     this.flashes.set(key, now);
+    this.flashKinds.set(key, kind);
     this.nodeFlashes.set(from, now);
     this.nodeFlashes.set(to, now);
+    this.nodeKinds.set(from, KIND_COLOR[kind] ?? FLASH_COLOR);
+    this.nodeKinds.set(to, KIND_COLOR[kind] ?? FLASH_COLOR);
+    this.pulses.push({ from, to, kind, since: now });
+    if (this.pulses.length > 80) this.pulses.splice(0, this.pulses.length - 80);   // a flood of messages: the oldest lights go out first
     this.container.dataset.flashes = String(++this.flashCount); // a counter, so that the page can be tested from outside
     this.animate();
     return true;
@@ -616,10 +630,91 @@ export class MapGraph {
       for (const map of [this.flashes, this.nodeFlashes]) {
         for (const [key, since] of map) if (now - since >= FLASH_MS) map.delete(key);
       }
+      this.pulses = this.pulses.filter((p) => now - p.since < PULSE_MS);
       this.renderer.refresh({ skipIndexation: true });
-      this.frame = this.flashes.size || this.nodeFlashes.size ? requestAnimationFrame(tick) : null;
+      this.frame = this.flashes.size || this.nodeFlashes.size || this.pulses.length ? requestAnimationFrame(tick) : null;
     };
     this.frame = requestAnimationFrame(tick);
+  }
+
+  // The exchanges on their way, drawn over the map: a comet from the one who wrote to the one who is answered, a ring where it lands, and a halo
+  // around everyone who is in a conversation right now (the more exchanges at once, the wider the halo: three people talking light up together)
+  drawPulses() {
+    if (!this.pulses.length) return;
+    const context = this.renderer.getCanvases().labels.getContext('2d');
+    const now = performance.now();
+    const where = (id) => {
+      if (!this.graph.hasNode(id)) return null;
+      const data = this.renderer.getNodeDisplayData(id);
+      const at = this.graph.getNodeAttributes(id);
+      return data ? { ...this.renderer.graphToViewport({ x: at.x, y: at.y }), size: data.size } : null;
+    };
+    const active = new Map();                                 // person -> how many exchanges are going on around them
+    context.save();
+    context.globalCompositeOperation = 'lighter';
+    for (const pulse of this.pulses) {
+      const t = (now - pulse.since) / PULSE_MS;
+      if (t < 0 || t >= 1) continue;
+      const a = where(pulse.from);
+      const b = where(pulse.to);
+      if (!a || !b) continue;
+      const rgb = KIND_COLOR[pulse.kind] ?? FLASH_COLOR;
+      active.set(pulse.from, (active.get(pulse.from) ?? 0) + (1 - t));
+      active.set(pulse.to, (active.get(pulse.to) ?? 0) + (1 - t));
+      if (CALM) continue;
+      const travel = Math.min(t / TRAVEL, 1);
+      if (travel < 1) {
+        const head = ease(travel);
+        const tail = Math.max(0, head - 0.22);               // the trail of the comet, along the line
+        const hx = a.x + (b.x - a.x) * head, hy = a.y + (b.y - a.y) * head;
+        const tx = a.x + (b.x - a.x) * tail, ty = a.y + (b.y - a.y) * tail;
+        const gradient = context.createLinearGradient(tx, ty, hx, hy);
+        gradient.addColorStop(0, css(rgb, 0));
+        gradient.addColorStop(1, css(rgb, 0.95));
+        context.strokeStyle = gradient;
+        context.lineWidth = 3 * UI;
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(tx, ty);
+        context.lineTo(hx, hy);
+        context.stroke();
+        const glow = context.createRadialGradient(hx, hy, 0, hx, hy, 9 * UI);
+        glow.addColorStop(0, css([255, 255, 255], 0.95));
+        glow.addColorStop(0.35, css(rgb, 0.8));
+        glow.addColorStop(1, css(rgb, 0));
+        context.fillStyle = glow;
+        context.beginPath();
+        context.arc(hx, hy, 9 * UI, 0, Math.PI * 2);
+        context.fill();
+      }
+      const ring = (point, from, to, strength) => {          // a ring that widens and fades
+        const u = (t - from) / (to - from);
+        if (u <= 0 || u >= 1) return;
+        context.strokeStyle = css(rgb, strength * (1 - u) ** 1.5);
+        context.lineWidth = (2.5 - 1.5 * u) * UI;
+        context.beginPath();
+        context.arc(point.x, point.y, point.size + (6 + 26 * ease(u)) * UI, 0, Math.PI * 2);
+        context.stroke();
+      };
+      ring(a, 0, 0.3, 0.55);                                 // where it leaves: a small one
+      ring(b, TRAVEL, 0.95, 0.9);                            // where it lands: a wide one
+      ring(b, TRAVEL + 0.12, 1, 0.5);                        // and its echo
+    }
+    for (const [id, amount] of active) {
+      const point = where(id);
+      if (!point) continue;
+      const strength = Math.min(1, 0.25 + 0.3 * amount);
+      const reach = point.size + (10 + 8 * Math.min(amount, 3)) * UI;
+      const rgb = this.nodeKinds.get(id) ?? FLASH_COLOR;
+      const halo = context.createRadialGradient(point.x, point.y, point.size * 0.8, point.x, point.y, reach);
+      halo.addColorStop(0, css(rgb, 0.45 * strength));
+      halo.addColorStop(1, css(rgb, 0));
+      context.fillStyle = halo;
+      context.beginPath();
+      context.arc(point.x, point.y, reach, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.restore();
   }
 
   // --- selecting -----------------------------------------------------------------------------------

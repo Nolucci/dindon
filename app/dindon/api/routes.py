@@ -101,15 +101,21 @@ _IN_THEME = """ AND EXISTS (SELECT 1 FROM conversation_messages cm JOIN topic_as
 # Both ends of a link have the ideology (as the role that they gave themselves)
 _WITH_IDEOLOGY = """ AND d.f IN (SELECT user_id FROM claimed_ideologies WHERE guild_id = %(guild)s AND ideology_id = %(ideology)s)
                   AND d.t IN (SELECT user_id FROM claimed_ideologies WHERE guild_id = %(guild)s AND ideology_id = %(ideology)s)"""
+# Both ends of a link have this role of the server (as it is on Discord, whatever it says: the roles of age and gender are never offered, see map_filters)
+_WITH_ROLE = """ AND d.f IN (SELECT user_id FROM member_roles WHERE guild_id = %(guild)s AND role_id = %(role)s)
+                  AND d.t IN (SELECT user_id FROM member_roles WHERE guild_id = %(guild)s AND role_id = %(role)s)"""
 
 
-def graph_sql(period: bool, channels: bool = False, theme: bool = False, ideology: bool = False) -> str:
+def graph_sql(period: bool, channels: bool = False, theme: bool = False, ideology: bool = False, role: bool = False) -> str:
     """The query of the map (also the one of the map on Discord): from the stored links, or counted again from the messages when a period, a channel or a topic
     narrows it; and, when asked, only the people who gave themselves an ideology. The parameters are named in the filters above."""
     source = (_PERIOD.replace("GROUP BY 1, 2, 3", (_IN_CHANNELS if channels else "") + (_IN_THEME if theme else "") + " GROUP BY 1, 2, 3") if period else _ALL_TIME)
     sql = _GRAPH.replace("{source}", source)
     if ideology:
         sql = sql.replace("WHERE %(bots)s OR (NOT uf.is_bot AND NOT ut.is_bot)", "WHERE (%(bots)s OR (NOT uf.is_bot AND NOT ut.is_bot))" + _WITH_IDEOLOGY)
+    if role:
+        plain = "WHERE %(bots)s OR (NOT uf.is_bot AND NOT ut.is_bot)"
+        sql = sql.replace(_WITH_IDEOLOGY, _WITH_IDEOLOGY + _WITH_ROLE) if ideology else sql.replace(plain, "WHERE (%(bots)s OR (NOT uf.is_bot AND NOT ut.is_bot))" + _WITH_ROLE)
     return sql
 
 
@@ -128,6 +134,7 @@ def graph(
     channels: str = Query("", pattern=r"^[0-9]*(,[0-9]+)*$", description="only the exchanges in these channels (ids, comma separated)"),
     theme: int | None = Query(None, description="only the exchanges of the conversations about this topic"),
     ideology: int | None = Query(None, description="only the links between people who both gave themselves this ideology"),
+    role: int | None = Query(None, description="only the links between people who both have this role of the server (as it is on Discord)"),
 ) -> dict:
     kind_list = [k for k in kinds.split(",") if k in KIND_FACTOR]
     if not kind_list:
@@ -139,10 +146,10 @@ def graph(
     with request.app.state.pool.connection() as conn:
         guild_id = resolve_guild(conn, guild)
         now = utc_now()
-        params = {"guild": guild_id, "kinds": kind_list, "bots": bots, "min_weight": min_weight, "limit": limit, "channels": channel_ids, "theme": theme, "ideology": ideology,
+        params = {"guild": guild_id, "kinds": kind_list, "bots": bots, "min_weight": min_weight, "limit": limit, "channels": channel_ids, "theme": theme, "ideology": ideology, "role": role,
                   "max_edges": max_edges, "ref": min(until, now) if until else now,
                   "since": since or datetime(1970, 1, 1, tzinfo=UTC), "until": until or datetime(2200, 1, 1, tzinfo=UTC)}
-        rows = conn.execute(graph_sql(period, bool(channel_ids), theme is not None, ideology is not None), params).fetchall()
+        rows = conn.execute(graph_sql(period, bool(channel_ids), theme is not None, ideology is not None, role is not None), params).fetchall()
         node_ids = sorted({r["a"] for r in rows} | {r["b"] for r in rows})
         # Points without a link: whoever ever wrote in this server (not only during the period) and is not on the map. Linked
         # people come first and keep their places; these only take what is left of `limit`, the most talkative first.
@@ -154,6 +161,7 @@ def graph(
                    FROM messages m JOIN channels c ON c.id = m.channel_id JOIN users u ON u.id = m.author_id
                    WHERE c.guild_id = %(guild)s AND (%(bots)s OR NOT u.is_bot)
                      AND (%(ideology)s::int IS NULL OR m.author_id IN (SELECT user_id FROM claimed_ideologies WHERE guild_id = %(guild)s AND ideology_id = %(ideology)s))
+                     AND (%(role)s::bigint IS NULL OR m.author_id IN (SELECT user_id FROM member_roles WHERE guild_id = %(guild)s AND role_id = %(role)s))
                      AND (cardinality(%(channels)s::bigint[]) = 0 OR m.channel_id = ANY(%(channels)s))
                    GROUP BY m.author_id ORDER BY count(*) DESC, m.author_id""", params) if r["id"] not in on_map]
             loners_total = len(candidates)
@@ -220,7 +228,15 @@ def map_filters(request: Request, guild: int | None = None) -> dict:
         ideologies = conn.execute(
             """SELECT i.id, i.name, count(DISTINCT ci.user_id) AS people FROM claimed_ideologies ci JOIN ideologies i ON i.id = ci.ideology_id
                WHERE ci.guild_id = %s GROUP BY i.id, i.name ORDER BY count(DISTINCT ci.user_id) DESC, i.name""", (guild_id,)).fetchall()
+        # The roles of the server where the bot is, as they are on Discord (not the ideologies read from them): the only ones left out are those of age and gender, which never come out,
+        # and the technical ones (everyone, separators)
+        roles = conn.execute(
+            """SELECT r.id, r.name, r.color, count(DISTINCT mr.user_id) AS people FROM roles r JOIN classified_roles cr ON cr.role_id = r.id
+               JOIN member_roles mr ON mr.role_id = r.id AND mr.guild_id = r.guild_id
+               WHERE r.guild_id = %s AND cr.kind NOT IN ('age', 'genre', 'base', 'separateur')
+               GROUP BY r.id, r.name, r.color, r.position ORDER BY r.position DESC, r.name LIMIT 150""", (guild_id,)).fetchall()
     return {"channels": [{"id": str(r["id"]), "name": r["name"], "messages": r["messages"]} for r in channels],
+            "roles": [{"id": str(r["id"]), "name": r["name"], "people": r["people"]} for r in roles],
             "themes": [{"id": r["id"], "label": r["label"]} for r in themes],
             "ideologies": [{"id": r["id"], "name": r["name"], "people": r["people"]} for r in ideologies]}
 

@@ -39,11 +39,11 @@
   let since = $state('');
   let until = $state('');
   let kinds = $state({ reply: true, mention: true, reaction: true });
-  let channel = $state('');       // narrow the map to one channel, one topic, one ideology; and hide the weakest links
+  let channel = $state('');       // narrow the map to one channel, one topic, one role of the server; and hide the weakest links
   let theme = $state('');
-  let ideology = $state('');
+  let role = $state('');
   let minWeight = $state('0');
-  let mapOptions = $state({ channels: [], themes: [], ideologies: [] });
+  let mapOptions = $state({ channels: [], themes: [], roles: [] });
   let density = $state('2500'); // how many links to draw at most: the strongest ones first
   let showImport = $state(false); // the window to import a part of the server
   let showInvite = $state(false); // the window to invite the bot to a server
@@ -54,6 +54,8 @@
   let showIsolated = $state(true); // also the people who wrote and have no link on the map (points on their own)
   let lastExchange = $state(null);
   let exchangeTimer;
+  let recent = [];                // the exchanges of the last seconds, to name the people who talk together
+  const CONVERSATION_MS = 8000;
   let meta = $state(null);
   let status = $state(null);
   let live = $state(false);
@@ -86,14 +88,14 @@
   const DEFAULTS = { preset: 'all', density: '2500', minWeight: '0' };
   // Something differs from what the map shows when it is opened
   let dirty = $derived(preset !== DEFAULTS.preset || since !== '' || until !== '' || !KINDS.every((k) => kinds[k.id]) || density !== DEFAULTS.density
-    || channel !== '' || theme !== '' || ideology !== '' || minWeight !== DEFAULTS.minWeight || !showIsolated || grouped || query !== '');
+    || channel !== '' || theme !== '' || role !== '' || minWeight !== DEFAULTS.minWeight || !showIsolated || grouped || query !== '');
 
   function resetFilters() {
     preset = DEFAULTS.preset;
     since = until = '';
     kinds = { reply: true, mention: true, reaction: true };
     density = DEFAULTS.density;
-    channel = theme = ideology = '';
+    channel = theme = role = '';
     minWeight = DEFAULTS.minWeight;
     showIsolated = true;
     query = '';
@@ -112,7 +114,7 @@
 
   function graphParams() {
     const params = { guild, kinds: KINDS.filter((k) => kinds[k.id]).map((k) => k.id).join(','), max_edges: density, isolated: showIsolated,
-      channels: channel || undefined, theme: theme || undefined, ideology: ideology || undefined, min_weight: Number(minWeight) || undefined };
+      channels: channel || undefined, theme: theme || undefined, role: role || undefined, min_weight: Number(minWeight) || undefined };
     const days = PRESETS.find((p) => p.id === preset)?.days;
     if (days) params.since = new Date(Date.now() - days * 86400000).toISOString();
     if (preset === 'custom') {
@@ -174,9 +176,16 @@
     }
     if (event.type === 'edge' && showsPresent && kinds[event.kind]) {
       const label = (id) => map?.labelOf(id) ?? id;
-      lastExchange = `${label(event.from)} → ${label(event.to)} · ${{ reply: 'réponse', mention: 'mention', reaction: 'réaction' }[event.kind]}`;
+      // Exchanges of the last few seconds: those who talk together are named together (A, B and C), not only the last pair
+      const at = Date.now();
+      recent = [...recent.filter((r) => at - r.at < CONVERSATION_MS), { at, from: event.from, to: event.to, kind: event.kind }];
+      const names = [...new Set(recent.flatMap((r) => [r.from, r.to]))];
+      const shownNames = names.slice(0, 4).map(label).join(', ') + (names.length > 4 ? ` et ${names.length - 4} autres` : '');
+      lastExchange = recent.length > 1 && names.length > 2
+        ? `${shownNames} · ${recent.length} échanges`
+        : `${label(event.from)} → ${label(event.to)} · ${{ reply: 'réponse', mention: 'mention', reaction: 'réaction' }[event.kind]}`;
       clearTimeout(exchangeTimer);
-      exchangeTimer = setTimeout(() => (lastExchange = null), 7000);
+      exchangeTimer = setTimeout(() => { lastExchange = null; recent = []; }, 7000);
       if (!map?.flash(event)) {
         pendingFlashes.push(event);
         scheduleReload(1500);
@@ -320,12 +329,12 @@
   // Another server was picked in the left bar: its map is shown
   async function loadOptions() {
     const options = guild ? await guard(() => api.mapFilters(guild)) : null;
-    mapOptions = options ?? { channels: [], themes: [], ideologies: [] };
+    mapOptions = options ?? { channels: [], themes: [], roles: [] };
   }
 
   $effect(() => {
     guild;                               // another server: its own channels, topics and ideologies
-    channel = theme = ideology = '';
+    channel = theme = role = '';
     loadOptions();
   });
 
@@ -353,7 +362,7 @@
         bind:density
         bind:channel
         bind:theme
-        bind:ideology
+        bind:role
         bind:minWeight
         {mapOptions}
         bind:showIsolated

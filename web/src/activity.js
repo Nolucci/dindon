@@ -392,6 +392,7 @@ async function load() {
     people = data.nodes.filter((n) => n.label).sort((a, b) => b.influence - a.influence);
     for (const node of data.nodes) nodeColors.set(node.id, node.color || '#dbdee1');
     loader.show(data.nodes);
+    $('reset').hidden = !($('period').value !== '30' || (kinds && kinds.size < (data.meta.kinds_allowed ?? []).length) || narrowed.weight !== '0' || narrowed.theme || narrowed.ideology);
     note(data.nodes.length ? `${data.nodes.length} personnes, ${data.edges.length} liens` : 'Rien à montrer pour cette période.');
     return true;
   } catch (error) {
@@ -416,6 +417,17 @@ async function start() {
   document.addEventListener('keydown', (event) => {            // "/" goes to the search, as on the page of the interface
     if (event.key === '/' && !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) { event.preventDefault(); $('q').focus(); }
   });
+  $('fit').onclick = () => map.resetView();
+  $('reset').onclick = () => {
+    $('period').value = '30';
+    kinds = null;
+    Object.assign(narrowed, { weight: '0', theme: '', ideology: '' });
+    filtersDrawn = '';
+    shown = focused = null;
+    $('card').hidden = true;
+    map.select(null);
+    void load().then(() => map.resetView());
+  };
   $('period').onchange = () => { void load().then((loaded) => { if (loaded && shown) showCard(shown); }); };
 
   const { client_id: clientId } = await get('/activity/config');

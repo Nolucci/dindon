@@ -12,9 +12,9 @@
     density = $bindable('2500'),
     channel = $bindable(''),
     theme = $bindable(''),
-    ideology = $bindable(''),
+    role = $bindable(''),
     minWeight = $bindable('0'),
-    mapOptions = { channels: [], themes: [], ideologies: [] },
+    mapOptions = { channels: [], themes: [], roles: [] },
     showIsolated = $bindable(true),
     grouped = $bindable(false),
     dirty = false,
@@ -153,10 +153,10 @@
     </select>
   {/if}
 
-  {#if mapOptions.ideologies.length}
-    <select class="select fsel" bind:value={ideology} onchange={onChange} aria-label="Rôle d’idées">
+  {#if mapOptions.roles?.length}
+    <select class="select fsel" bind:value={role} onchange={onChange} aria-label="Rôle du serveur">
       <option value="">Rôle</option>
-      {#each mapOptions.ideologies as i (i.id)}<option value={i.id}>{i.name} ({fmt.format(i.people)})</option>{/each}
+      {#each mapOptions.roles as r (r.id)}<option value={r.id}>{r.name} ({fmt.format(r.people)})</option>{/each}
     </select>
   {/if}
 

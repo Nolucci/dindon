@@ -448,7 +448,7 @@ def test_the_color_that_an_export_gives_is_not_used_when_the_roles_are_not_known
 
 def test_the_map_can_be_narrowed_to_a_channel_a_theme_or_an_ideology(me):
     options = me.get("/api/map/filters").json()
-    assert set(options) == {"channels", "themes", "ideologies"} and len(options["channels"]) >= 2
+    assert set(options) == {"channels", "roles", "themes", "ideologies"} and len(options["channels"]) >= 2
     everything = me.get("/api/graph").json()
     busiest, quietest = options["channels"][0], options["channels"][-1]
     one = me.get("/api/graph", params={"channels": quietest["id"]}).json()
@@ -459,3 +459,12 @@ def test_the_map_can_be_narrowed_to_a_channel_a_theme_or_an_ideology(me):
     assert me.get("/api/graph", params={"theme": 999999}).json()["edges"] == []                    # no conversation about it
     assert me.get("/api/graph", params={"ideology": 999}).json()["edges"] == []                    # nobody has this role
     assert me.get("/api/graph", params={"ideology": 999, "isolated": True}).json()["nodes"] == []
+    # the roles offered are those of the server as they are on Discord; the ones that say an age or a gender never are
+    names = {r["name"] for r in options["roles"]}
+    assert options["roles"] and not names & {"Homme", "Femme", "18-25 ans"} and all(r["people"] > 0 for r in options["roles"])
+    role = options["roles"][0]
+    narrowed = me.get("/api/graph", params={"role": role["id"]}).json()
+    assert len(narrowed["edges"]) <= len(everything["edges"])
+    assert me.get("/api/graph", params={"role": 999}).json()["edges"] == []                         # nobody has this role
+    assert me.get("/api/graph", params={"role": role["id"], "ideology": 999}).json()["edges"] == []   # the two together
+    assert me.get("/api/graph", params={"role": "abc"}).status_code == 422
