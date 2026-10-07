@@ -21,7 +21,7 @@ from psycopg.types.json import Jsonb
 
 from dindon import locks
 from dindon.clock import utc_now
-from dindon.debate import rules
+from dindon.debate import polls, rules
 
 
 class DebateRefused(Exception):
@@ -226,16 +226,19 @@ def start(conn: psycopg.Connection, *, guild_id: int, channel_id: int, topic: st
              Jsonb(axis.snapshot()) if axis else None, quiet_seconds, now)).fetchone())
 
 
-def attach_thread(conn: psycopg.Connection, debate_id: int, *, thread_id: int, question_message_id: int, now: datetime | None = None) -> Debate:
+def attach_thread(conn: psycopg.Connection, debate_id: int, *, thread_id: int, question_message_id: int, now: datetime | None = None,
+                  poll_question: str | None = None, poll_description: str | None = None) -> Debate:
     """The place of the debate (its thread, or the channel) and its launch message exist: the debate opens. What is written after the launch message belongs to it."""
     now = now or utc_now()
     with conn.transaction(), conn.cursor(row_factory=tuple_row) as cur:
         debate = _locked(cur, debate_id)
         if debate.status != "preparing":
             raise DebateRefused("not_preparing")
-        return _row(cur.execute(
+        opened = _row(cur.execute(
             f"""UPDATE debates SET status = 'open', thread_id = %s, question_message_id = %s, start_message_id = %s, started_at = %s, last_activity_at = %s
                 WHERE id = %s RETURNING {_COLUMNS}""", (thread_id, question_message_id, question_message_id, now, now, debate_id)).fetchone())
+        polls.ensure(conn, opened, poll_question, poll_description)
+        return opened
 
 
 def fail(conn: psycopg.Connection, debate_id: int, now: datetime | None = None) -> Debate | None:
@@ -267,7 +270,7 @@ def record_message(conn: psycopg.Connection, debate_id: int, *, message_id: int,
         return added
 
 
-def set_position(conn: psycopg.Connection, debate_id: int, user_id: int, position: str, now: datetime | None = None) -> str:
+def set_position(conn: psycopg.Connection, debate_id: int, user_id: int, position: str, now: datetime | None = None, *, member: dict | None = None) -> str:
     """A person takes (or changes) their position. Returns 'recorded' (the first time), 'changed' or 'unchanged'.
     Refused: 'position', 'unknown', 'not_open' (over), 'blocked'."""
     if position not in rules.POSITIONS:
@@ -279,12 +282,22 @@ def set_position(conn: psycopg.Connection, debate_id: int, user_id: int, positio
             raise DebateRefused("not_open")
         if _blocked(cur, user_id):
             raise DebateRefused("blocked")
+        if member and (user := member.get("user")) and str(user.get("id")) == str(user_id):
+            cur.execute("""INSERT INTO users (id, name, global_name, is_bot) VALUES (%s, %s, %s, false)
+                           ON CONFLICT (id) DO UPDATE SET name = CASE WHEN excluded.name = excluded.id::text THEN users.name ELSE excluded.name END,
+                               global_name = COALESCE(excluded.global_name, users.global_name), last_seen_at = now()""",
+                        (user_id, user.get("username") or str(user_id), user.get("global_name")))
+            cur.execute("""INSERT INTO members (guild_id, user_id, nickname, observed_at) SELECT id, %s, %s, now() FROM guilds WHERE id = %s
+                           ON CONFLICT (guild_id, user_id) DO UPDATE SET nickname = excluded.nickname, observed_at = now()""",
+                        (user_id, member.get("nick"), debate.guild_id))
+        polls.ensure(conn, debate)
         last = cur.execute("SELECT position FROM debate_positions WHERE debate_id = %s AND user_id = %s ORDER BY id DESC LIMIT 1", (debate_id, user_id)).fetchone()
         if last is not None and last[0] == position:
             return "unchanged"
         cur.execute("INSERT INTO debate_positions (debate_id, user_id, position, chosen_at) VALUES (%s, %s, %s, %s)", (debate_id, user_id, position, now))
         cur.execute("DELETE FROM debate_end_votes WHERE debate_id = %s AND user_id = %s", (debate_id, user_id))      # a new side, a new say
         cur.execute("UPDATE debates SET last_activity_at = %s WHERE id = %s", (now, debate_id))
+        polls.record_evidence(cur, debate)
         _settle(cur, debate, now)                                          # leaving a camp can empty it, or leave the rest of the smallest camp in agreement
         return "recorded" if last is None else "changed"
 
@@ -372,9 +385,13 @@ def quiet(conn: psycopg.Connection, now: datetime | None = None) -> list[int]:
 
 
 def _close(cur: psycopg.Cursor, debate: Debate, reason: str, now: datetime) -> Debate:
+    cur.execute("UPDATE debate_polls SET dirty = true, revision = revision + 1 WHERE debate_id = %s", (debate.id,))
     rating = None if reason in (rules.FAILED, rules.NO_PARTICIPANTS) else now + timedelta(seconds=rules.RATING_SECONDS)
-    return _row(cur.execute(f"UPDATE debates SET status = 'closed', close_reason = %s, closed_at = %s, rating_ends_at = %s WHERE id = %s RETURNING {_COLUMNS}",
-                            (reason, now, rating, debate.id)).fetchone())
+    closed = _row(cur.execute(f"UPDATE debates SET status = 'closed', close_reason = %s, closed_at = %s, rating_ends_at = %s WHERE id = %s RETURNING {_COLUMNS}",
+                             (reason, now, rating, debate.id)).fetchone())
+    if reason == rules.FAILED:
+        cur.execute("SELECT refresh_person_axis_scores(%s)", (debate.guild_id,))
+    return closed
 
 
 def close_stale(conn: psycopg.Connection, now: datetime, max_age: timedelta) -> int:

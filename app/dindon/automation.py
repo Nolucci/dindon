@@ -149,7 +149,9 @@ def pending(conn: psycopg.Connection, guild_id: int, embed_model: str) -> dict:
                AND NOT EXISTS (SELECT 1 FROM conversation_extractions x WHERE x.conversation_id = c.id)""", (guild_id,)).fetchone()[0]
         unlinked = cur.execute(
             """SELECT count(*) FROM propositions p WHERE p.axes_read_at IS NULL AND p.status NOT IN ('rejected', 'merged')
-               AND EXISTS (SELECT 1 FROM claims c WHERE c.proposition_id = p.id AND c.guild_id = %s)""", (guild_id,)).fetchone()[0]
+               AND (EXISTS (SELECT 1 FROM claims c WHERE c.proposition_id = p.id AND c.guild_id = %(guild)s)
+                    OR EXISTS (SELECT 1 FROM debate_polls q JOIN debates d ON d.id = q.debate_id
+                               WHERE q.proposition_id = p.id AND d.guild_id = %(guild)s))""", {"guild": guild_id}).fetchone()[0]
         run = cur.execute("SELECT max(id) FROM topic_runs WHERE guild_id = %s", (guild_id,)).fetchone()[0]
         unplaced = cur.execute(
             """SELECT count(*) FROM conversations c JOIN channels ch ON ch.id = c.channel_id WHERE ch.guild_id = %s AND c.kept

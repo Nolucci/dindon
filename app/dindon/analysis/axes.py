@@ -216,7 +216,9 @@ def assign_axes(conn: psycopg.Connection, client: Ollama, model: str, guild_id: 
     with conn.cursor(row_factory=tuple_row) as cur:
         todo = cur.execute(
             """SELECT p.id, p.text FROM propositions p WHERE p.axes_read_at IS NULL AND p.status NOT IN ('rejected', 'merged')
-               AND EXISTS (SELECT 1 FROM claims c WHERE c.proposition_id = p.id AND c.guild_id = %s) ORDER BY p.id""", (guild_id,)).fetchall()
+               AND (EXISTS (SELECT 1 FROM claims c WHERE c.proposition_id = p.id AND c.guild_id = %(guild)s)
+                    OR EXISTS (SELECT 1 FROM debate_polls q JOIN debates d ON d.id = q.debate_id
+                               WHERE q.proposition_id = p.id AND d.guild_id = %(guild)s)) ORDER BY p.id""", {"guild": guild_id}).fetchall()
         decided = cur.execute("SELECT count(*) FROM propositions WHERE axes_validated_at IS NOT NULL").fetchone()[0]
     described = "\n\nLes axes :\n" + describe(axes, anchors)
     systems = [SYSTEM + described, SYSTEM_CAREFUL + described]

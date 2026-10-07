@@ -1,7 +1,7 @@
 """The forum where the debates of a server are created, when there is one (docs/regles-du-bot.md, « Un forum pour les débats »).
 
 Many servers keep their debates in a **forum channel** (Discord's type 15): every debate is a *post* with labels (« étiquettes », Discord's *tags*: Économie, Religion…). A moderator tells Dindon
-once, with `/dindon forum`, which forum it is; from then on a debate that is opened in a thread is created there, as a post, instead of a thread under the channel where the command was
+once, with `/dindon param`, which forum it is; from then on a debate that is opened in a thread is created there, as a post, instead of a thread under the channel where the command was
 used: the channel is not polluted. Nothing is stored of a person: the channel, its name and, if asked, the label that every debate carries.
 
 **The labels.** Dindon matches the debate topic and axis to the labels actually present in the forum. The optional label chosen by a
@@ -129,3 +129,17 @@ def pick_tags(available: list, default_id: str | None, axis_name: str | None, to
         if fallback:
             picked.append(fallback)
     return picked[:MAX_TAGS]
+
+
+POLL_KEY = "debate_polls.{}"
+
+
+def poll_channel(conn: psycopg.Connection, guild_id: int) -> int | None:
+    row = conn.execute("SELECT value FROM runtime_settings WHERE key = %s", (POLL_KEY.format(guild_id),)).fetchone()
+    return int(row[0]["channel_id"]) if row and isinstance(row[0], dict) and str(row[0].get("channel_id", "")).isdigit() else None
+
+
+def save_poll_channel(conn: psycopg.Connection, guild_id: int, channel_id: int) -> None:
+    conn.execute("""INSERT INTO runtime_settings (key, value, updated_at) VALUES (%s, %s, now())
+                    ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = now()""",
+                 (POLL_KEY.format(guild_id), Jsonb({"channel_id": str(channel_id)})))

@@ -123,14 +123,15 @@ def erase_server(conn: psycopg.Connection, guild_id: int, *, source: str = "remo
         cur.execute("DELETE FROM guilds WHERE id = %s", (guild_id,))
         counts["debates"] = cur.execute("DELETE FROM debates WHERE guild_id = %s", (guild_id,)).rowcount   # their messages, positions and claims go with them
         cur.execute("DELETE FROM card_prefs WHERE guild_id = %s", (guild_id,))                              # the cards that people set up there
-        cur.execute("DELETE FROM runtime_settings WHERE key = %s", (f"debate_forum.{guild_id}",))        # the forum that was chosen for its debates
+        cur.execute("DELETE FROM runtime_settings WHERE key IN (%s, %s)", (f"debate_forum.{guild_id}", f"debate_polls.{guild_id}"))        # the forum that was chosen for its debates
         cur.execute("DELETE FROM identity_history WHERE guild_id = %s", (guild_id,))      # the nicknames used there
         counts["people"] = cur.execute(
             """DELETE FROM users u WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.author_id = u.id)
                                      AND NOT EXISTS (SELECT 1 FROM members mb WHERE mb.user_id = u.id)""").rowcount
         counts["propositions"] = cur.execute(
             """DELETE FROM propositions p WHERE p.status IN ('proposed', 'rejected')
-                                            AND NOT EXISTS (SELECT 1 FROM claims c WHERE c.proposition_id = p.id)""").rowcount
+                                            AND NOT EXISTS (SELECT 1 FROM claims c WHERE c.proposition_id = p.id)
+                                            AND NOT EXISTS (SELECT 1 FROM debate_polls q WHERE q.proposition_id = p.id)""").rowcount
         cur.execute("DELETE FROM ingest_runs WHERE guild_id = %s", (guild_id,))
         if known or any(counts.values()):
             _log(cur, None, "erase_server", source, counts)

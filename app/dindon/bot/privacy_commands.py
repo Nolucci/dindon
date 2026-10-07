@@ -36,7 +36,7 @@ log = logging.getLogger("dindon.bot.privacy")
 EPHEMERAL = 64
 CHANNEL_MESSAGE, DEFERRED_MESSAGE, UPDATE_MESSAGE, MODAL = 4, 5, 7, 9
 DEFERRED_UPDATE = 6
-SUBCOMMANDS = ("info", "mes-donnees", "stop", "effacer", "reprendre", "card", "mycard", "map", "debat", "forum")
+SUBCOMMANDS = ("info", "mes-donnees", "stop", "effacer", "reprendre", "card", "mycard", "map", "debat", "param")
 COOLDOWN_SECONDS = 15
 MAX_FILE_BYTES = 7_000_000          # under every limit of Discord for an attachment
 
@@ -61,10 +61,11 @@ COMMAND = {
                       "choices": [{"name": label, "value": key} for key, label in discord_map.SHAPES.items()]}]},
         {"type": 1, "name": "debat", "description": "Ouvrir un débat : une fenêtre pour choisir ses paramètres, des positions, des statistiques à la fin",
          "options": [{"type": 3, "name": "sujet", "description": "La question débattue (vide : vous pourrez choisir un axe dans la fenêtre)", "required": False, "min_length": 3, "max_length": 200}]},
-        {"type": 1, "name": "forum", "description": "Choisir le forum où Dindon crée les débats (réservé aux modérateurs)",
-         "options": [{"type": 7, "name": "salon", "description": "Le forum des débats : chaque débat y devient un post", "channel_types": [15]},
+        {"type": 1, "name": "param", "description": "Choisir le forum des débats et le salon des sondages (modérateurs)",
+         "options": [{"type": 7, "name": "forum", "description": "Le forum des débats : chaque débat y devient un post", "channel_types": [15]},
+                     {"type": 7, "name": "sondages", "description": "Le salon texte où publier les sondages liés aux débats", "channel_types": [0, 5]},
                      {"type": 3, "name": "etiquette", "description": "Étiquette de secours si le sujet ne correspond à aucune", "max_length": 20},
-                     {"type": 5, "name": "retirer", "description": "Les débats reviennent dans des fils sous le salon"}]},
+                     {"type": 5, "name": "retirer", "description": "Retirer le forum des débats et le salon des sondages"}]},
     ],
 }
 
@@ -457,11 +458,11 @@ class Interactions:
             await self._mycard(data, user_id, text)
         elif sub == "map":
             await self._map(data, user_id, options[0], text)
-        elif sub in ("debat", "forum"):
+        elif sub in ("debat", "param"):
             if self.debates is None:
                 await self._callback(data, CHANNEL_MESSAGE, text["no_debates"])
-            elif sub == "forum":
-                await self.debates.forum_command(data, user_id, options[0])
+            elif sub == "param":
+                await self.debates.param_command(data, user_id, options[0])
             else:
                 await self.debates.command(data, user_id, options[0])
         elif self.service.too_soon(user_id):

@@ -245,12 +245,12 @@ class World:
                                            "available_tags": [{"id": t[0], "name": t[1], "moderated": len(t) > 2 and t[2]} for t in tags]}
         return channel_id
 
-    def forum(self, user=ALICE_ID, *, salon=None, etiquette=None, retirer=None, permissions=MANAGE_MESSAGES, guild=GUILD, id="781"):
-        """`/dindon forum`: a moderator tells Dindon where the debates go (or looks at it, or takes it off)."""
-        options = [{"type": kind, "name": name, "value": value} for name, kind, value in (("salon", 7, salon), ("etiquette", 3, etiquette), ("retirer", 5, retirer)) if value is not None]
+    def forum(self, user=ALICE_ID, *, salon=None, sondages=None, etiquette=None, retirer=None, permissions=MANAGE_MESSAGES, guild=GUILD, id="781"):
+        """`/dindon param`: a moderator tells Dindon where the debates go (or looks at it, or takes it off)."""
+        options = [{"type": kind, "name": name, "value": value} for name, kind, value in (("forum", 7, salon), ("sondages", 7, sondages), ("etiquette", 3, etiquette), ("retirer", 5, retirer)) if value is not None]
         member = {"user": {"id": str(user)}, **({"permissions": str(permissions)} if permissions is not None else {})}
         run(self.interactions.answer({"id": id, "token": "tok", "type": 2, "application_id": "42", "guild_id": guild, "channel_id": GENERAL, "channel": {"id": GENERAL, "type": 0},
-                                      "data": {"name": "dindon", "options": [{"type": 1, "name": "forum", "options": options}]}, "member": member}))
+                                      "data": {"name": "dindon", "options": [{"type": 1, "name": "param", "options": options}]}, "member": member}))
 
     def click(self, user, place, debate_id, kind, value, **member):
         self.time.advance(seconds=2)                                  # people do not click twice in a second

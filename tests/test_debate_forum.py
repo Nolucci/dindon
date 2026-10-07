@@ -80,14 +80,15 @@ def test_removing_a_server_removes_its_forum_setting(conn):
     assert forum.get(conn, 1) is None and forum.get(conn, 2) is not None
 
 
-# --- /dindon forum -----------------------------------------------------------------------------------------------------------
+# --- /dindon param -----------------------------------------------------------------------------------------------------------
 
 
 def test_the_command_has_a_forum_channel_option_and_the_labels(world):  # noqa: F811
     from dindon.bot.privacy_commands import COMMAND
 
-    [command] = [o for o in COMMAND["options"] if o["name"] == "forum"]
-    salon, etiquette, retirer = command["options"]
+    [command] = [o for o in COMMAND["options"] if o["name"] == "param"]
+    salon, sondages, etiquette, retirer = command["options"]
+    assert sondages["channel_types"] == [0, 5]
     assert (salon["type"], salon["channel_types"], etiquette["type"], retirer["type"]) == (7, [15], 3, 5) and all(not o.get("required") for o in command["options"])
     assert all(len(o["description"]) <= 100 for o in [command, *command["options"]]) and etiquette["max_length"] == 20          # (Discord: a label is 20 characters at most)
 
@@ -168,7 +169,7 @@ def test_a_debate_opened_in_a_thread_is_created_in_the_forum_as_a_post_with_its_
     debate = only_debate(ingest_db)
     [post] = with_forum.discord.threads
     assert with_forum.discord.threads[post]["parent"] == FORUM and with_forum.discord.threads[post]["applied_tags"] == ["t_eco", "t_pol"]
-    assert [c[:2] for c in with_forum.discord.calls[1:]] == [("GET", f"/channels/{FORUM}"), ("POST", f"/channels/{FORUM}/threads"), ("PUT", f"/channels/{post}/thread-members/@me")]   # (after `/dindon forum` itself)
+    assert [c[:2] for c in with_forum.discord.calls[1:]] == [("GET", f"/channels/{FORUM}"), ("POST", f"/channels/{FORUM}/threads"), ("PUT", f"/channels/{post}/thread-members/@me")]   # (after `/dindon param` itself)
     posted = [c for c in with_forum.discord.calls if c[0] == "POST"]
     assert [c[1] for c in posted] == [f"/channels/{FORUM}/threads"]                                              # one call: the post and its first message, nothing under #général
     assert not [c for c in with_forum.discord.calls if f"/channels/{GENERAL}/threads" in c[1]]

@@ -425,10 +425,6 @@
           <PersonCard {card} {guild} loading={cardLoading} error={cardError} onClose={() => { selectPerson(null); }} onPick={pick} />
         {/if}
 
-        <div class="legend" aria-hidden="true">
-          <div><span class="dot big"></span> Taille : poids des échanges (les plus petits points n’ont aucun lien affiché) · couleur : celle de la personne sur Discord (son rôle le plus haut qui a une couleur)</div>
-          <div><span class="bar"></span> Les liens se révèlent en <strong>survolant</strong> ou en <strong>cliquant</strong> une personne ; leur épaisseur est le poids de l’échange{#if meta && !meta.period}&nbsp;(les échanges récents comptent plus, demi-vie {meta.half_life_days} j){/if}</div>
-        </div>
       </main>
 
       <footer>
@@ -575,51 +571,6 @@
     max-width: 44ch;
   }
 
-  .legend {
-    position: absolute;
-    left: 0.875rem;
-    bottom: 0.75rem;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    display: grid;
-    gap: 0.375rem;
-    pointer-events: none;
-    background: var(--bg-glass);
-    backdrop-filter: blur(0.75rem);
-    -webkit-backdrop-filter: blur(0.75rem);
-    border: 1px solid var(--border-subtle);
-    box-shadow: var(--shadow-md);
-    padding: 0.625rem 0.75rem;
-    border-radius: var(--radius-md);
-    max-width: min(26.25rem, 60vw);
-  }
-
-  .legend strong {
-    color: var(--text-secondary);
-    font-weight: 600;
-  }
-
-  /* The colors of the points and lines are in lib/mapgraph.js: a point is the color of its person in Discord */
-  .dot {
-    display: inline-block;
-    border-radius: 50%;
-    background: conic-gradient(#e74c3c, #f1c40f, #2ecc71, #3498db, #9b59b6, #e74c3c);
-    vertical-align: middle;
-  }
-
-  .dot.big {
-    width: 0.75rem;
-    height: 0.75rem;
-  }
-
-  .bar {
-    display: inline-block;
-    width: 1.375rem;
-    height: 0.1875rem;
-    background: rgba(181, 186, 193, 0.6);
-    vertical-align: middle;
-    border-radius: 0.125rem;
-  }
 
   /* The status line: the bar of the filters, upside down */
   footer {
@@ -715,22 +666,10 @@
 
     .people { right: 0.75rem; justify-content: space-between; }
     .people input { flex: 1; width: auto; min-width: 0; }
-    .legend { bottom: 0.75rem; max-width: calc(100% - 5.75rem); }
 
     /* The card of a person opens as a sheet at the bottom: the map stays visible above it */
     .canvas.with-card { right: 0; bottom: 62%; }
     .zoomPad.with-card { display: none; }
   }
 
-  /* On a phone the legend only keeps its first line: there is nothing to hover with a finger */
-  @media (max-width: 608px) {
-    .legend {
-      font-size: 0.6875rem;
-      max-width: calc(100% - 1.75rem);
-    }
-
-    .legend div:nth-child(2) {
-      display: none;
-    }
-  }
 </style>

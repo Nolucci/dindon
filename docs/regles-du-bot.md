@@ -17,7 +17,7 @@ Avant de le déployer auprès de vraies personnes, définir la durée de conserv
 | `/dindon mycard` | écran privé pour régler sa propre card : le contenu de chaque partie (blocs, positions montrées, petite note), avec les suggestions de Dindon |
 | `/dindon map [periode] [personne] [forme]` | publie l'image de la carte si l'administrateur l'a activée. Avec une personne : seulement ses propres liens (pas ceux des autres entre eux), ceux avec qui elle échange le plus sont plus gros (jamais plus qu'elle) ; forme au choix : normale, spirale, étoile, carré, cœur, tête de dindon (aussi par un menu sous l'image) |
 | `/dindon debat [sujet]` | ouvre une fenêtre de paramètres ; le sujet peut être choisi à partir d'un axe actif |
-| `/dindon forum` | montre ou règle le forum des débats ; modification réservée aux modérateurs |
+| `/dindon param` | montre ou règle le forum des débats et le salon des sondages ; modification réservée aux modérateurs |
 
 Les actions sur les données personnelles portent seulement sur l'auteur de la commande, identifié par Discord. Leurs réponses sont privées ; `card` et `map` sont volontairement publiques. Une personne ayant choisi `stop` ou `effacer` n'est plus enregistrée ni incluse dans les débats. L'effacement touche aussi les fichiers d'import, mais une ancienne sauvegarde doit être gérée séparément.
 
@@ -33,7 +33,7 @@ La fenêtre permet de définir sujet ou axe, contexte, lieu (fil public, forum c
 
 **Fin du débat** : les participants appuient sur « Voter la fin du débat ». Il se termine quand la majorité du plus petit camp (pour ou contre, non vide) l'a demandé, ou dès qu'un camp se vide après que les deux ont existé en même temps (par exemple 4 contre 0). Changer de camp retire sa demande. Un modérateur peut aussi le terminer d'office, et il se termine après le silence choisi. Il n'a pas de durée fixe. Le bot publie les statistiques et reprend après redémarrage les annonces dues.
 
-`/dindon forum` choisit un forum. Dindon attribue aux nouveaux posts les étiquettes disponibles qui correspondent au sujet ou à l'axe (jusqu'à cinq) ; les étiquettes réservées aux modérateurs ne sont pas choisies automatiquement. L'option `etiquette:` sert de secours si aucun thème ne correspond. Si le forum impose une étiquette et qu'aucune n'a été indiquée, il faut une étiquette générale « Politique » ou « Philosophie » non réservée ; elle est utilisée seulement si rien de plus précis ne correspond. Quand l'option « Ouvrir un fil » est cochée, Dindon y crée un post ; sinon il utilise le salon. Si le forum n'est plus disponible, le code essaie un fil sous le salon d'origine. Dans un débat tenu directement dans un salon, tous les messages de ce salon écrits pendant le débat sont comptés.
+`/dindon param` choisit un forum. Dindon attribue aux nouveaux posts les étiquettes disponibles qui correspondent au sujet ou à l'axe (jusqu'à cinq) ; les étiquettes réservées aux modérateurs ne sont pas choisies automatiquement. L'option `etiquette:` sert de secours si aucun thème ne correspond. Si le forum impose une étiquette et qu'aucune n'a été indiquée, il faut une étiquette générale « Politique » ou « Philosophie » non réservée ; elle est utilisée seulement si rien de plus précis ne correspond. Quand l'option « Ouvrir un fil » est cochée, Dindon y crée un post ; sinon il utilise le salon. Si le forum n'est plus disponible, le code essaie un fil sous le salon d'origine. Dans un débat tenu directement dans un salon, tous les messages de ce salon écrits pendant le débat sont comptés.
 
 ## Verdict
 
@@ -57,3 +57,11 @@ Le mode `live` dépend de `DINDON_DEBATE_PRECISION` et du seuil `DINDON_DEBATE_M
 La recherche envoie une **phrase neutre**, pas le message Discord entier ni le nom de son auteur, à Google Fact Check Tools ou à un SearXNG configuré. Le vérificateur limite chaque affirmation à deux recherches et trois pages. `answer` peut fonctionner sans service de recherche, mais ne peut alors approfondir un vote défavorable. Les modes avec recherche font donc sortir cette phrase de la machine ; l'activité normale du bot communique aussi avec Discord.
 
 Les interactions réelles avec Discord, la fiabilité du modèle et la pertinence des sources demandent une validation sur le serveur concerné. Les tests du dépôt couvrent le protocole et les règles avec un faux Discord et des données inventées.
+
+### Sondages et axes des cartes
+
+`/dindon param forum:#débats sondages:#sondages` choisit les deux destinations. Chaque nouveau débat publie dans le salon choisi un sondage avec une question courte, des précisions sur les termes si nécessaire et un lien vers le débat. Les trois boutons sont **Pour**, **Ne sait pas**, **Contre**. Le modèle local prépare la question et les précisions ; s'il ne répond pas, le sujet et le contexte fournis sont utilisés. Pour une question d'axe, Pour correspond au premier pôle indiqué dans la question, Contre au second.
+
+Les boutons du débat et du sondage enregistrent la même position : une réponse modifiée remplace la précédente dans le calcul. Les réponses Pour et Contre alimentent les axes de la partie Informations des cartes ; Ne sait pas et Témoin ne donnent aucune direction. Les réponses aux questions d'axes ont un lien explicite ; celles aux sujets libres sont reliées aux axes par l'analyse des propositions. Les messages du débat restent analysés par le parcours habituel des conversations. Les scores conservent leur marge d'incertitude.
+
+Le sondage se ferme avec le débat. Sa destination, son message et les mises à jour à publier sont conservés pour reprendre après un redémarrage ou un échec de publication. Les réponses suivent les règles d'opposition à l'enregistrement et d'effacement des données des débats.

@@ -137,6 +137,7 @@ class BotRunner:
         self.interactions = interactions                # privacy commands (bot/privacy_commands.py), or None
         self.debates = debates                          # the debates (bot/debate_commands.py), or None
         if debates is not None:
+            debates.guild_info = self.directory.guild
             debates.allowed = self.directory.is_allowed   # a debate is only opened on a server that is followed
         self._debate_ticking = False
         self._debate_checking = False
@@ -561,7 +562,10 @@ def build_interactions(settings: Settings, service):
     from dindon.debate.checker import notice_mode
 
     interactions.live = notice_mode(checker)                                 # what the members are told that Dindon does (texts.notice)
-    debates = interactions.debates = Debates(settings.database_url, DiscordREST(settings.discord_token, settings.discord_api_url), checker=checker)
+    from dindon.analysis.ollama import Ollama
+
+    debates = interactions.debates = Debates(settings.database_url, DiscordREST(settings.discord_token, settings.discord_api_url), checker=checker,
+                                             poll_client=Ollama(settings.ollama_url, timeout=30), poll_model=settings.naming_model)
     debates.interactions = interactions
     return interactions, debates
 

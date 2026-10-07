@@ -22,7 +22,7 @@ Les vecteurs et les positions sont traités par lots. Un seul appel au modèle t
 
 Le bot en direct reçoit les événements du Gateway, met à jour la base et répond aux commandes `/dindon`. `/dindon card` publie une fiche ; `/dindon map` publie une image si la carte Discord est activée. Avec `DISCORD_CLIENT_ID` et `DISCORD_CLIENT_SECRET`, l'Activity affiche la carte dans un salon vocal et contrôle l'appartenance au serveur via Discord.
 
-`/dindon debat` ouvre une fenêtre de configuration : sujet ou axe actif, contexte, fil public ou salon, vérification et fin après une période de silence. Les participants choisissent une position ; l'auteur ou un modérateur peut terminer le débat. Les statistiques finales sont publiées et visibles sur la page **Débats**. Un modérateur peut désigner un forum avec `/dindon forum`. Le détail des modes de vérification et des limites figure dans [Règles du bot](regles-du-bot.md).
+`/dindon debat` ouvre une fenêtre de configuration : sujet ou axe actif, contexte, fil public ou salon, vérification et fin après une période de silence. Les participants choisissent une position ; l'auteur ou un modérateur peut terminer le débat. Les statistiques finales sont publiées et visibles sur la page **Débats**. Un modérateur choisit le forum des débats et le salon des sondages avec `/dindon param forum:#débats sondages:#sondages`. Les sondages renvoient vers les débats ; les positions prises dans les deux lieux alimentent les axes des cartes. Le détail des modes de vérification et des limites figure dans [Règles du bot](regles-du-bot.md).
 
 ## Données des membres
 

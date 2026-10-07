@@ -3,7 +3,7 @@
 * `/dindon debat sujet` creates **nothing**: the person gets a popup (a Discord modal) where they choose the parameters: the subject and its context, a thread or the channel itself, whether the
   claims are checked, and the silence after which the debate ends by itself. When they send it the debate is written (refused here if a limit says so), its place is made (a **public thread**
   under the channel, or the channel itself), the **launch message** with the three position buttons and the end button is posted, and only then does the debate open (`attach_thread`).
-* There is **no time limit and no vote**. A debate ends when the person who opened it, or a moderator, presses « Terminer le débat », or after the silence chosen in the popup.
+* The linked poll records the same positions as the debate buttons. There is **no time limit**. A debate ends when the person who opened it, or a moderator, presses « Terminer le débat », or after the silence chosen in the popup.
 * Every message written in the place of a running debate is handed over by the engine (`on_message`) and counted in batches. Bots are not participants. In the channel itself that is every message of
   the channel, while the debate is open: the launch message says so.
 * A **tick** (every couple of seconds while a debate runs) writes the counted messages, ends the debates whose silence is over (`store.quiet`), posts what is owed to Discord (the closing
@@ -22,6 +22,7 @@ import asyncio
 import logging
 import threading
 import time
+from dataclasses import replace
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
@@ -31,7 +32,7 @@ from dindon.bot.privacy_commands import Reply
 from dindon.bot.rest import DiscordREST, Response
 from dindon.clock import utc_now
 from dindon.db import connect
-from dindon.debate import answers, claims, forum, ratings, rules, stats, store, texts
+from dindon.debate import answers, claims, forum, polls, ratings, rules, stats, store, texts
 from dindon.debate.checker import notice_mode
 from dindon.debate.reading import Reading
 from dindon.debate.store import Debate, DebateRefused
@@ -62,10 +63,10 @@ TEXT = {
     "failed": "Une erreur est survenue, rien n'a été modifié. Réessayez dans un instant.",
     "forum_fallback": " (Le forum des débats n'a pas répondu : le débat est dans un fil de ce salon.)",
     "forum_denied": "Seuls les modérateurs peuvent régler le forum des débats (droit de gérer le salon, le serveur, les messages ou les fils).",
-    "forum_none": "Aucun forum n'est réglé : un débat a lieu dans un fil sous le salon (ou dans le salon). `/dindon forum salon:` en choisit un.",
-    "forum_current": "Les débats sont créés dans le forum {forum}{tag}. `/dindon forum retirer:Oui` les remet dans des fils sous le salon.",
+    "forum_none": "Aucun forum n'est réglé : un débat a lieu dans un fil sous le salon (ou dans le salon). `/dindon param forum:` en choisit un.",
+    "forum_current": "Les débats sont créés dans le forum {forum}{tag}. `/dindon param retirer:Oui` les remet dans des fils sous le salon.",
     "forum_set": "C'est noté : les débats de ce serveur seront créés dans le forum {forum}{tag}, un post chacun.",
-    "forum_removed": "C'est fait : les débats reviennent dans des fils sous le salon.",
+    "forum_removed": "C'est fait : les débats reviennent dans des fils sous le salon, sans sondage dédié.",
     "forum_not_forum": "Ce salon n'est pas un forum de ce serveur : choisissez un salon de type forum.",
     "forum_unreachable": "Dindon ne peut pas lire ce forum. Donnez-lui l'accès : voir le salon, envoyer des messages, envoyer des messages dans les posts.",
     "forum_tag_unknown": "Je ne connais pas l'étiquette « {tag} » dans ce forum. Étiquettes : {tags}.",
@@ -91,14 +92,16 @@ def _choice(value: str, axis: dict | None = None) -> str:
 
 class Debates:
     def __init__(self, database_url: str, rest: DiscordREST, *, clock: Callable[[], datetime] = utc_now, mono: Callable[[], float] = time.monotonic,
-                 refresh_seconds: float = 5.0, click_seconds: float = 1.0, checker=None):
+                 refresh_seconds: float = 5.0, click_seconds: float = 1.0, checker=None, poll_client=None, poll_model=None):
         self._url, self.rest, self.clock, self._mono = database_url, rest, clock, mono
+        self.poll_client, self.poll_model = poll_client, poll_model
         self.checker = checker                                    # reads the messages for claims and checks them (debate/checker.py), or None: nothing is read, nothing leaves
         self._check_retry_at = 0.0
         self._check_failing = False
         self._retracting = False                                  # corrections wait to be taken back from Discord
         self._refresh_seconds, self._click_seconds = refresh_seconds, click_seconds
         self.interactions = None                                  # the answerer of commands (privacy_commands.Interactions), set by whoever builds both
+        self.guild_info = lambda guild_id: None
         self.allowed: Callable[[object], bool] = lambda guild_id: True   # does the bot follow this server? (the engine sets it)
         self._conn: psycopg.Connection | None = None
         self._lock = threading.Lock()
@@ -106,6 +109,9 @@ class Debates:
         self._inbox: list[tuple[int, int, int, datetime]] = []    # (debate, message, author, when) counted messages waiting to be written
         self._early: list[dict] = []                              # the few fields of messages that came before the debates were loaded: looked at once they are
         self._deleted: list[tuple[int, list[int]]] = []           # (debate, ids) messages deleted in a debate thread, to see whether any was the bot's own
+        self._poll_deletions: list[tuple[int, list[int]]] = []
+        self._poll_pending = False
+        self._poll_lock = asyncio.Lock()
         self._gone_threads: set[int] = set()                      # threads (and channels) deleted on Discord, whose debates must be closed
         self._gone_channels: set[int] = set()
         self._gap = True                                          # messages may have been missed: the threads must be read again (true at the start)
@@ -152,7 +158,7 @@ class Debates:
     def has_work(self) -> bool:
         """Whether the engine should wake up often: a debate runs, or something is owed. Until the first tick, yes (the debates have not been loaded)."""
         return (not self._loaded or bool(self._threads) or bool(self._inbox) or bool(self._dirty) or self._owing or self._gap
-                or bool(self._deleted) or bool(self._gone_threads) or bool(self._gone_channels) or self._retracting)
+                or self._poll_pending or bool(self._poll_deletions) or bool(self._deleted) or bool(self._gone_threads) or bool(self._gone_channels) or self._retracting)
 
     @property
     def verifying(self) -> bool:
@@ -212,6 +218,7 @@ class Debates:
 
     def on_delete(self, data: dict, ids: list) -> None:
         """Messages were deleted in a channel. Only those of a debate thread matter here, and only if one of them is the bot's own."""
+        self._poll_deletions.append((int(data["channel_id"]), [int(i) for i in ids if str(i).isdigit()]))
         debate_id = self._threads.get(str(data.get("channel_id")))
         numbers = [int(i) for i in ids if str(i).isdigit()]
         if debate_id is not None and numbers:
@@ -232,6 +239,7 @@ class Debates:
         for debate in await self.db(store.active):
             if debate.thread_id is not None:
                 self._threads[str(debate.thread_id)] = debate.id
+        self._poll_pending = await self.db(lambda c: c.execute("SELECT EXISTS (SELECT 1 FROM debate_polls WHERE dirty AND channel_id IS NOT NULL)").fetchone()[0])
         self._loaded = True
         self._swept = self._mono()
         early, self._early = self._early, []
@@ -333,6 +341,18 @@ class Debates:
 
     async def _open(self, debate: Debate, started: datetime) -> str:
         """Makes the place of the debate (a post of the server's forum, a thread, or the channel itself) and posts the message that launches it, then opens the debate. Returns what the author is told."""
+        guild = self.guild_info(debate.guild_id)
+        if guild is not None:
+            await self.db(lambda c: c.execute("INSERT INTO guilds (id, name) VALUES (%s, %s) ON CONFLICT DO NOTHING", (debate.guild_id, guild.name)))
+        if debate.axis and not debate.context:
+            anchors = await self.db(lambda c: c.execute("""SELECT k.value, k.description FROM axis_anchors k JOIN axes a ON a.id = k.axis_id
+                                                          WHERE a.code = %s AND k.value IN (-1, 1) ORDER BY k.value""", (debate.axis['code'],)).fetchall())
+            if anchors:
+                debate = replace(debate, context="\n".join(f"{debate.axis['for' if value < 0 else 'against']} : {meaning}" for value, meaning in anchors))
+        question, description = await asyncio.to_thread(polls.draft, debate, self.poll_client, self.poll_model)
+        if self.poll_client is not None and not debate.axis and len(question) <= rules.TOPIC_MAX:
+            debate = replace(debate, topic=question, context=description)
+            await self.db(lambda c: c.execute("UPDATE debates SET topic = %s, context = %s WHERE id = %s", (question, description, debate.id)))
         place, note, starter = debate.channel_id, "", None
         if debate.in_thread:
             made = await self._forum_post(debate)
@@ -353,16 +373,24 @@ class Debates:
                 return await self._not_opened(debate, posted)
             starter = posted.id
         try:
-            await self.db(lambda c: store.attach_thread(c, debate.id, thread_id=place, question_message_id=starter, now=started))
+            await self.db(lambda c: store.attach_thread(c, debate.id, thread_id=place, question_message_id=starter, now=started, poll_question=question, poll_description=description))
         except Exception as error:
             log.error("a debate could not be opened (%s)", type(error).__name__)
             await self._close_failed(debate.id)
             return TEXT["open_failed"]
         self._threads[str(place)] = debate.id
+        self._poll_pending = True
+        try:
+            await self._publish_polls()
+        except Exception as error:
+            log.warning("the poll will be published on the next tick (%s)", type(error).__name__)
+        pending_poll = await self.db(lambda c: c.execute("SELECT channel_id FROM debate_polls WHERE debate_id = %s AND channel_id IS NOT NULL AND message_id IS NULL", (debate.id,)).fetchone())
+        if pending_poll:
+            note += f" Le sondage attend sa publication dans <#{pending_poll[0]}> : vérifiez que Dindon peut y envoyer des messages."
         return TEXT["opened"].format(place=f"<#{place}>") + note
 
     async def _forum_post(self, debate: Debate) -> tuple[int, int] | str | None:
-        """The debate as a post of the server's forum, if a moderator chose one (`/dindon forum`): (the post, its first message). None: there is no forum. 'failed': there is one and it did not
+        """The debate as a post of the server's forum, if a moderator chose one (`/dindon param`): (the post, its first message). None: there is no forum. 'failed': there is one and it did not
         work (deleted, no access, a label that is required…): the debate then goes in a thread under the channel, and the author is told. The labels are read from the forum now, not from
         memory: a label that was renamed or removed would make Discord refuse the post."""
         try:
@@ -389,8 +417,8 @@ class Debates:
         starter = (made.data.get("message") or {}).get("id") if isinstance(made.data, dict) else None
         return made.id, int(starter) if str(starter or "").isdigit() else made.id    # (the first message of a forum post has the number of the post)
 
-    async def forum_command(self, data: dict, user_id: int, option: dict) -> None:
-        """`/dindon forum`: tells Dindon in which forum of the server the debates are created (a post each, with labels), or shows it, or takes it off. Moderators only. Answered privately."""
+    async def param_command(self, data: dict, user_id: int, option: dict) -> None:
+        """`/dindon param`: tells Dindon in which forum of the server the debates are created (a post each, with labels), or shows it, or takes it off. Moderators only. Answered privately."""
         say = self.interactions.say
         values = {o.get("name"): o.get("value") for o in option.get("options") or []}
         guild_id = data.get("guild_id")
@@ -398,16 +426,42 @@ class Debates:
             await say(data, TEXT["elsewhere"])
             return
         current = await self.db(lambda c: forum.get(c, int(guild_id)))
-        if not values.get("salon") and not values.get("retirer"):
-            await say(data, TEXT["forum_current"].format(forum=f"<#{current.channel_id}>", tag=f" (étiquette « {current.tag_name} »)" if current.tag_name else "") if current else TEXT["forum_none"])
+        current_poll = await self.db(lambda c: forum.poll_channel(c, int(guild_id)))
+        if "forum" in values:
+            values["salon"] = values["forum"]
+        if not values.get("salon") and not values.get("retirer") and not values.get("sondages") and not values.get("etiquette"):
+            shown = TEXT["forum_current"].format(forum=f"<#{current.channel_id}>", tag=f" (étiquette « {current.tag_name} »)" if current.tag_name else "") if current else TEXT["forum_none"]
+            await say(data, shown + (f" Les sondages sont publiés dans <#{current_poll}>." if current_poll else " Aucun salon de sondages n'est réglé."))
+
             return
         if not self._moderator(data):
             await say(data, TEXT["forum_denied"])
             return
         if values.get("retirer"):
-            await self.db(lambda c: forum.clear(c, int(guild_id)))
+            def clear(c):
+                with c.transaction():
+                    forum.clear(c, int(guild_id))
+                    c.execute("DELETE FROM runtime_settings WHERE key = %s", (forum.POLL_KEY.format(guild_id),))
+            await self.db(clear)
             await say(data, TEXT["forum_removed"])
             return
+        poll_id = values.get("sondages")
+        if poll_id:
+            found_poll = await self._rest("GET", f"/channels/{poll_id}")
+            if (not found_poll.ok or not isinstance(found_poll.data, dict) or found_poll.data.get("type") not in TEXT_CHANNEL_TYPES
+                    or str(found_poll.data.get("guild_id")) != str(guild_id)):
+                await say(data, "Choisissez un salon texte de ce serveur auquel Dindon a accès pour les sondages.")
+                return
+        if not values.get("salon"):
+            if values.get("etiquette") and current:
+                values["salon"] = str(current.channel_id)
+            elif values.get("etiquette"):
+                await say(data, TEXT["forum_none"])
+                return
+            else:
+                await self.db(lambda c: forum.save_poll_channel(c, int(guild_id), int(poll_id)))
+                await say(data, f"Les sondages seront publiés dans <#{poll_id}>.")
+                return
         channel_id = str(values["salon"])
         found = await self._rest("GET", f"/channels/{channel_id}")
         if not found.ok or not isinstance(found.data, dict):
@@ -428,9 +482,15 @@ class Debates:
             await say(data, TEXT["forum_tag_required"].format(tags=forum.tag_names(available) or "aucune"))
             return
         saved = forum.Forum(int(channel_id), str(found.data.get("name") or ""), str(chosen["id"]) if chosen else None, str(chosen["name"]) if chosen else None)
-        await self.db(lambda c: forum.save(c, int(guild_id), saved))
+        def save(c):
+            with c.transaction():
+                forum.save(c, int(guild_id), saved)
+                if poll_id:
+                    forum.save_poll_channel(c, int(guild_id), int(poll_id))
+        await self.db(save)
         await say(data, TEXT["forum_set"].format(forum=f"<#{saved.channel_id}>", tag=f" (étiquette « {saved.tag_name} »)" if saved.tag_name else "")
-                  + (TEXT["forum_tag_moderated"] if chosen and chosen.get("moderated") else ""))
+                  + (TEXT["forum_tag_moderated"] if chosen and chosen.get("moderated") else "")
+                  + (f" Les sondages seront publiés dans <#{poll_id}>." if poll_id else ""))
 
     async def _not_opened(self, debate: Debate, response: Response) -> str:
         log.warning("a debate could not be opened on Discord (HTTP %s, code %s)", response.status, response.code)
@@ -474,9 +534,14 @@ class Debates:
             return
         when = self.clock()
         try:
-            result = await self.db(lambda c: store.set_position(c, debate_id, user_id, value, when))
             debate = await self.db(lambda c: store.get(c, debate_id))
-            text = TEXT[result].format(choice=_choice(value, debate.axis if debate else None))
+            destination = await self.db(lambda c: c.execute("SELECT channel_id FROM debate_polls WHERE debate_id = %s", (debate_id,)).fetchone())
+            if (debate is None or str(data.get("guild_id")) != str(debate.guild_id)
+                    or str(data.get("channel_id")) not in {str(debate.thread_id), str(destination[0]) if destination else ""}):
+                raise DebateRefused("unknown")
+            result = await self.db(lambda c: store.set_position(c, debate_id, user_id, value, when, member=data.get("member")))
+            debate = await self.db(lambda c: store.get(c, debate_id))
+            text = TEXT[result].format(choice=_choice(value, debate.axis if debate and str(data.get("channel_id")) == str(debate.thread_id) else None))
             self._dirty.add(debate_id)
             if debate is not None and debate.status == "closed" and debate.thread_id is not None:       # leaving a camp can empty it, which ends the debate
                 self._threads.pop(str(debate.thread_id), None)
@@ -643,6 +708,7 @@ class Debates:
         await self._corrections()
         await self._answers()
         await self._refresh()
+        await self._publish_polls()
         if self._mono() - self._swept > 60:
             self._swept = self._mono()
             await self.db(lambda c: store.close_stale(c, self.clock(), STALE_PREPARING))
@@ -903,6 +969,40 @@ class Debates:
                 self._succeeded(key)
             elif self._failed_post(key, answer) >= claims.CORRECTION_ATTEMPTS:
                 await self.db(lambda c, i=correction_id: claims.mark_retracted(c, i, self.clock()))
+
+    async def _publish_polls(self) -> None:
+        async with self._poll_lock:
+            await self._publish_polls_locked()
+
+    async def _publish_polls_locked(self) -> None:
+        deleted, self._poll_deletions = self._poll_deletions, []
+        for channel_id, ids in deleted:
+            await self.db(lambda c, ch=channel_id, ms=ids: c.execute(
+                "UPDATE debate_polls SET message_id = NULL, dirty = true, revision = revision + 1 WHERE channel_id = %s AND message_id = ANY(%s)", (ch, ms)))
+        pending = await self.db(lambda c: c.execute(
+            "SELECT debate_id, channel_id, message_id, question, description, revision FROM debate_polls WHERE dirty AND channel_id IS NOT NULL ORDER BY debate_id").fetchall())
+        self._poll_pending = bool(pending)
+        for row in pending:
+            debate_id, channel_id, message_id, _, _, revision = row
+            key = (debate_id, "poll")
+            if not self._may_try(key):
+                continue
+            debate = await self.db(lambda c, i=debate_id: store.get(c, i))
+            if debate is None or debate.thread_id is None:
+                continue
+            counts = await self.db(lambda c, i=debate_id: store.position_counts(c, i))
+            body = polls.message(debate, row, counts)
+            method, path = ("PATCH", f"/channels/{channel_id}/messages/{message_id}") if message_id else ("POST", f"/channels/{channel_id}/messages")
+            result = await self._rest(method, path, body)
+            if result.ok and (message_id or result.id):
+                await self.db(lambda c, i=debate_id, m=message_id or result.id, v=revision: c.execute(
+                    "UPDATE debate_polls SET message_id = %s, dirty = revision <> %s WHERE debate_id = %s", (m, v, i)))
+                self._succeeded(key)
+            elif result.status == 404 and result.code == 10008 and message_id:
+                await self.db(lambda c, i=debate_id: c.execute("UPDATE debate_polls SET message_id = NULL WHERE debate_id = %s", (i,)))
+            else:
+                self._failed_post(key, result)
+        self._poll_pending = await self.db(lambda c: c.execute("SELECT EXISTS (SELECT 1 FROM debate_polls WHERE dirty AND channel_id IS NOT NULL)").fetchone()[0])
 
     async def _post_question(self, debate: Debate) -> None:
         """The question was deleted on Discord: it is posted again, with the counts as they are now."""

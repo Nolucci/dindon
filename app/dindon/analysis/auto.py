@@ -18,6 +18,7 @@ TICK_SECONDS = 20
 
 def _guilds(conn) -> list[int]:
     return [r[0] for r in conn.execute("""SELECT g.id FROM guilds g WHERE EXISTS (SELECT 1 FROM channels c JOIN messages m ON m.channel_id = c.id WHERE c.guild_id = g.id)
+                                          OR EXISTS (SELECT 1 FROM debates d JOIN debate_polls q ON q.debate_id = d.id WHERE d.guild_id = g.id)
                                           ORDER BY g.id""").fetchall()]
 
 
