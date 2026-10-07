@@ -138,10 +138,13 @@
                 <span class="numbers">
                   {fmt.format(machine.calls)} appels · {fmt.format(machine.items)} éléments{machine.average !== null ? ` · ${String(machine.average).replace('.', ',')} s en moyenne` : ''}
                 </span>
-                <span class="share" title="Part des appels reçus, comparée à la part demandée">
-                  {machine.observed} %{machine.share !== null ? ` / ${machine.share} % demandés` : ''}
+                <span class="share" title="Part des calculs effectués et objectif de répartition">
+                  {machine.observed} %{machine.share !== null ? ` / ${machine.share} % visés` : ''}
                 </span>
                 <progress max="100" value={machine.observed} aria-label="Part des appels reçus"></progress>
+                {#if machine.round}
+                  <span class="numbers">Salve {machine.round.number} : {fmt.format(machine.round.calls)} calculs{machine.round.average !== null ? ` · ${String(machine.round.average).replace('.', ',')} s en moyenne` : ''}</span>
+                {/if}
                 {#if machine.errors}<span class="err">{machine.errors} erreur{machine.errors > 1 ? 's' : ''}{machine.last_error ? ` · ${machine.last_error}` : ''}</span>{/if}
               </li>
             {/each}

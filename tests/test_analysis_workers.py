@@ -49,8 +49,10 @@ def test_shares_split_the_work_in_percent_and_zero_gets_nothing():
         pool = OllamaPool(local.url, (helper.url,), timeout=1)
         pool.models()
         pool.set_shares({local.url: 25, helper.url: 75})
-        pool.embed_batches("bge-m3", [[str(i)] for i in range(8)])
-        count = lambda fake: sum(path == "/api/embed" for path, _ in fake.requests)
+        for i in range(8):
+            pool.embed("bge-m3", [str(i)])
+        def count(fake):
+            return sum(path == "/api/embed" for path, _ in fake.requests)
         assert (count(local), count(helper)) == (2, 6)
         seen = {row["url"]: row for row in pool.activity()}
         assert seen[local.url]["calls"] == 2 and seen[helper.url]["calls"] == 6 and seen[helper.url]["items"] == 6
@@ -201,3 +203,113 @@ def test_cancelling_interrupts_a_long_database_step(ingest_url, tmp_path, monkey
         assert jobs.status()["state"] == "cancelled"
     finally:
         server.stop()
+
+
+def _measured_pool():
+    pool = OllamaPool("http://127.0.0.1:1", ("http://127.0.0.1:2",))
+    pool._models = {c.base_url: {"chat", "vectors"} for c in pool.clients}
+    pool.set_shares({c.base_url: 50 for c in pool.clients})
+    return pool
+
+
+def test_free_computers_take_work_without_overlapping_requests(monkeypatch):
+    pool = _measured_pool()
+    pool.set_shares({pool.local.base_url: 90, pool.clients[0].base_url: 10})
+    guard = threading.Lock()
+    active, maximum, counts = {}, {}, {}
+
+    def work(client, _model, texts):
+        with guard:
+            url = client.base_url
+            active[url] = active.get(url, 0) + 1
+            maximum[url] = max(maximum.get(url, 0), active[url])
+            counts[url] = counts.get(url, 0) + 1
+        time.sleep(0.04 if client is pool.local else 0.005)
+        with guard:
+            active[url] -= 1
+        return texts
+
+    for client in pool.clients:
+        monkeypatch.setattr(client, "embed", lambda model, texts, c=client: work(c, model, texts))
+    groups = [[str(i)] for i in range(40)]
+    assert pool.embed_batches("vectors", groups) == groups
+    assert all(value == 1 for value in maximum.values())
+    assert counts[pool.clients[0].base_url] > counts[pool.local.base_url] * 3
+
+
+def test_each_round_reports_its_own_statistics_and_smooths_shares(monkeypatch):
+    pool = _measured_pool()
+    fast = pool.clients[0]
+    delays = {fast.base_url: 0.005, pool.local.base_url: 0.04}
+    for client in pool.clients:
+        def chat(*_args, c=client):
+            time.sleep(delays[c.base_url])
+            return {}
+        monkeypatch.setattr(client, "chat_json", chat)
+    pool.begin_round()
+    for _ in range(4):
+        pool.chat_json("chat", "s", "u", {})
+    first = {r["url"]: r for r in pool.finish_round(1, "chat")}
+    assert all(r["calls"] == 2 and r["average"] > 0 for r in first.values())
+    assert first[fast.base_url]["share"] > 75
+    assert sum(r["share"] for r in first.values()) == 100
+    first_share = first[fast.base_url]["share"]
+    delays[fast.base_url] = 0.08
+    pool.begin_round()
+    # Measure both machines, including the slower one, without relying on a quota.
+    for client in pool.clients:
+        pool._timed(client, "chat_json", "chat", "s", "u", {})
+    second = {r["url"]: r for r in pool.finish_round(2, "chat")}
+    assert all(r["calls"] == 1 and r["number"] == 2 for r in second.values())
+    assert 50 < second[fast.base_url]["share"] < first_share
+    assert pool.activity()[0]["round"]["number"] == 2
+    assert pool.shares == {c.base_url: 50 for c in pool.clients}  # saved initial settings stay intact
+    pool.set_shares({pool.local.base_url: 100, fast.base_url: 0})
+    pool.begin_round()
+    pool.chat_json("chat", "s", "u", {})
+    third = {r["url"]: r for r in pool.finish_round(3, "chat")}
+    assert third[fast.base_url]["calls"] == 0 and third[fast.base_url]["share"] == 0
+    pool.reset()
+    assert all(row["calls"] == 0 and row["round"] is None for row in pool.activity())
+
+
+def test_waiting_for_a_computer_is_cancellable(monkeypatch):
+    pool = _measured_pool()
+    stopped = threading.Event()
+    pool.cancelled = stopped.is_set
+    pool._busy = {c.base_url: 1 for c in pool.clients}
+    result = []
+    thread = threading.Thread(target=lambda: result.append(_cancel_result(pool)))
+    pool._models = {c.base_url: {"qwen3:14b"} for c in pool.clients}
+    thread.start()
+    stopped.set()
+    thread.join(1)
+    assert not thread.is_alive() and result == ["InterruptedError"]
+
+
+def test_analysis_publishes_statistics_after_each_complete_round(ingest_url, tmp_path, monkeypatch):
+    pool = _measured_pool()
+    settings = settings_for(ingest_url, tmp_path, "password")
+    pool._models = {c.base_url: {settings.naming_model, settings.embed_model} for c in pool.clients}
+    for client in pool.clients:
+        monkeypatch.setattr(client, "chat_json", lambda *_args: {})
+    jobs = AnalysisJobs(settings, client=pool)
+    seen = []
+
+    def extract(_conn, client, name_model, _embed_model, _guild, **_options):
+        # The second round can already inspect the preceding round's statistics.
+        seen.append(jobs.status()["last_round"])
+        for _ in range(2):
+            client.chat_json(name_model, "s", "u", {})
+        return {"done": 2, "claims": 0, "refused": 0, "failed": 0, "left": 1, "unread": 0}
+
+    monkeypatch.setattr(job_module, "extract_claims", extract)
+    monkeypatch.setattr(job_module, "verify_stances", lambda *_args, **_kwargs: {"checked": 0, "changed": 0, "questions": 0, "failed": 0})
+    monkeypatch.setattr(job_module, "assign_axes", lambda *_args, **_kwargs: {"done": 0, "links": 0, "scores": 0, "failed": 0})
+    jobs._run(GUILD_ID, ("claims",), None, False, threading.Event(), limit=2, rounds=2)
+    final = jobs.status()
+    assert final["state"] == "done" and final["last_round"]["number"] == 2
+    assert seen[0] is None and seen[1]["number"] == 1
+    assert sum(c["calls"] for c in final["last_round"]["computers"]) == 2
+    assert sum(c["calls"] for c in final["computers"]) == 4
+    assert sum(c["share"] for c in final["last_round"]["computers"]) == 100

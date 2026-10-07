@@ -160,7 +160,6 @@
   let workerNote = $state('');
   let shareForm = $state(null);     // the percentage of the work by computer ("local" is the server), while it is edited
   const shareKey = (worker) => (worker.local ? 'local' : worker.url);
-  const shareTotal = $derived(shareForm ? Object.values(shareForm).reduce((sum, v) => sum + (Number(v) || 0), 0) : 0);
   const sharesChanged = $derived(shareForm && workers?.shares && JSON.stringify(shareForm) !== JSON.stringify(workers.shares));
   let form = $state(null);          // what the person is editing
   let saved = $state('');
@@ -202,7 +201,17 @@
   }
 
   function setShare(key, value) {
-    shareForm = { ...shareForm, [key]: Math.max(0, Math.min(100, Math.round(Number(value) || 0))) };
+    const selected = Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+    const others = Object.keys(shareForm).filter((other) => other !== key);
+    if (!others.length) { shareForm = { [key]: 100 }; return; }
+    const remaining = 100 - selected;
+    const total = others.reduce((sum, other) => sum + shareForm[other], 0);
+    const exact = others.map((other) => ({ key: other, value: remaining * (total ? shareForm[other] / total : 1 / others.length) }));
+    const next = Object.fromEntries(exact.map((entry) => [entry.key, Math.floor(entry.value)]));
+    const extra = remaining - Object.values(next).reduce((sum, amount) => sum + amount, 0);
+    exact.sort((a, b) => (b.value - Math.floor(b.value)) - (a.value - Math.floor(a.value)));
+    for (let i = 0; i < extra; i++) next[exact[i].key]++;
+    shareForm = Object.fromEntries(Object.keys(shareForm).map((other) => [other, other === key ? selected : next[other]]));
   }
 
   function equalShares() {
@@ -563,8 +572,8 @@
                   {#if !worker.local}<button type="button" class="btn" onclick={() => saveWorkers(workers.configured.filter((url) => url !== worker.url))}>Retirer</button>{/if}
                   {#if shareForm && workers.workers.length > 1}
                     <label class="shareRow">
-                      <span class="muted small">Part du travail</span>
-                      <input type="range" min="0" max="100" step="5" value={shareForm[shareKey(worker)] ?? 0} oninput={(e) => setShare(shareKey(worker), e.currentTarget.value)} aria-label={`Part du travail de ${worker.local ? 'le serveur' : worker.url}, en pourcentage`} />
+                      <span class="muted small">Part initiale du travail</span>
+                      <input type="range" min="0" max="100" step="1" value={shareForm[shareKey(worker)] ?? 0} oninput={(e) => setShare(shareKey(worker), e.currentTarget.value)} aria-label={`Part du travail de ${worker.local ? 'le serveur' : worker.url}, en pourcentage`} />
                       <input class="field-input shareNumber" type="number" min="0" max="100" value={shareForm[shareKey(worker)] ?? 0} oninput={(e) => setShare(shareKey(worker), e.currentTarget.value)} aria-label="Pourcentage" /> %
                     </label>
                   {/if}
@@ -573,11 +582,10 @@
             </ul>
             {#if shareForm && workers.workers.length > 1}
               <div class="actions">
-                <span class="small" class:danger={shareTotal !== 100} role="status">Total : {shareTotal} %{shareTotal !== 100 ? ' (doit faire 100 %)' : ''}</span>
                 <button type="button" class="btn" onclick={equalShares}>Répartir également</button>
-                <button type="button" class="btn" disabled={shareTotal !== 100 || !sharesChanged} onclick={saveShares}>Enregistrer la répartition</button>
+                <button type="button" class="btn" disabled={!sharesChanged} onclick={saveShares}>Enregistrer la répartition</button>
               </div>
-              <p class="muted small">Un ordinateur à 0 % ne reçoit rien (le serveur reprend la main s’il est le seul à avoir le modèle). La répartition s’applique aux vecteurs et au nommage des thèmes.</p>
+              <p class="muted small">Les parts s’ajustent après chaque salve selon les performances. Un ordinateur à 0 % reste en réserve.</p>
             {/if}
           {:else}<p class="muted small">Le serveur travaille seul pour le moment.</p>{/if}
           <div class="actions">

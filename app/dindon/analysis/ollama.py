@@ -157,8 +157,8 @@ class Ollama:
 class OllamaPool:
     """Share independent inference calls between Ollama instances; the database stays on the server.
 
-    A disconnected helper is retried on the local instance. Only embedding batches are
-    parallelised: the other analysis stages currently depend on previous results.
+    Independent calls use one slot per computer. Failed calls are retried on another
+    compatible computer; measured throughput adjusts the targets after each round.
     """
 
     def __init__(self, local_url: str, helper_urls: tuple[str, ...], timeout: float = 600):
@@ -170,12 +170,16 @@ class OllamaPool:
         self._models: dict[str, set[str]] = {}
         self._digests: dict[str, dict[str, str]] = {}
         self._failed: set[str] = set()
-        self._cursor = 0
         self._busy: dict[str, int] = {}                  # calls in flight on each computer
         self._activity: dict[str, dict] = {}              # what each computer is doing and has done since the last reset (counts only, never a text)
-        self._sent: dict[str, int] = {}                  # calls given to each computer since the last reset (for the shares)
+        self._sent: dict[tuple[str, str, str], int] = {}                  # calls given to each computer since the last reset (for the shares)
         self.shares: dict[str, int] = {}                 # percentage of the work by base_url; empty: equal split
-        self._lock = threading.Lock()
+        self._lock = threading.Condition()
+        self._measurements: dict[tuple[str, str, str], dict] = {}
+        self._baseline: dict[tuple[str, str, str], dict] = {}
+        self._rates: dict[tuple[str, str, str], float] = {}
+        self._adaptive: dict[tuple[str, str], dict[str, int]] = {}
+        self._last_round: dict[str, dict] = {}
 
     def _act(self, url: str) -> dict:
         return self._activity.setdefault(url, {"active": 0, "kind": None, "since": None, "calls": 0, "items": 0, "seconds": 0.0,
@@ -194,7 +198,9 @@ class OllamaPool:
                              "running_for": round(now - a["since"], 1) if a["active"] and a["since"] else None,
                              "calls": a["calls"], "items": a["items"], "average": round(a["seconds"] / a["calls"], 2) if a["calls"] else None,
                              "errors": a["errors"], "last_error": a["last_error"], "last_at": a["last_at"],
-                             "observed": round(100 * a["calls"] / total), "share": self.shares.get(client.base_url) if self.shares else None})
+                             "observed": round(100 * a["calls"] / total),
+                             "share": self._last_round.get(client.base_url, {}).get("share", self.shares.get(client.base_url)),
+                             "round": dict(self._last_round[client.base_url]) if client.base_url in self._last_round else None})
             return rows
 
     def set_shares(self, shares: dict[str, int] | None) -> None:
@@ -202,15 +208,18 @@ class OllamaPool:
         with self._lock:
             self.shares = {url: int(v) for url, v in (shares or {}).items()}
             self._sent.clear()
+            self._adaptive.clear()
+            self._last_round.clear()
+            self._lock.notify_all()
 
-    def _pick(self, eligible: list[Ollama]) -> Ollama:
+    def _pick(self, eligible: list[Ollama], shares: dict[str, int], operation: tuple[str, str]) -> Ollama:
         """The computer that is the furthest below its share. Without shares: the least busy one, a helper before the server. Call with the lock held."""
-        if not self.shares:
+        if not shares:
             return min(eligible, key=lambda c: (self._busy.get(c.base_url, 0), c is self.local))
-        wanted = [c for c in eligible if self.shares.get(c.base_url, 0) > 0] or eligible
-        client = min(wanted, key=lambda c: ((self._sent.get(c.base_url, 0) + 1) / max(self.shares.get(c.base_url, 0), 1),
+        client = min(eligible, key=lambda c: ((self._sent.get((*operation, c.base_url), 0) + 1) / max(shares.get(c.base_url, 0), 1),
                                             self._busy.get(c.base_url, 0), c is self.local))
-        self._sent[client.base_url] = self._sent.get(client.base_url, 0) + 1
+        key = (*operation, client.base_url)
+        self._sent[key] = self._sent.get(key, 0) + 1
         return client
 
     @property
@@ -247,6 +256,11 @@ class OllamaPool:
             self._failed.clear()
             self._sent.clear()
             self._activity.clear()
+            self._measurements.clear()
+            self._baseline.clear()
+            self._rates.clear()
+            self._adaptive.clear()
+            self._last_round.clear()
 
     def status(self, wanted: tuple[str, ...] = ()) -> list[dict]:
         """A fresh, content-free health report for the admin interface."""
@@ -296,35 +310,97 @@ class OllamaPool:
         else:
             with self._lock:
                 a = self._act(client.base_url)
-                a.update(calls=a["calls"] + 1, items=a["items"] + items, seconds=a["seconds"] + time.monotonic() - started, last_at=time.time())
+                elapsed = time.monotonic() - started
+                a.update(calls=a["calls"] + 1, items=a["items"] + items, seconds=a["seconds"] + elapsed, last_at=time.time())
+                key = (client.base_url, method, args[0])
+                measured = self._measurements.setdefault(key, {"calls": 0, "items": 0, "seconds": 0.0})
+                measured.update(calls=measured["calls"] + 1, items=measured["items"] + items, seconds=measured["seconds"] + elapsed)
             return result
         finally:
             with self._lock:
                 a = self._act(client.base_url)
                 a["active"] -= 1
 
-    def _call_on(self, client: Ollama, method: str, *args):
-        try:
-            return self._timed(client, method, *args)
-        except OllamaError:
+    def begin_round(self) -> None:
+        with self._lock:
+            self._baseline = {key: dict(value) for key, value in self._measurements.items()}
+
+    def finish_round(self, number: int, model: str) -> list[dict]:
+        """Snapshot this round and smooth throughput separately for each operation/model.
+
+        Pauses count as occupied time. Sparse samples retain the previous estimate;
+        a zero configured share stays excluded. Targets never queue work on a busy host.
+        """
+        with self._lock:
+            totals = {c.base_url: {"number": number, "calls": 0, "items": 0, "seconds": 0.0} for c in self.clients}
+            for key, measured in self._measurements.items():
+                old = self._baseline.get(key, {"calls": 0, "items": 0, "seconds": 0.0})
+                delta = {field: measured[field] - old[field] for field in old}
+                row = totals[key[0]]
+                for field in delta:
+                    row[field] += delta[field]
+                if delta["calls"] and delta["seconds"] > 0:
+                    rate = delta["items"] / delta["seconds"]
+                    self._rates[key] = 0.5 * self._rates[key] + 0.5 * rate if key in self._rates else rate
+            self._baseline = {key: dict(value) for key, value in self._measurements.items()}
+            for method, name in {(key[1], key[2]) for key in self._rates}:
+                eligible = self._eligible(name)
+                wanted = [c for c in eligible if not self.shares or self.shares.get(c.base_url, 0) > 0] or eligible
+                rates = {c.base_url: self._rates.get((c.base_url, method, name)) for c in wanted}
+                # Do not guess the capacity of a computer that has not answered yet.
+                if rates and all(rate is not None for rate in rates.values()):
+                    total = sum(rates.values())
+                    exact = {url: 100 * rate / total for url, rate in rates.items()}
+                    target = {url: max(1, int(value)) for url, value in exact.items()}
+                    while sum(target.values()) != 100:
+                        if sum(target.values()) < 100:
+                            url = max(target, key=lambda u: exact[u] - target[u])
+                            target[url] += 1
+                        else:
+                            url = max((u for u in target if target[u] > 1), key=lambda u: target[u] - exact[u])
+                            target[url] -= 1
+                    self._adaptive[(method, name)] = target
+            targets = self._adaptive.get(("chat_json", model), self.shares)
+            for url, row in totals.items():
+                row["average"] = round(row["seconds"] / row["calls"], 2) if row["calls"] else None
+                row["seconds"] = round(row["seconds"], 2)
+                row["share"] = targets.get(url, 0) if targets else None
+            self._last_round = totals
+            self._sent.clear()
+            return [{"url": c.base_url, "local": c is self.local, **totals[c.base_url]} for c in self.clients]
+
+    def _dispatch(self, method: str, *args):
+        self._sync()
+        while True:
             with self._lock:
-                self._failed.add(client.base_url)
-            if client is self.local or self.local not in self._eligible(args[0]):
-                raise
-            return self._timed(self.local, method, *args)
+                while True:
+                    if self.cancelled():
+                        raise InterruptedError("analyse annulée")
+                    eligible = self._eligible(args[0])
+                    if not eligible:
+                        raise OllamaError(f"Le modèle {args[0]} n'est disponible sur aucun ordinateur d'analyse")
+                    wanted = [c for c in eligible if not self.shares or self.shares.get(c.base_url, 0) > 0] or eligible
+                    free = [c for c in wanted if not self._busy.get(c.base_url, 0)]
+                    if free:
+                        shares = self._adaptive.get((method, args[0]), self.shares)
+                        client = self._pick(free, shares, (method, args[0]))
+                        self._busy[client.base_url] = 1
+                        break
+                    self._lock.wait(timeout=0.1)
+            try:
+                return self._timed(client, method, *args)
+            except OllamaError:
+                with self._lock:
+                    self._failed.add(client.base_url)
+                if not self._eligible(args[0]):
+                    raise
+            finally:
+                with self._lock:
+                    self._busy[client.base_url] = 0
+                    self._lock.notify_all()
 
     def embed(self, model: str, texts: list[str]) -> list[list[float]]:
-        self._sync()
-        eligible = self._eligible(model)
-        if not eligible:
-            raise OllamaError(f"Le modèle {model} n'est installé sur aucun ordinateur d'analyse")
-        with self._lock:
-            if self.shares:
-                client = self._pick(eligible)
-            else:
-                client = eligible[self._cursor % len(eligible)]
-                self._cursor += 1
-        return self._call_on(client, "embed", model, texts)
+        return self._dispatch("embed", model, texts)
 
     def embed_batches(self, model: str, groups: list[list[str]]) -> list[list[list[float]]]:
         if len(groups) < 2:
@@ -334,20 +410,7 @@ class OllamaPool:
             return list(executor.map(lambda group: self.embed(model, group), groups))
 
     def chat_json(self, model: str, system: str, user: str, schema: dict, num_ctx: int = 8192) -> dict:
-        self._sync()
-        eligible = self._eligible(model)
-        if not eligible:
-            raise OllamaError(f"Le modèle {model} n'est installé sur aucun ordinateur d'analyse")
-        # The computer with the fewest calls in flight; at equal load a helper (typically the Apple Silicon computer) before the server, which is the fallback.
-        # With one call at a time this is the helper; with two at a time (see parallel.py) the second one goes to the server.
-        with self._lock:
-            client = self._pick(eligible)
-            self._busy[client.base_url] = self._busy.get(client.base_url, 0) + 1
-        try:
-            return self._call_on(client, "chat_json", model, system, user, schema, num_ctx)
-        finally:
-            with self._lock:
-                self._busy[client.base_url] -= 1
+        return self._dispatch("chat_json", model, system, user, schema, num_ctx)
 
 
 def _unit(vector: list[float]) -> list[float]:

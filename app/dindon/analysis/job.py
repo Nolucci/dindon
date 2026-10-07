@@ -52,7 +52,7 @@ class AnalysisJobs:
     @staticmethod
     def _idle() -> dict:
         return {"state": "idle", "guild": None, "stage": None, "stages": [], "completed_stages": [],
-                "started_at": None, "finished_at": None, "done": 0, "of": None, "round": None, "rounds": None, "error": None}
+                "started_at": None, "finished_at": None, "done": 0, "of": None, "round": None, "rounds": None, "last_round": None, "error": None}
 
     def readiness(self) -> dict:
         """What the person needs to know before starting: is Ollama running, and are the two models installed."""
@@ -94,8 +94,6 @@ class AnalysisJobs:
               rounds: int | None = 1) -> None:
         """Checks that the models are there, then starts. The positions are read in batches ("salves"): `limit` conversations each (None: all), `rounds` batches
         (None: until nothing is left to read), the positions being checked and linked to the axes after each batch so that results come as it goes. Raises NotReady or AnalysisBusy, before anything is started."""
-        if isinstance(self.client, OllamaPool):
-            self.client.reset()
         ready = self.readiness()
         needed = [m for stage, m in (("embeddings", self.embed_model), ("themes", self.name_model), ("claims", self.name_model), ("claims", self.embed_model), ("axes", self.name_model))
                   if stage in stages]
@@ -107,6 +105,8 @@ class AnalysisJobs:
         with self._lock:
             if self._thread is not None and self._thread.is_alive():
                 raise AnalysisBusy()
+            if isinstance(self.client, OllamaPool):
+                self.client.reset()
             self._cancel = threading.Event()
             self._lines.clear()
             planned = (["compacteur : conversations"] if "conversations" in stages else []) + (["partitionneur : vecteurs"] if "embeddings" in stages else []) + (["partitionneur : thèmes"] if "themes" in stages else []) + (["classeur : positions"] if "claims" in stages else []) + (["classeur : vérification des positions", "juge : liens aux axes"] if "claims" in stages or "axes" in stages else [])
@@ -224,6 +224,8 @@ class AnalysisJobs:
                             self._state.update(round=batch, rounds=rounds)
                         if rounds != 1:
                             self._line(f"salve {batch}" + (f" sur {rounds}" if rounds else "") + (f" : {limit} conversations au plus" if limit else ""))
+                        if isinstance(self.client, OllamaPool):
+                            self.client.begin_round()
                         self._stage("classeur : positions")
                         r = extract_claims(conn, self.client, self.name_model, self.embed_model, guild_id, limit=limit, progress=self._progress, cancelled=cancel.is_set)
                         self._line(f"{r['done']} conversations lues : {r['claims']} positions retenues avec preuve, {r['refused']} refusées"
@@ -232,6 +234,14 @@ class AnalysisJobs:
                         if cancel.is_set():
                             break
                         check_and_link()                                           # results come after each batch, not only at the very end
+                        if isinstance(self.client, OllamaPool) and not cancel.is_set():
+                            computers = self.client.finish_round(batch, self.name_model)
+                            with self._lock:
+                                self._state["last_round"] = {"number": batch, "computers": computers}
+                            for computer in computers:
+                                name = "Serveur" if computer["local"] else computer["url"]
+                                self._line(f"salve {batch} · {name} : {computer['calls']} calculs, {computer['seconds']} s"
+                                           + (f", part suivante {computer['share']} %" if computer["share"] is not None else ""))
                         if r["left"] == 0 or (rounds is not None and batch >= rounds) or r["done"] + r["unread"] == 0:
                             break                                                  # nothing left, the batches asked for are done, or no conversation could be read
                 elif "axes" in stages and not cancel.is_set():
