@@ -94,6 +94,25 @@ _PERIOD = """SELECT i.from_user_id AS f, i.to_user_id AS t, i.kind,
     GROUP BY 1, 2, 3"""
 
 
+# Filters on the messages that the links come from. Only added when asked, so that the usual map is not slowed down.
+_IN_CHANNELS = " AND i.message_id IN (SELECT x.id FROM messages x WHERE x.channel_id = ANY(%(channels)s))"
+_IN_THEME = """ AND EXISTS (SELECT 1 FROM conversation_messages cm JOIN topic_assignments ta ON ta.conversation_id = cm.conversation_id
+                            WHERE cm.message_id = i.message_id AND ta.topic_id IN (SELECT t.id FROM topics t WHERE t.id = %(theme)s OR t.merged_into = %(theme)s))"""
+# Both ends of a link have the ideology (as the role that they gave themselves)
+_WITH_IDEOLOGY = """ AND d.f IN (SELECT user_id FROM claimed_ideologies WHERE guild_id = %(guild)s AND ideology_id = %(ideology)s)
+                  AND d.t IN (SELECT user_id FROM claimed_ideologies WHERE guild_id = %(guild)s AND ideology_id = %(ideology)s)"""
+
+
+def graph_sql(period: bool, channels: bool = False, theme: bool = False, ideology: bool = False) -> str:
+    """The query of the map (also the one of the map on Discord): from the stored links, or counted again from the messages when a period, a channel or a topic
+    narrows it; and, when asked, only the people who gave themselves an ideology. The parameters are named in the filters above."""
+    source = (_PERIOD.replace("GROUP BY 1, 2, 3", (_IN_CHANNELS if channels else "") + (_IN_THEME if theme else "") + " GROUP BY 1, 2, 3") if period else _ALL_TIME)
+    sql = _GRAPH.replace("{source}", source)
+    if ideology:
+        sql = sql.replace("WHERE %(bots)s OR (NOT uf.is_bot AND NOT ut.is_bot)", "WHERE (%(bots)s OR (NOT uf.is_bot AND NOT ut.is_bot))" + _WITH_IDEOLOGY)
+    return sql
+
+
 @router.get("/graph")
 def graph(
     request: Request,
@@ -106,19 +125,24 @@ def graph(
     max_edges: int = Query(20000, ge=10, le=100000),
     bots: bool = False,
     isolated: bool = Query(False, description="also the people who ever wrote and are not on the map: points without a link"),
+    channels: str = Query("", pattern=r"^[0-9]*(,[0-9]+)*$", description="only the exchanges in these channels (ids, comma separated)"),
+    theme: int | None = Query(None, description="only the exchanges of the conversations about this topic"),
+    ideology: int | None = Query(None, description="only the links between people who both gave themselves this ideology"),
 ) -> dict:
     kind_list = [k for k in kinds.split(",") if k in KIND_FACTOR]
     if not kind_list:
         raise HTTPException(status_code=422, detail="Types d'échanges : reply, mention ou reaction.")
     since, until = _utc(since), _utc(until)
-    period = since is not None or until is not None
+    channel_ids = [int(c) for c in channels.split(",") if c]
+    narrowed = bool(channel_ids) or theme is not None          # the stored links do not know the channel or the topic: counted again from the messages
+    period = since is not None or until is not None or narrowed
     with request.app.state.pool.connection() as conn:
         guild_id = resolve_guild(conn, guild)
         now = utc_now()
-        params = {"guild": guild_id, "kinds": kind_list, "bots": bots, "min_weight": min_weight, "limit": limit,
+        params = {"guild": guild_id, "kinds": kind_list, "bots": bots, "min_weight": min_weight, "limit": limit, "channels": channel_ids, "theme": theme, "ideology": ideology,
                   "max_edges": max_edges, "ref": min(until, now) if until else now,
                   "since": since or datetime(1970, 1, 1, tzinfo=UTC), "until": until or datetime(2200, 1, 1, tzinfo=UTC)}
-        rows = conn.execute(_GRAPH.replace("{source}", _PERIOD if period else _ALL_TIME), params).fetchall()
+        rows = conn.execute(graph_sql(period, bool(channel_ids), theme is not None, ideology is not None), params).fetchall()
         node_ids = sorted({r["a"] for r in rows} | {r["b"] for r in rows})
         # Points without a link: whoever ever wrote in this server (not only during the period) and is not on the map. Linked
         # people come first and keep their places; these only take what is left of `limit`, the most talkative first.
@@ -129,6 +153,8 @@ def graph(
                 """SELECT m.author_id AS id, count(*) AS messages, max(m.sent_at) AS last_at
                    FROM messages m JOIN channels c ON c.id = m.channel_id JOIN users u ON u.id = m.author_id
                    WHERE c.guild_id = %(guild)s AND (%(bots)s OR NOT u.is_bot)
+                     AND (%(ideology)s::int IS NULL OR m.author_id IN (SELECT user_id FROM claimed_ideologies WHERE guild_id = %(guild)s AND ideology_id = %(ideology)s))
+                     AND (cardinality(%(channels)s::bigint[]) = 0 OR m.channel_id = ANY(%(channels)s))
                    GROUP BY m.author_id ORDER BY count(*) DESC, m.author_id""", params) if r["id"] not in on_map]
             loners_total = len(candidates)
             loners = candidates[:max(limit - len(node_ids), 0)]
@@ -176,6 +202,23 @@ def graph(
                      "isolated_shown": len(loners), "isolated_hidden": loners_total - len(loners),
                      "edges_shown": len(edges), "edges_hidden": edges_total - len(edges), "generated_at": iso(utc_now())},
             "nodes": nodes, "edges": edges}
+
+
+@router.get("/map/filters")
+def map_filters(request: Request, guild: int | None = None) -> dict:
+    """What the map can be narrowed to: the channels, the topics (when the analysis found some) and the ideologies that people gave themselves."""
+    with request.app.state.pool.connection() as conn:
+        guild_id = resolve_guild(conn, guild)
+        channels = conn.execute(
+            """SELECT c.id, c.name, count(*) AS messages FROM channels c JOIN messages m ON m.channel_id = c.id WHERE c.guild_id = %s
+               GROUP BY c.id, c.name ORDER BY count(*) DESC, c.name LIMIT 300""", (guild_id,)).fetchall()
+        themes = conn.execute("SELECT id, label FROM topics WHERE guild_id = %s AND status IN ('proposed', 'validated') ORDER BY label", (guild_id,)).fetchall()
+        ideologies = conn.execute(
+            """SELECT i.id, i.name, count(DISTINCT ci.user_id) AS people FROM claimed_ideologies ci JOIN ideologies i ON i.id = ci.ideology_id
+               WHERE ci.guild_id = %s GROUP BY i.id, i.name ORDER BY count(DISTINCT ci.user_id) DESC, i.name""", (guild_id,)).fetchall()
+    return {"channels": [{"id": str(r["id"]), "name": r["name"], "messages": r["messages"]} for r in channels],
+            "themes": [{"id": r["id"], "label": r["label"]} for r in themes],
+            "ideologies": [{"id": r["id"], "name": r["name"], "people": r["people"]} for r in ideologies]}
 
 
 @router.get("/avatar/{user_id}")

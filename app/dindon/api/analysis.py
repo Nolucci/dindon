@@ -35,6 +35,11 @@ class TopicChange(BaseModel):
     status: Literal["proposed", "validated", "rejected"] | None = None
 
 
+class Reset(BaseModel):
+    guild: str = Field(pattern=r"^[0-9]{1,20}$")
+    what: Literal["themes", "positions", "contradictions"]
+
+
 class Merge(BaseModel):
     into: int
 
@@ -200,3 +205,30 @@ def digest(request: Request, guild: int | None = None, format: Literal["md", "js
     else:
         body, media = digest_of.to_markdown(result), "text/markdown"
     return Response(body, media_type=f"{media}; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="synthese-{guild_id}{'' if part == 'all' else '-' + part}.{format}"'})
+
+
+@router.post("/analysis/reset")
+def reset(request: Request, body: Reset) -> dict:
+    """Deletes what the analysis derived for one server, never its messages: the themes (topics and their assignments), the positions (what
+    people said, with the proofs, and the scores computed from them; the conversations can then be read again) or the contradictions (the scores
+    per axis that they are computed from; the changes of mind come from the positions). Refused while the analysis runs."""
+    if request.app.state.analysis.status().get("state") in ("running", "cancelling"):
+        raise HTTPException(status_code=409, detail="L'analyse est en cours : arrêtez-la avant de supprimer ses résultats.")
+    with request.app.state.pool.connection() as conn, conn.transaction():
+        guild_id = resolve_guild(conn, int(body.guild))
+        deleted: dict[str, int] = {}
+
+        def remove(name: str, sql: str) -> None:
+            deleted[name] = conn.execute(sql, (guild_id,)).rowcount
+
+        if body.what == "themes":
+            remove("themes", "DELETE FROM topics WHERE guild_id = %s")
+            remove("runs", "DELETE FROM topic_runs WHERE guild_id = %s")
+        elif body.what == "positions":
+            remove("positions", "DELETE FROM claims WHERE guild_id = %s")
+            remove("conversations_to_read_again", "DELETE FROM conversation_extractions WHERE conversation_id IN "
+                                                  "(SELECT cv.id FROM conversations cv JOIN channels ch ON ch.id = cv.channel_id WHERE ch.guild_id = %s)")
+            remove("scores", "DELETE FROM person_axis_scores WHERE guild_id = %s")
+        else:
+            remove("scores", "DELETE FROM person_axis_scores WHERE guild_id = %s")
+    return {"guild": str(guild_id), "what": body.what, "deleted": deleted}

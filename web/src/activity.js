@@ -37,7 +37,7 @@ style.textContent = `
   #suggest button:hover, #suggest button:focus-visible { background: rgba(88, 101, 242, .3); outline: none; }
   #suggest .none { padding: .4rem .5rem; color: var(--text-secondary, #b5bac1); }
   #suggest mark { background: none; color: ${GOLD}; font-weight: 700; }
-  #kinds { display: flex; gap: .3rem; }
+  #kinds, #filters { display: flex; gap: .3rem; flex-wrap: wrap; }
   #kinds button { font: inherit; font-size: .8rem; padding: .2rem .6rem; border-radius: 999px; cursor: pointer; color: var(--text-secondary, #b5bac1); background: transparent; border: 1px solid #4e5058; }
   #kinds button[aria-pressed="true"] { color: #fff; background: rgba(88, 101, 242, .55); border-color: #5865f2; }
   #main { flex: 1; min-height: 0; display: flex; gap: .5rem; }
@@ -267,7 +267,33 @@ let pictures = new Map();   // person -> local address of their photo, or null
 let loader = null;
 
 // What the map asked for: the same words for the map and for a card, so that a card is read in the map that is on the screen
-const mapQuery = () => `guild=${guild}&period=${$('period').value}${kinds ? `&kinds=${[...kinds].join(',')}` : ''}${focused ? `&focus=${focused}` : ''}`;
+const mapQuery = () => `guild=${guild}&period=${$('period').value}${kinds ? `&kinds=${[...kinds].join(',')}` : ''}${focused ? `&focus=${focused}` : ''}`
+  + `${narrowed.weight !== '0' ? `&weight=${narrowed.weight}` : ''}${narrowed.theme ? `&theme=${narrowed.theme}` : ''}${narrowed.ideology ? `&ideology=${narrowed.ideology}` : ''}`;
+
+// What the person narrowed the map to, among the filters that the admins offer (the server ignores any other)
+const narrowed = { weight: '0', theme: '', ideology: '' };
+const WEIGHT_CHOICES = [['0', 'Force : tous'], ['0.5', 'Force : ≥ 0,5'], ['1', 'Force : ≥ 1'], ['3', 'Force : ≥ 3'], ['10', 'Force : ≥ 10']];
+let filtersDrawn = '';
+
+function drawFilters(meta) {
+  const allowed = meta.filters_allowed ?? [];
+  const choices = meta.choices ?? {};
+  const signature = JSON.stringify([allowed, choices]);
+  if (signature === filtersDrawn) return;                    // the same choices: the selects keep what the person picked
+  filtersDrawn = signature;
+  const select = (key, label, options) => {
+    const box = el('select');
+    box.setAttribute('aria-label', label);
+    for (const [value, text] of options) box.add(new Option(text, value, false, value === narrowed[key]));
+    box.onchange = () => { narrowed[key] = box.value; void load().then((loaded) => { if (loaded && shown) showCard(shown); }); };
+    return box;
+  };
+  const boxes = [];
+  if (allowed.includes('weight')) boxes.push(select('weight', 'Force minimale des liens', WEIGHT_CHOICES));
+  if (allowed.includes('theme') && choices.themes?.length) boxes.push(select('theme', 'Thème', [['', 'Thème : tous'], ...choices.themes.map((t) => [String(t.id), t.label])]));
+  if (allowed.includes('ideology') && choices.ideologies?.length) boxes.push(select('ideology', 'Rôle d’idées', [['', 'Rôle : tous'], ...choices.ideologies.map((i) => [String(i.id), i.name])]));
+  $('filters').replaceChildren(...boxes);
+}
 
 function drawKinds(allowed) {
   const box = $('kinds');
@@ -362,6 +388,7 @@ async function load() {
     if (number !== loadNumber) return false;
     map.load(data);
     drawKinds(data.meta.kinds_allowed ?? []);
+    drawFilters(data.meta);
     people = data.nodes.filter((n) => n.label).sort((a, b) => b.influence - a.influence);
     for (const node of data.nodes) nodeColors.set(node.id, node.color || '#dbdee1');
     loader.show(data.nodes);

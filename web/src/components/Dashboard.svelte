@@ -39,6 +39,11 @@
   let since = $state('');
   let until = $state('');
   let kinds = $state({ reply: true, mention: true, reaction: true });
+  let channel = $state('');       // narrow the map to one channel, one topic, one ideology; and hide the weakest links
+  let theme = $state('');
+  let ideology = $state('');
+  let minWeight = $state('0');
+  let mapOptions = $state({ channels: [], themes: [], ideologies: [] });
   let density = $state('2500'); // how many links to draw at most: the strongest ones first
   let showImport = $state(false); // the window to import a part of the server
   let showInvite = $state(false); // the window to invite the bot to a server
@@ -78,7 +83,8 @@
   let noKind = $derived(!KINDS.some((k) => kinds[k.id]));
 
   function graphParams() {
-    const params = { guild, kinds: KINDS.filter((k) => kinds[k.id]).map((k) => k.id).join(','), max_edges: density, isolated: showIsolated };
+    const params = { guild, kinds: KINDS.filter((k) => kinds[k.id]).map((k) => k.id).join(','), max_edges: density, isolated: showIsolated,
+      channels: channel || undefined, theme: theme || undefined, ideology: ideology || undefined, min_weight: Number(minWeight) || undefined };
     const days = PRESETS.find((p) => p.id === preset)?.days;
     if (days) params.since = new Date(Date.now() - days * 86400000).toISOString();
     if (preset === 'custom') {
@@ -284,6 +290,17 @@
   }
 
   // Another server was picked in the left bar: its map is shown
+  async function loadOptions() {
+    const options = guild ? await guard(() => api.mapFilters(guild)) : null;
+    mapOptions = options ?? { channels: [], themes: [], ideologies: [] };
+  }
+
+  $effect(() => {
+    guild;                               // another server: its own channels, topics and ideologies
+    channel = theme = ideology = '';
+    loadOptions();
+  });
+
   function guildPicked(id) {
     guild = id;
     analysisSection = 'themes';
@@ -306,6 +323,11 @@
         bind:until
         bind:kinds
         bind:density
+        bind:channel
+        bind:theme
+        bind:ideology
+        bind:minWeight
+        {mapOptions}
         bind:showIsolated
         presets={PRESETS}
         kindList={KINDS}
@@ -378,7 +400,7 @@
     {#if view === 'analyse'}
       <Analyse {guild} bind:section={analysisSection} onAuthLost={onLogout} onAutomate={() => showView('system')} onPerson={showPerson} />
     {:else if view === 'system'}
-      <System onAuthLost={onLogout} />
+      <System {guild} onAuthLost={onLogout} />
     {:else if view === 'debates'}
       <Debates onAuthLost={onLogout} />
     {:else if view === 'privacy'}

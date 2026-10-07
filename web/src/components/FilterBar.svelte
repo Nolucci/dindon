@@ -10,6 +10,11 @@
     until = $bindable(''),
     kinds = $bindable({}),
     density = $bindable('2500'),
+    channel = $bindable(''),
+    theme = $bindable(''),
+    ideology = $bindable(''),
+    minWeight = $bindable('0'),
+    mapOptions = { channels: [], themes: [], ideologies: [] },
     showIsolated = $bindable(true),
     presets,
     kindList,
@@ -130,6 +135,33 @@
     <option value="2500">Liens : lisibles</option>
     <option value="8000">Liens : détaillés</option>
     <option value="20000">Liens : tous (lent)</option>
+  </select>
+
+  <select class="select" bind:value={channel} onchange={onChange} aria-label="Salon">
+    <option value="">Salon : tous</option>
+    {#each mapOptions.channels as c (c.id)}<option value={c.id}>#{c.name} ({fmt.format(c.messages)})</option>{/each}
+  </select>
+
+  {#if mapOptions.themes.length}
+    <select class="select" bind:value={theme} onchange={onChange} aria-label="Thème">
+      <option value="">Thème : tous</option>
+      {#each mapOptions.themes as t (t.id)}<option value={t.id}>{t.label}</option>{/each}
+    </select>
+  {/if}
+
+  {#if mapOptions.ideologies.length}
+    <select class="select" bind:value={ideology} onchange={onChange} aria-label="Rôle d’idées">
+      <option value="">Rôle : tous</option>
+      {#each mapOptions.ideologies as i (i.id)}<option value={i.id}>{i.name} ({fmt.format(i.people)})</option>{/each}
+    </select>
+  {/if}
+
+  <select class="select" bind:value={minWeight} onchange={onChange} aria-label="Force minimale des liens">
+    <option value="0">Force : tous les liens</option>
+    <option value="0.5">Force : au moins 0,5</option>
+    <option value="1">Force : au moins 1</option>
+    <option value="3">Force : au moins 3</option>
+    <option value="10">Force : au moins 10</option>
   </select>
 
   <label class="toggle" title="Les personnes qui ont déjà écrit mais n’ont aucun lien affiché, quelle que soit la période">

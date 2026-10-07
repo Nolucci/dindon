@@ -4,7 +4,30 @@
   import { ago as agoOf } from '../lib/format.js';
   import { matches, slash } from '../lib/text.js';
 
-  let { onAuthLost } = $props();
+  let { guild = '', onAuthLost } = $props();
+
+  // Deleting what the analysis derived (never the messages), one kind at a time, after a confirmation
+  const RESULTS = {
+    themes: ['Thèmes', 'les thèmes trouvés ou validés pour ce serveur'],
+    positions: ['Positions', 'les positions lues, leurs citations et les scores qui en viennent (les conversations pourront être relues)'],
+    contradictions: ['Contradictions', 'les scores par axe dont les contradictions sont calculées'],
+  };
+  let resetNote = $state('');
+  let resetting = $state('');
+  async function resetResults(what) {
+    if (!confirm(`Supprimer ${RESULTS[what][1]} ? Les messages ne sont pas touchés. Cette action est définitive.`)) return;
+    resetting = what;
+    resetNote = '';
+    try {
+      const done = await api.analysisReset(guild, what);
+      resetNote = `${RESULTS[what][0]} supprimé${what === 'themes' ? 's' : 'es'} (${Object.values(done.deleted).reduce((a, b) => a + b, 0)} lignes).`;
+    } catch (error) {
+      if (error instanceof AuthError) onAuthLost();
+      else resetNote = error.message;
+    } finally {
+      resetting = '';
+    }
+  }
 
   const fmt = new Intl.NumberFormat('fr-FR');
   let info = $state(null);
@@ -50,7 +73,8 @@
   const dmapChanged = $derived(dmap && dmapSaved && JSON.stringify(dmap) !== JSON.stringify(dmapSaved));
   const DMAP_KINDS = { reply: 'Réponses', mention: 'Mentions', reaction: 'Réactions' };
   const DMAP_SECTIONS = { activity: 'Activité (messages, rang, jours actifs, contacts, réactions reçues)', months: 'Messages par mois (graphique)', habits: 'Rythme (heures et jours habituels)', links: 'Liens principaux (avec qui la personne échange)' };
-  const dmapSensitive = $derived(dmap && (dmap.sections.includes('roles') || dmap.sections.includes('axes')));
+  const DMAP_FILTERS = { weight: 'Force minimale des liens' };
+  const dmapSensitive = $derived(dmap && (dmap.sections.includes('roles') || dmap.sections.includes('axes') || dmap.filters.includes('theme') || dmap.filters.includes('ideology')));
 
   async function loadDmap() {
     try {
@@ -365,6 +389,15 @@
           {/if}
           <span class="muted small">Seules les personnes dont le nom est affiché sur la carte ont une fiche. Jamais un message, jamais un salon.</span>
         </fieldset>
+        <fieldset class="what" disabled={!dmap.enabled}>
+          <legend class="muted small">Filtres proposés dans l’Activité</legend>
+          {#each Object.entries(DMAP_FILTERS) as [filter, label]}
+            <label class="check"><input type="checkbox" value={filter} bind:group={dmap.filters} /> <span>{label}</span></label>
+          {/each}
+          <label class="check"><input type="checkbox" value="theme" bind:group={dmap.filters} /> <span><strong>Thème</strong> des conversations. <em>Lecture de l’IA : montre qui parle de quoi.</em></span></label>
+          <label class="check"><input type="checkbox" value="ideology" bind:group={dmap.filters} /> <span><strong>Rôle d’idées</strong>. <em>Montre qui s’est donné ce rôle.</em></span></label>
+          <span class="muted small">Jamais de filtre par salon : l’Activité ne montre aucun salon, et un salon que la personne ne peut pas lire ne doit pas se deviner par ses échanges.</span>
+        </fieldset>
         <div class="knobs">
           <label class="knob"><span class="knobHead"><span>Personnes sur l’image</span><output>{dmap.max_people}</output></span>
             <input type="range" min="5" max="350" step="1" bind:value={dmap.max_people} oninput={limitDmapNames} aria-label="Personnes sur l’image" />
@@ -456,6 +489,17 @@
       {:else}
         <p class="muted">Chargement…</p>
       {/if}
+    </section>
+
+    <section class="panel card wide" aria-label="Résultats de l’analyse">
+      <header><h2 class="eyebrow">Résultats de l’analyse</h2></header>
+      <p class="muted small">Supprime ce que l’analyse a déduit du serveur affiché sur la carte. Les messages et les liens de la carte ne sont jamais touchés ; l’analyse peut les refaire.</p>
+      <div class="actions">
+        {#each Object.entries(RESULTS) as [what, [label]] (what)}
+          <button type="button" class="btn btn-danger" disabled={!guild || resetting !== ''} onclick={() => resetResults(what)}>Supprimer les {label.toLowerCase()}</button>
+        {/each}
+      </div>
+      {#if resetNote}<p class="muted small" role="status">{resetNote}</p>{/if}
     </section>
 
     <section class="panel card wide" aria-label="Serveurs suivis">

@@ -26,7 +26,7 @@ from psycopg.rows import dict_row
 
 from dindon import privacy
 from dindon.api.common import LABEL
-from dindon.api.routes import _ALL_TIME, _GRAPH, _PERIOD, MEMBER_COLORS, _color
+from dindon.api.routes import MEMBER_COLORS, _color, graph_sql
 from dindon.automation import _get, _put
 from dindon.clock import utc_now
 
@@ -38,8 +38,15 @@ PERIODS = {"7": ("7 derniers jours", 7), "30": ("30 derniers jours", 30), "90": 
 # the admin to confirm that the people are informed (`acknowledged`, docs/regles-du-bot.md), else they are never shown.
 SECTIONS = ("activity", "months", "habits", "links", "roles", "axes")
 SENSITIVE = ("roles", "axes")
+# What the person looking at the Activity can narrow the map to. The strength of the links shows nothing more than the map; a topic and an ideology are readings of
+# what people say, so, like `roles` and `axes`, they need the confirmation of the admin. Never a channel: the map shows no channel, and a channel that a member
+# cannot read must not be told apart by its exchanges.
+FILTERS = ("weight", "theme", "ideology")
+SENSITIVE_FILTERS = ("theme", "ideology")
+WEIGHTS = (0.0, 0.5, 1.0, 3.0, 10.0)
 MIN_SCORE = 0.3          # an axis is shown when the person stands at least this far from the middle (as on the card of /dindon card)
-DEFAULT = {"enabled": False, "max_people": 40, "names": 15, "kinds": list(KINDS), "sections": ["activity", "months", "habits", "links"], "acknowledged": False}
+DEFAULT = {"enabled": False, "max_people": 40, "names": 15, "kinds": list(KINDS), "sections": ["activity", "months", "habits", "links"], "filters": ["weight"],
+           "acknowledged": False}
 WIDTH, HEIGHT, SCALE = 1280, 720, 2          # 16:9, like the background (and like the Activity)
 ASSETS = Path(__file__).parent / "assets"
 PANEL_WIDTH = 350                              # the card of the person, on the right
@@ -59,6 +66,8 @@ def clean(values: dict) -> dict:
     out["acknowledged"] = bool(values.get("acknowledged", False))
     sections = [k for k in SECTIONS if k in (values.get("sections") or [])] if "sections" in values else list(DEFAULT["sections"])
     out["sections"] = [k for k in sections if out["acknowledged"] or k not in SENSITIVE]
+    filters = [k for k in FILTERS if k in (values.get("filters") or [])] if "filters" in values else list(DEFAULT["filters"])
+    out["filters"] = [k for k in filters if out["acknowledged"] or k not in SENSITIVE_FILTERS]
     return out
 
 
@@ -72,17 +81,20 @@ def save(conn: psycopg.Connection, values: dict) -> dict:
     return cfg
 
 
-def collect(conn: psycopg.Connection, guild_id: int, days: int | None, focus: int | None, cfg: dict) -> dict | None:
-    """The people and links to draw, or None when there is nothing to show (or the person in focus is not to be shown)."""
+def collect(conn: psycopg.Connection, guild_id: int, days: int | None, focus: int | None, cfg: dict, narrow: dict | None = None) -> dict | None:
+    """The people and links to draw, or None when there is nothing to show (or the person in focus is not to be shown). `narrow` is what the person looking
+    asked for (`weight`, `theme`, `ideology`): only what the admins allow (`cfg["filters"]`) is ever applied."""
+    narrow = {k: v for k, v in (narrow or {}).items() if k in cfg["filters"] and v not in (None, "", 0)}
     blocked = privacy.blocked_ids(conn)
     cur = conn.cursor(row_factory=dict_row)             # whatever the rows of the connection are (the bot's are tuples, the API's are dicts)
     if focus in blocked:
         return None
     now = utc_now()
     since = now - timedelta(days=days) if days else datetime(1970, 1, 1, tzinfo=UTC)
-    params = {"guild": guild_id, "kinds": cfg["kinds"], "bots": False, "min_weight": 0, "limit": 500 if focus else cfg["max_people"] + len(blocked),
+    params = {"guild": guild_id, "kinds": cfg["kinds"], "bots": False, "min_weight": narrow.get("weight", 0), "channels": [], "theme": narrow.get("theme"), "ideology": narrow.get("ideology"),
+              "limit": 500 if focus else cfg["max_people"] + len(blocked),
               "max_edges": 5000, "ref": now, "since": since, "until": datetime(2200, 1, 1, tzinfo=UTC)}
-    rows = [r for r in cur.execute(_GRAPH.replace("{source}", _PERIOD if days else _ALL_TIME), params).fetchall()
+    rows = [r for r in cur.execute(graph_sql(bool(days) or "theme" in narrow, theme="theme" in narrow, ideology="ideology" in narrow), params).fetchall()
             if r["a"] not in blocked and r["b"] not in blocked]
     if focus is not None:
         near = {}

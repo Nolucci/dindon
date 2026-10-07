@@ -444,3 +444,18 @@ def test_the_color_that_an_export_gives_is_not_used_when_the_roles_are_not_known
     ingest_document(ingest_db, document, GATEWAY_SOURCE, digest(document), only_new=True)
     assert [n["color"] for n in _graph(me, isolated="true")["nodes"]] == [None]
 
+
+
+def test_the_map_can_be_narrowed_to_a_channel_a_theme_or_an_ideology(me):
+    options = me.get("/api/map/filters").json()
+    assert set(options) == {"channels", "themes", "ideologies"} and len(options["channels"]) >= 2
+    everything = me.get("/api/graph").json()
+    busiest, quietest = options["channels"][0], options["channels"][-1]
+    one = me.get("/api/graph", params={"channels": quietest["id"]}).json()
+    assert one["edges"] != everything["edges"] and sum(e["n"] for e in one["edges"]) < sum(e["n"] for e in everything["edges"])
+    both = me.get("/api/graph", params={"channels": f"{busiest['id']},{quietest['id']}"}).json()
+    assert sum(e["n"] for e in both["edges"]) >= sum(e["n"] for e in one["edges"])
+    assert me.get("/api/graph", params={"channels": "abc"}).status_code == 422
+    assert me.get("/api/graph", params={"theme": 999999}).json()["edges"] == []                    # no conversation about it
+    assert me.get("/api/graph", params={"ideology": 999}).json()["edges"] == []                    # nobody has this role
+    assert me.get("/api/graph", params={"ideology": 999, "isolated": True}).json()["nodes"] == []

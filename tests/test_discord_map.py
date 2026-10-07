@@ -131,7 +131,7 @@ def test_the_admin_sets_it_from_the_interface(ingest_url, tmp_path):
         assert web.post("/api/login", json={"password": PASSWORD}).status_code == 200
         assert web.get("/api/discord-map").json()["enabled"] is False
         saved = web.put("/api/discord-map", json={"enabled": True, "max_people": 20, "names": 5, "kinds": ["reply"]}).json()
-        assert saved == {"enabled": True, "max_people": 20, "names": 5, "kinds": ["reply"], "sections": ["activity", "months", "habits", "links"], "acknowledged": False} == web.get("/api/discord-map").json()
+        assert saved == {"enabled": True, "max_people": 20, "names": 5, "kinds": ["reply"], "sections": ["activity", "months", "habits", "links"], "filters": ["weight"], "acknowledged": False} == web.get("/api/discord-map").json()
         many = web.put("/api/discord-map", json={"enabled": True, "max_people": 350, "names": 350})
         assert many.status_code == 200 and many.json()["max_people"] == many.json()["names"] == 350
         assert web.put("/api/discord-map", json={"max_people": 351}).status_code == 422
@@ -408,3 +408,21 @@ def test_the_interface_shows_photos_too(ingest_db, ingest_url, tmp_path, fake_cd
         ingest_db.execute("INSERT INTO privacy_subjects (user_id, status, reason, source) VALUES (%s, 'stopped', 'objection', 'discord')", (BOB_ID,))
         assert web.get(f"/api/avatar/{BOB_ID}", params={"guild": GUILD}).status_code == 404                                                 # nor for somebody who stopped
         assert all(n["avatar"] is None for n in web.get("/api/graph", params={"guild": GUILD}).json()["nodes"] if n["id"] == str(BOB_ID))
+
+
+def test_the_member_narrows_the_map_only_with_the_filters_that_the_admins_offer(ingest_db, ingest_url, activity_web):
+    talk(ingest_url)
+    discord_map.save(ingest_db, {"enabled": True, "kinds": ["reply", "mention"]})
+    plain = member_map(activity_web).json()
+    assert plain["meta"]["filters_allowed"] == ["weight"] and plain["meta"]["choices"] == {} and len(plain["edges"]) == 2
+    assert member_map(activity_web, weight=10).json()["edges"] == []                           # the strength is always offered
+    assert member_map(activity_web, weight=7).status_code == 422                               # only the choices of the page
+    assert len(member_map(activity_web, theme=999999, ideology=999).json()["edges"]) == 2      # not offered: ignored, never more than allowed
+    discord_map.save(ingest_db, {"enabled": True, "kinds": ["reply", "mention"], "filters": ["weight", "theme", "ideology"]})
+    assert discord_map.load(ingest_db)["filters"] == ["weight"]                                # a topic and a role need the confirmation of the admin
+    discord_map.save(ingest_db, {"enabled": True, "kinds": ["reply", "mention"], "filters": ["weight", "theme", "ideology"], "acknowledged": True})
+    offered = member_map(activity_web).json()["meta"]
+    assert offered["filters_allowed"] == ["weight", "theme", "ideology"] and set(offered["choices"]) == {"themes", "ideologies"}
+    assert member_map(activity_web, theme=999999).json()["edges"] == []                        # no conversation about it
+    assert member_map(activity_web, ideology=999).json()["edges"] == []                        # nobody has this role
+    assert member_card(activity_web, BOB_ID, ideology=999).status_code == 404                  # the card follows the same filter

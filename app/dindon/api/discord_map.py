@@ -14,6 +14,7 @@ class Body(BaseModel):
     names: int = Field(default=15, ge=0, le=350)
     kinds: list[str] = Field(default_factory=lambda: list(discord_map.KINDS))
     sections: list[str] = Field(default_factory=lambda: list(discord_map.DEFAULT["sections"]))     # what the card of a person shows in the Activity
+    filters: list[str] = Field(default_factory=lambda: list(discord_map.DEFAULT["filters"]))        # what the member can narrow the map to in the Activity
     acknowledged: bool = False                                                                       # the people are informed: needed for the sections that read them
 
 
@@ -26,7 +27,7 @@ def read(request: Request) -> dict:
 @router.put("")
 def write(request: Request, body: Body) -> dict:
     """Saves the settings. The sections that read the people (roles, axes) are refused without the confirmation that the people are informed (it would be dropped silently otherwise)."""
-    if not body.acknowledged and set(body.sections) & set(discord_map.SENSITIVE):
-        raise HTTPException(status_code=422, detail="Pour montrer les rôles ou les positions, confirmez que les personnes sont informées (docs/regles-du-bot.md).")
+    if not body.acknowledged and (set(body.sections) & set(discord_map.SENSITIVE) or set(body.filters) & set(discord_map.SENSITIVE_FILTERS)):
+        raise HTTPException(status_code=422, detail="Pour montrer les rôles, les positions ou filtrer par thème ou par rôle, confirmez que les personnes sont informées (docs/regles-du-bot.md).")
     with request.app.state.pool.connection() as conn:
         return discord_map.save(conn, body.model_dump())

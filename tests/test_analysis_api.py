@@ -234,3 +234,19 @@ def test_the_digest_is_a_file_to_download_in_markdown_or_json(me):
     only = me.get("/api/digest", params={"part": "themes"})
     assert "## Thèmes" in only.text and "## Positions" not in only.text and only.headers["content-disposition"].endswith('themes.md"')
     assert set(me.get("/api/digest", params={"part": "contradictions", "format": "json"}).json()) == {"guild", "contradictions"}
+
+
+def test_what_the_analysis_derived_can_be_deleted_one_kind_at_a_time(me, ingest_db):
+    analyze(me, topics=6)
+    guild = me.get("/api/analysis").json()["guild"]
+    assert me.post("/api/analysis/reset", json={"guild": guild, "what": "nothing"}).status_code == 422
+    done = me.post("/api/analysis/reset", json={"guild": guild, "what": "contradictions"}).json()
+    assert done["what"] == "contradictions" and me.get("/api/topics").json()                       # the topics are still there
+    done = me.post("/api/analysis/reset", json={"guild": guild, "what": "themes"}).json()
+    assert done["deleted"]["themes"] >= 6 and me.get("/api/topics").json() == []
+    assert me.get("/api/analysis").json()["counts"]["messages"] > 2000                            # the messages are never touched
+    me.post("/api/analysis/reset", json={"guild": guild, "what": "positions"})
+
+
+def test_nothing_is_deleted_without_the_session(app):
+    assert app.post("/api/analysis/reset", json={"guild": "1", "what": "themes"}).status_code == 401
