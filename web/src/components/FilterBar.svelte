@@ -130,34 +130,34 @@
     {/each}
   </div>
 
-  <select class="select" bind:value={density} onchange={onChange} aria-label="Nombre de liens affichés">
+  <select class="select fsel" bind:value={density} onchange={onChange} aria-label="Nombre de liens affichés">
     <option value="800">Liens : essentiels</option>
     <option value="2500">Liens : lisibles</option>
     <option value="8000">Liens : détaillés</option>
     <option value="20000">Liens : tous (lent)</option>
   </select>
 
-  <select class="select" bind:value={channel} onchange={onChange} aria-label="Salon">
-    <option value="">Salon : tous</option>
+  <select class="select fsel" bind:value={channel} onchange={onChange} aria-label="Salon">
+    <option value="">Salon</option>
     {#each mapOptions.channels as c (c.id)}<option value={c.id}>#{c.name} ({fmt.format(c.messages)})</option>{/each}
   </select>
 
   {#if mapOptions.themes.length}
-    <select class="select" bind:value={theme} onchange={onChange} aria-label="Thème">
-      <option value="">Thème : tous</option>
+    <select class="select fsel" bind:value={theme} onchange={onChange} aria-label="Thème">
+      <option value="">Thème</option>
       {#each mapOptions.themes as t (t.id)}<option value={t.id}>{t.label}</option>{/each}
     </select>
   {/if}
 
   {#if mapOptions.ideologies.length}
-    <select class="select" bind:value={ideology} onchange={onChange} aria-label="Rôle d’idées">
-      <option value="">Rôle : tous</option>
+    <select class="select fsel" bind:value={ideology} onchange={onChange} aria-label="Rôle d’idées">
+      <option value="">Rôle</option>
       {#each mapOptions.ideologies as i (i.id)}<option value={i.id}>{i.name} ({fmt.format(i.people)})</option>{/each}
     </select>
   {/if}
 
-  <select class="select" bind:value={minWeight} onchange={onChange} aria-label="Force minimale des liens">
-    <option value="0">Force : tous les liens</option>
+  <select class="select fsel" bind:value={minWeight} onchange={onChange} aria-label="Force minimale des liens">
+    <option value="0">Force</option>
     <option value="0.5">Force : au moins 0,5</option>
     <option value="1">Force : au moins 1</option>
     <option value="3">Force : au moins 3</option>
@@ -166,12 +166,12 @@
 
   <label class="toggle" title="Les personnes qui ont déjà écrit mais n’ont aucun lien affiché, quelle que soit la période">
     <input type="checkbox" bind:checked={showIsolated} onchange={onIsolated} />
-    <span class="toggleLabel">Personnes sans lien</span>
+    <span class="toggleLabel">Sans lien</span>
   </label>
 
   <button type="button" class="tool-btn fit" onclick={onFit} title="Revenir à la vue d’ensemble">
     <span class="fitIcon"><Icon name="fit" /></span>
-    Tout voir
+    <span class="fitText">Tout voir</span>
   </button>
 </div>
 
@@ -180,21 +180,53 @@
   .bar {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
+    gap: 0.375rem;
+    padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--border-subtle);
     background: var(--bg-primary);
-    flex-wrap: wrap;
+    flex-wrap: nowrap;               /* one line; on a narrow window it wraps again (below) */
     flex-shrink: 0;
+  }
+
+  /* The menus take the room they are left (the longest channel name must not stretch the bar) and cut what does not fit */
+  .fsel {
+    flex: 0 1 auto;
+    min-width: 5rem;
+    max-width: 9.5rem;
+    font-size: 0.75rem;
+    padding: 0.3125rem 0.375rem;
+    text-overflow: ellipsis;
+  }
+
+  .segmented :global(button) {
+    padding: 0.3125rem 0.5rem;
+  }
+
+  .kind,
+  .fit {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 1100px) {
+    .bar {
+      flex-wrap: wrap;
+    }
+  }
+
+  @media (max-width: 1500px) {
+    .fitText {
+      display: none;                 /* the icon alone, its title says the rest */
+    }
   }
 
   .searchWrapper {
     position: relative;
     display: flex;
     align-items: center;
-    flex: 1 1 11.25rem;
-    min-width: 10.625rem;
-    max-width: 16.25rem;
+    flex: 1 1 9rem;
+    min-width: 6.5rem;
+    max-width: 14rem;
   }
 
   .searchIcon {
@@ -321,15 +353,16 @@
   /* Stats.module.css .seriesToggleRow, .seriesToggleBtn: a kind that is hidden fades */
   .kinds {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.375rem;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+    gap: 0.25rem;
   }
 
   .kind {
     display: inline-flex;
     align-items: center;
-    gap: 0.4375rem;
-    padding: 0.375rem 0.625rem;
+    gap: 0.3125rem;
+    padding: 0.3125rem 0.5rem;
     border: 1px solid var(--border-subtle);
     border-radius: 62.4375rem;
     background: var(--bg-tertiary);
