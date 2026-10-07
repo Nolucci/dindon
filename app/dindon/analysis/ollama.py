@@ -184,7 +184,9 @@ class OllamaPool:
         errors = []
         for client in self.clients:
             try:
-                listed = client._call("/api/tags", timeout=timeout).get("models", [])
+                # Health checks must not inherit the cancellation callback of an
+                # analysis request running (or just stopped) on this client.
+                listed = Ollama(client.base_url, timeout=client.timeout)._call("/api/tags", timeout=timeout).get("models", [])
                 names = {m["name"] for m in listed}
                 self._models[client.base_url] = names
                 self._digests[client.base_url] = {m["name"]: m.get("digest", "") for m in listed}

@@ -97,6 +97,22 @@ def test_a_different_embedding_build_is_not_mixed_with_the_server():
         local.stop()
 
 
+def test_model_health_check_still_works_after_analysis_is_cancelled():
+    server = FakeOllama().start()
+    try:
+        pool = OllamaPool(server.url, (), timeout=5)
+        pool.models()
+        stopped = threading.Event()
+        pool.cancelled = stopped.is_set
+        pool._sync()  # A model call has inherited the analysis cancellation callback.
+        stopped.set()
+
+        assert "bge-m3:latest" in pool.models()
+        assert pool.status()[0]["online"] is True
+    finally:
+        server.stop()
+
+
 def test_cancelling_interrupts_an_inflight_model_request():
     server = FakeOllama().start()
     server.chat_delay = 3
