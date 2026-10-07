@@ -250,3 +250,17 @@ def test_what_the_analysis_derived_can_be_deleted_one_kind_at_a_time(me, ingest_
 
 def test_nothing_is_deleted_without_the_session(app):
     assert app.post("/api/analysis/reset", json={"guild": "1", "what": "themes"}).status_code == 401
+
+
+def test_the_positions_are_read_in_batches_and_checked_after_each(me):
+    analyze(me, topics=6)
+    job = analyze(me, stages=["claims"], limit=3, rounds=2)
+    lines = "\n".join(job["lines"])
+    assert job["state"] == "done" and job["error"] is None and job["rounds"] == 2 and job["round"] == 2
+    assert "salve 1 sur 2 : 3 conversations au plus" in lines and "salve 2 sur 2" in lines
+    assert lines.count("positions relues") == 2                    # checked after each batch
+    left = me.get("/api/positions").json()["conversations"]
+    assert left["read"] <= 6 < left["kept"]                                                       # no more than 2 x 3 conversations
+    until = analyze(me, stages=["claims"], limit=2000, rounds=None)                              # until the end: a batch bigger than what is left is the last one
+    assert until["state"] == "done" and until["rounds"] is None and "salve 1 : 2000" in "\n".join(until["lines"]) and "salve 2" not in "\n".join(until["lines"])
+    assert me.post("/api/analysis", json={"stages": ["claims"], "rounds": 0}).status_code == 422

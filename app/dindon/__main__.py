@@ -84,7 +84,7 @@ def _analyze(settings, args) -> int:
     jobs = AnalysisJobs(settings, echo=print)
     stages = tuple(s for s in ALL_STAGES if (s in args.stages if args.stages else s in STAGES))   # the claims only when asked for
     try:
-        jobs.start(guild, stages, topics=args.topics, rebuild=args.rebuild, limit=args.limit)
+        jobs.start(guild, stages, topics=args.topics, rebuild=args.rebuild, limit=args.limit, rounds=args.rounds or None)
     except (NotReady, AnalysisBusy) as problem:
         print(f"Cannot start: {problem}", file=sys.stderr)
         return 1
@@ -236,7 +236,9 @@ def _build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--guild", type=int, help="server ID (default: the first of DINDON_GUILD_IDS, else the most recently imported)")
     analyze.add_argument("--stage", action="append", dest="stages", choices=["conversations", "embeddings", "themes", "claims", "axes"],
                          help="only this stage (can be repeated; default: all, in order). A stage never redoes what is done")
-    analyze.add_argument("--limit", type=int, help="for the stage claims: read at most this many conversations (the most important first)")
+    analyze.add_argument("--limit", type=int, help="for the stage claims: read at most this many conversations in each batch (the most important first)")
+    analyze.add_argument("--rounds", type=int, default=1, help="for the stage claims: how many batches of --limit conversations (default 1; 0: until nothing is left to read). "
+                                                                "The positions are checked and linked to the axes after each batch")
     analyze.add_argument("--topics", type=int, help="how many topics (default: found by the silhouette)")
     analyze.add_argument("--rebuild", action="store_true", help="forget the conversations (and the vectors made from them) and make them again")
     export = sub.add_parser("export", help="export one channel (and its threads) as JSON v2 files, with Dindon's own exporter (needs a token)")

@@ -232,8 +232,10 @@ def extract_claims(conn: psycopg.Connection, client: Ollama, model: str, embed_m
     """Reads the kept conversations that were not read yet (the most important first). Returns what was done."""
     with conn.cursor(row_factory=tuple_row) as cur:
         todo = [r[0] for r in cur.execute(_TODO, {"guild": guild_id}).fetchall()]
+    left = len(todo)
     if limit is not None:
         todo = todo[:limit]
+    left -= len(todo)                                                     # what a next batch would still have to read
     done = kept = refused = failed = unread = in_a_row = 0
     for n, cid in enumerate(todo, 1):
         if cancelled():
@@ -297,4 +299,4 @@ def extract_claims(conn: psycopg.Connection, client: Ollama, model: str, embed_m
         if progress:
             progress(n, len(todo))
     log.info("extraction: %d conversations read, %d claims kept, %d refused, %d failed", done, kept, refused, failed)
-    return {"done": done, "claims": kept, "refused": refused, "failed": failed, "waiting": len(todo), "unread": unread}
+    return {"done": done, "claims": kept, "refused": refused, "failed": failed, "waiting": len(todo), "unread": unread, "left": left}

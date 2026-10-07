@@ -52,7 +52,7 @@ class AnalysisJobs:
     @staticmethod
     def _idle() -> dict:
         return {"state": "idle", "guild": None, "stage": None, "stages": [], "completed_stages": [],
-                "started_at": None, "finished_at": None, "done": 0, "of": None, "error": None}
+                "started_at": None, "finished_at": None, "done": 0, "of": None, "round": None, "rounds": None, "error": None}
 
     def readiness(self) -> dict:
         """What the person needs to know before starting: is Ollama running, and are the two models installed."""
@@ -82,8 +82,10 @@ class AnalysisJobs:
             self.client = OllamaPool(self._settings.ollama_url, urls) if urls else Ollama(self._settings.ollama_url)
             self._ready = None
 
-    def start(self, guild_id: int, stages: tuple[str, ...] = STAGES, *, topics: int | None = None, rebuild: bool = False, limit: int | None = None) -> None:
-        """Checks that the models are there, then starts. Raises NotReady or AnalysisBusy, before anything is started."""
+    def start(self, guild_id: int, stages: tuple[str, ...] = STAGES, *, topics: int | None = None, rebuild: bool = False, limit: int | None = None,
+              rounds: int | None = 1) -> None:
+        """Checks that the models are there, then starts. The positions are read in batches ("salves"): `limit` conversations each (None: all), `rounds` batches
+        (None: until nothing is left to read), the positions being checked and linked to the axes after each batch so that results come as it goes. Raises NotReady or AnalysisBusy, before anything is started."""
         if isinstance(self.client, OllamaPool):
             self.client.reset()
         ready = self.readiness()
@@ -101,7 +103,7 @@ class AnalysisJobs:
             self._lines.clear()
             planned = (["compacteur : conversations"] if "conversations" in stages else []) + (["partitionneur : vecteurs"] if "embeddings" in stages else []) + (["partitionneur : thèmes"] if "themes" in stages else []) + (["classeur : positions"] if "claims" in stages else []) + (["classeur : vérification des positions", "juge : liens aux axes"] if "claims" in stages or "axes" in stages else [])
             self._state = {**self._idle(), "state": "running", "guild": str(guild_id), "started_at": utc_iso(), "stages": planned}
-            self._thread = threading.Thread(target=self._run, args=(guild_id, stages, topics, rebuild, self._cancel, limit), daemon=True, name="analysis")
+            self._thread = threading.Thread(target=self._run, args=(guild_id, stages, topics, rebuild, self._cancel, limit, rounds), daemon=True, name="analysis")
             self._thread.start()
 
     def cancel(self) -> bool:
@@ -164,7 +166,8 @@ class AnalysisJobs:
 
         return current
 
-    def _run(self, guild_id: int, stages: tuple[str, ...], topics: int | None, rebuild: bool, cancel: threading.Event, limit: int | None = None) -> None:
+    def _run(self, guild_id: int, stages: tuple[str, ...], topics: int | None, rebuild: bool, cancel: threading.Event, limit: int | None = None,
+             rounds: int | None = 1) -> None:
         error = None
         try:
             with connect(self._settings.database_url, wait=5) as conn:
@@ -191,21 +194,38 @@ class AnalysisJobs:
                     r = discover_themes(conn, self.client, guild_id, embed_model=self.embed_model, name_model=self.name_model, topics=topics,
                                         progress=self._line, step_progress=self._progress, cancelled=cancel.is_set)
                     self._line(f"{r['topics']} thèmes proposés pour {r['assigned']} conversations (k={r['k']}, {r['named_by_model']} nommés par le modèle)")
-                if "claims" in stages and not cancel.is_set():
-                    self._stage("classeur : positions")
-                    r = extract_claims(conn, self.client, self.name_model, self.embed_model, guild_id, limit=limit, progress=self._progress, cancelled=cancel.is_set)
-                    self._line(f"{r['done']} conversations lues : {r['claims']} positions retenues avec preuve, {r['refused']} refusées"
-                               + (f", {r['failed']} à reprendre (le modèle n'a pas répondu)" if r["failed"] else ""))
-                if ("claims" in stages or "axes" in stages) and not cancel.is_set():
+                def check_and_link() -> None:
                     self._stage("classeur : vérification des positions")
                     r = verify_stances(conn, self.client, self.name_model, guild_id, progress=self._progress, cancelled=cancel.is_set)
                     self._line(f"{r['checked']} positions relues : {r['changed']} corrigées, {r['questions']} écartées (une question n'est pas une position)"
                                + (f", {r['failed']} à reprendre" if r["failed"] else ""))
-                if ("claims" in stages or "axes" in stages) and not cancel.is_set():
+                    if cancel.is_set():
+                        return
                     self._stage("juge : liens aux axes")
                     r = assign_axes(conn, self.client, self.name_model, guild_id, progress=self._progress, cancelled=cancel.is_set, embed_model=self.embed_model)
                     self._line(f"{r['done']} propositions reliées aux axes ({r['links']} liens), {r['scores']} scores de personnes calculés"
                                + (f", {r['failed']} à reprendre" if r["failed"] else ""))
+
+                if "claims" in stages and not cancel.is_set():
+                    batch = 0
+                    while not cancel.is_set():
+                        batch += 1
+                        with self._lock:
+                            self._state.update(round=batch, rounds=rounds)
+                        if rounds != 1:
+                            self._line(f"salve {batch}" + (f" sur {rounds}" if rounds else "") + (f" : {limit} conversations au plus" if limit else ""))
+                        self._stage("classeur : positions")
+                        r = extract_claims(conn, self.client, self.name_model, self.embed_model, guild_id, limit=limit, progress=self._progress, cancelled=cancel.is_set)
+                        self._line(f"{r['done']} conversations lues : {r['claims']} positions retenues avec preuve, {r['refused']} refusées"
+                                   + (f", {r['failed']} à reprendre (le modèle n'a pas répondu)" if r["failed"] else "")
+                                   + (f" ; {r['left']} restent à lire" if r["left"] else ""))
+                        if cancel.is_set():
+                            break
+                        check_and_link()                                           # results come after each batch, not only at the very end
+                        if r["left"] == 0 or (rounds is not None and batch >= rounds) or r["done"] + r["unread"] == 0:
+                            break                                                  # nothing left, the batches asked for are done, or no conversation could be read
+                elif "axes" in stages and not cancel.is_set():
+                    check_and_link()
         except NotEnough as problem:                              # words that were written for a person
             error = str(problem)
         except OllamaError as problem:

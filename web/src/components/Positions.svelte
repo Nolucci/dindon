@@ -15,7 +15,9 @@
   let info = $state(null);        // /api/analysis (ready, job)
   let opened = $state(null);      // { id, loading, people }
   let problem = $state('');
-  let amount = $state('40');
+  let perBatch = $state(40);         // conversations read in each batch ("salve")
+  let batches = $state(1);           // how many batches
+  let untilEnd = $state(false);      // keep going until nothing is left to read
   let busy = $state(false);
   let poll = null;
 
@@ -106,7 +108,7 @@
 
   async function start() {
     busy = true;
-    const body = { guild, stages: ['claims'], limit: amount === 'all' ? null : Number(amount) };
+    const body = { guild, stages: ['claims'], limit: Math.max(1, Math.floor(Number(perBatch)) || 1), rounds: untilEnd ? null : Math.max(1, Math.floor(Number(batches)) || 1) };
     const answer = await guard(() => api.analysisStart(body));
     busy = false;
     if (answer) {
@@ -238,19 +240,21 @@
         </div>
         <p class="muted hint">{fmt.format(remaining)} conversation{remaining > 1 ? 's' : ''} restante{remaining > 1 ? 's' : ''}. Les conversations déjà lues ne sont pas relues.</p>
         <details class="advanced"><summary>Options de lecture</summary>
-          <label class="inline">Combien de conversations
-            <select class="select" bind:value={amount} aria-label="Combien de conversations lire">
-              <option value="20">20 les plus importantes</option>
-              <option value="40">40 les plus importantes</option>
-              <option value="150">150 les plus importantes</option>
-              <option value="all">toutes ({fmt.format(remaining)})</option>
-            </select>
+          <label class="inline">Conversations par salve
+            <input class="field-input num" type="number" min="1" max="100000" step="1" bind:value={perBatch} aria-label="Nombre de conversations lues par salve" />
           </label>
+          <label class="inline">Nombre de salves
+            <input class="field-input num" type="number" min="1" max="10000" step="1" bind:value={batches} disabled={untilEnd} aria-label="Nombre de salves" />
+          </label>
+          <label class="check"><input type="checkbox" bind:checked={untilEnd} /> <span>Continuer jusqu’à la fin ({fmt.format(remaining)} restantes)</span></label>
+          <p class="muted hint">Après chaque salve, les positions sont vérifiées et reliées aux axes : les contradictions apparaissent au fur et à mesure.
+            {untilEnd ? 'Toutes les conversations restantes seront lues.' : `Jusqu’à ${fmt.format(Math.max(1, Math.floor(Number(perBatch)) || 1) * Math.max(1, Math.floor(Number(batches)) || 1))} conversations.`}</p>
           <p class="muted hint">Environ 15 s par conversation. {fmt.format(data.claims.refused)} position{data.claims.refused > 1 ? 's' : ''} refusée{data.claims.refused > 1 ? 's' : ''} faute de preuve. Modèle : <code>{info?.models.naming}</code>. Les ordinateurs d’analyse ajoutés dans Système peuvent recevoir le texte nécessaire au calcul.</p>
         </details>
         {#if job && job.state !== 'idle'}
           <div class="progress" aria-live="polite">
             <span class="badge" class:success={job.state === 'done'} class:danger={job.state === 'failed'} class:accent={running}>{STATES[job.state]}</span>
+            {#if running && job.round && (job.rounds !== 1)}<span class="muted">salve {job.round}{job.rounds ? ` / ${job.rounds}` : ''}</span>{/if}
             {#if running && job.of}<progress max={job.of} value={job.done}></progress><span class="muted">{job.done} / {job.of}</span>{/if}
             {#if job.error}<p class="banner" role="alert">{job.error}</p>{/if}
             {#if job.lines.length}<details class="jobLog"><summary>Journal de lecture</summary><pre class="lines">{job.lines.join('\n')}</pre></details>{/if}
@@ -395,7 +399,9 @@
   .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
   .inline { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: var(--text-secondary); }
   .hint { font-size: 0.75rem; }
-  .advanced .inline { margin-top: 0.75rem; }
+  .advanced .inline { margin-top: 0.75rem; margin-right: 1rem; }
+  .num { width: 6rem; }
+  .advanced .check { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; font-size: 0.8125rem; color: var(--text-secondary); }
   .advanced .hint { margin-top: 0.5rem; }
   .jobLog { flex-basis: 100%; }
   .jobLog .lines { margin-top: 0.5rem; }

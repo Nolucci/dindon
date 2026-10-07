@@ -24,7 +24,8 @@ EXCERPT_CHARS = 500
 class StartRequest(BaseModel):
     guild: str | None = Field(default=None, pattern=r"^[0-9]{1,20}$", description="a Discord id, as text (18 digits do not fit a JavaScript number)")
     stages: list[Literal["conversations", "embeddings", "themes", "claims", "axes"]] = list(STAGES)
-    limit: int | None = Field(default=None, ge=1, le=100000, description="for the claims: read at most this many conversations")
+    limit: int | None = Field(default=None, ge=1, le=100000, description="for the claims: read at most this many conversations in each batch (null: all)")
+    rounds: int | None = Field(default=1, ge=1, le=10000, description="for the claims: how many batches (null: until nothing is left to read)")
     topics: int | None = Field(default=None, ge=2, le=80, description="the number of topics, when the person wants to choose it")
     rebuild: bool = False
 
@@ -78,7 +79,7 @@ def start(request: Request, body: StartRequest) -> dict:
     with state.pool.connection() as conn:
         guild_id = resolve_guild(conn, int(body.guild) if body.guild else None)
     try:
-        state.analysis.start(guild_id, tuple(body.stages), topics=body.topics, rebuild=body.rebuild, limit=body.limit)
+        state.analysis.start(guild_id, tuple(body.stages), topics=body.topics, rebuild=body.rebuild, limit=body.limit, rounds=body.rounds)
     except NotReady as problem:
         raise HTTPException(status_code=409, detail=str(problem)) from None
     except AnalysisBusy:
