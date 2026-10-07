@@ -79,3 +79,14 @@ def test_the_inbox_loop_imports_what_is_dropped_and_the_retention_loop_purges(in
     asyncio.run(run())
     assert settings.inbox_dir.is_dir()                                                      # the loop made the folder
     assert ingest_db.execute("SELECT count(*) FROM messages").fetchone()[0] == 0           # older than a day: purged
+
+
+def test_digest_gives_themes_positions_and_contradictions_in_a_few_lines(cli, ingest_db):
+    ingest(ingest_db, [Talk().say("un message", ALICE)])
+    code, out = cli("digest", "--guild", str(GUILD_ID), "--json")
+    digest = json.loads(out)
+    assert code == 0 and digest["guild"] == GUILD_ID
+    assert set(digest) == {"guild", "themes", "positions", "contradictions"}
+    assert set(digest["contradictions"]) == {"against_own_roles", "opposed_roles", "changed_mind"}
+    code, out = cli("digest", "--guild", str(GUILD_ID))
+    assert code == 0 and "## Thèmes" in out and "## Positions" in out and "## Contradictions" in out

@@ -16,6 +16,7 @@ Les commandes `dindon` s'exécutent dans le conteneur (`docker compose exec app 
 | `make backup` | écrit une sauvegarde SQL compressée dans `backups/` |
 | `make lint`, `make test`, `make check-ui` | Ruff, Pytest, vérification facultative de l'interface avec Playwright |
 | `make demo`, `make politique` | serveurs de démonstration inventés, ports 8011 et 8012 |
+| `dindon digest [--guild ID] [--limit N] [--json]` | synthèse courte d'un serveur : thèmes, positions (pour/contre/nuancé) et contradictions, en Markdown ou en JSON ; lecture seule, sans les personnes qui ont demandé à ne pas être enregistrées |
 | `make axes` | génère `political/axes-review.txt` depuis la base pour relire les axes et idéologies |
 
 `make test` utilise une base Docker jetable. `make check-ui` demande Playwright et son navigateur. `tools/host/install.sh` peut installer sur Mac le redémarrage d'Ollama et une sauvegarde nocturne ; sa propre aide précise les options.

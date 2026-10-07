@@ -194,6 +194,22 @@ def _cmd_debate_report(settings, args) -> int:
     return 0
 
 
+def _cmd_digest(settings, args) -> int:
+    """The themes, positions and contradictions of a server in a few lines (Markdown, or JSON with --json)."""
+    from dindon import digest
+
+    with connect(settings.database_url) as conn:
+        guild = args.guild or (settings.guild_ids[0] if settings.guild_ids else None)
+        if guild is None:
+            row = conn.execute("SELECT g.id FROM guilds g ORDER BY (SELECT max(r.imported_at) FROM ingest_runs r WHERE r.guild_id = g.id) DESC NULLS LAST LIMIT 1").fetchone()
+            guild = row[0] if row else None
+        if guild is None or conn.execute("SELECT 1 FROM guilds WHERE id = %s", (guild,)).fetchone() is None:
+            return _fail("Aucun serveur dans la base : précisez --guild après un import.")
+        result = digest.build(conn, guild, limit=args.limit)
+    print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else digest.to_markdown(result), end="" if not args.json else "\n")
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="dindon")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -240,6 +256,10 @@ def _build_parser() -> argparse.ArgumentParser:
     rights.add_argument("--reason", default="", help="why (kept in the register; do not put anything personal)")
     report = sub.add_parser("debate-report", help="what the claims of the debates came to: each claim, its verdict and its sources, and the parity table by position (docs/regles-du-bot.md)")
     report.add_argument("--debate", type=int, help="one debate (default: the last 20)")
+    digest = sub.add_parser("digest", help="the themes, the positions and the contradictions of a server, in a few lines (read only)")
+    digest.add_argument("--guild", type=int, help="server ID (default: the first of DINDON_GUILD_IDS, else the most recently imported)")
+    digest.add_argument("--limit", type=int, default=10, help="lines per part (default 10)")
+    digest.add_argument("--json", action="store_true", help="JSON instead of Markdown")
     forget = sub.add_parser("forget-server", help="delete everything held of one server (messages, members, links, scores, files). Cannot be undone")
     forget.add_argument("guild_id", type=int, help="Discord id of the server")
     catchup = sub.add_parser("catchup", help="export the last days again now, to see what was edited or deleted")
@@ -348,7 +368,7 @@ def _fail(message: str) -> int:
 COMMANDS = {
     "migrate": _cmd_migrate, "check": _cmd_check, "rebuild-edges": _cmd_rebuild_edges, "bot": _cmd_bot, "bot-health": _cmd_bot_health, "preflight": _cmd_preflight, "backfill": _cmd_backfill, "catchup": _cmd_catchup, "forget-server": _cmd_forget_server,
     "serve": _cmd_serve, "analyze": _analyze, "export": _export,
-    "privacy": _privacy, "ingest": _cmd_ingest, "debate-report": _cmd_debate_report,
+    "privacy": _privacy, "ingest": _cmd_ingest, "debate-report": _cmd_debate_report, "digest": _cmd_digest,
 }
 
 
