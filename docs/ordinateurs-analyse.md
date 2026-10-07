@@ -63,6 +63,8 @@ sudo docker compose exec -T app python -c 'import json,urllib.request; print([m[
 
 Puis dans **Système → Performance → Ordinateurs d'analyse**, ajoutez `http://100.x.y.z:11434`. L'état doit passer à **Connecté** après « Actualiser l'état » et indiquer les modèles utilisés. Si un modèle porte le bon nom mais n'a pas la même empreinte que sur le serveur, Dindon écarte cet ordinateur pour ce modèle afin de ne pas mélanger deux espaces de vecteurs. Vous pouvez ajouter un Mac et plusieurs PC Windows ; la liste est conservée dans la base, même après un redémarrage. Une modification est refusée pendant une analyse pour ne pas interrompre ses calculs.
 
+Ne mettez pas à jour le modèle de vecteurs du serveur juste pour rendre un ordinateur compatible si des vecteurs ont déjà été calculés : les anciens vecteurs restent associés au nom du modèle. Faites correspondre la version de l'auxiliaire à celle du serveur ou planifiez une reconstruction complète des vecteurs.
+
 Lancez ensuite une analyse qui comporte des **vecteurs**. Le journal annonce le nombre d'ordinateurs configurés. Pour vérifier leur utilisation, observez l'activité d'Ollama sur les ordinateurs et le nombre de vecteurs terminés dans l'interface.
 
 Si un ordinateur s'éteint pendant une analyse, Dindon essaie de refaire sa requête sur l'Ollama du serveur si le même modèle y est installé. Une requête en cours peut attendre le délai d'expiration avant cette reprise ; retirez l'ordinateur hors ligne pour les analyses suivantes.
