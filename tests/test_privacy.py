@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from dindon import privacy
 from dindon.api.main import create_app
-from dindon.bot.privacy_commands import COMMAND, EPHEMERAL, Interactions, PrivacyService
+from dindon.bot.privacy_commands import COMMAND, DM_COMMAND, EPHEMERAL, Interactions, PrivacyService
 from dindon.bot.runner import BotRunner, Writer
 from dindon.bot.rest import Response
 from gateway_fixtures import ALICE, BOB, CAROL, GUILD, guild_create, message_create
@@ -211,7 +211,7 @@ def commands(ingest_url, tmp_path):
 def test_the_command_is_registered_and_info_answers_at_once(ingest_url, tmp_path):
     interactions, service, sent, clock = commands(ingest_url, tmp_path)
     asyncio.run(interactions.register("42"))
-    assert sent.of("PUT")[0][:2] == ("PUT", "/applications/42/commands") and sent.of("PUT")[0][2] == [COMMAND] and sent.of("PUT")[0][3] is True
+    assert sent.of("PUT")[0][:2] == ("PUT", "/applications/42/commands") and sent.of("PUT")[0][2] == [DM_COMMAND] and sent.of("PUT")[0][3] is True
     asyncio.run(interactions.answer(interaction(CAROL_ID, "info")))
     method, path, body, authorized, _ = sent.calls[-1]
     assert (method, path, authorized) == ("POST", "/interactions/777/tok/callback", False)   # the token is in the URL: no authorization
@@ -230,7 +230,7 @@ def test_the_entry_point_of_the_activity_is_kept_when_the_activity_is_set_up(ing
     interactions, service, sent, clock = commands(ingest_url, tmp_path)
     interactions.activity = True
     asyncio.run(interactions.register("42"))
-    assert sent.of("PUT")[0][2] == [COMMAND, ENTRY_POINT]
+    assert sent.of("PUT")[0][2] == [DM_COMMAND, ENTRY_POINT]
     assert ENTRY_POINT["type"] == 4 and ENTRY_POINT["handler"] == 2 and interactions.registered      # Discord opens the Activity itself: no answer to give
 
 
@@ -619,7 +619,7 @@ def test_server_commands_are_synced_first_and_unchanged_commands_are_not_rewritt
     assert sent.calls[0][:2] == ("GET", guild_path)
     assert sent.calls[1][:3] == ("POST", guild_path, COMMAND)
     assert other in sent.commands[guild_path]
-    assert sent.commands[global_path] == [COMMAND]
+    assert sent.commands[global_path] == [DM_COMMAND]
     writes = [c for c in sent.calls if c[0] != "GET"]
     # A new bot process reads Discord's definitions and still avoids unnecessary writes.
     rebuilt, _service, after, _clock = commands(ingest_url, tmp_path)
@@ -643,7 +643,7 @@ def test_changed_options_are_updated_after_a_rebuild(ingest_url, tmp_path):
     sent.commands["/applications/42/commands"] = [old]
     asyncio.run(interactions.register("42", (str(GUILD),)))
     assert sent.of("POST")[0][1:3] == (guild_path, COMMAND)
-    assert sent.of("PUT")[0][2] == [COMMAND]
+    assert sent.of("PUT")[0][2] == [DM_COMMAND]
 
 
 def test_ready_and_new_server_events_sync_only_followed_servers(ingest_url, tmp_path):
@@ -696,7 +696,7 @@ def test_failed_server_registration_can_be_retried_and_activity_is_global_only(i
         await interactions.register_guild("42", str(GUILD))
     asyncio.run(go())
     assert sent.commands[f"/applications/42/guilds/{GUILD}/commands"] == [COMMAND]
-    assert sent.commands["/applications/42/commands"] == [COMMAND, ENTRY_POINT]
+    assert sent.commands["/applications/42/commands"] == [DM_COMMAND, ENTRY_POINT]
     assert interactions.registered
 
 
@@ -730,4 +730,27 @@ def test_refused_activity_does_not_prevent_slash_command_registration(ingest_url
     asyncio.run(interactions.register("42", (str(GUILD),)))
     assert interactions.registered
     assert sent.commands[f"/applications/42/guilds/{GUILD}/commands"] == [COMMAND]
-    assert sent.commands["/applications/42/commands"] == [COMMAND]
+    assert sent.commands["/applications/42/commands"] == [DM_COMMAND]
+
+
+def test_existing_global_command_becomes_dm_only_without_changing_server_or_activity(ingest_url, tmp_path):
+    from dindon.bot.privacy_commands import ENTRY_POINT
+
+    interactions, _service, sent, _clock = commands(ingest_url, tmp_path)
+    interactions.activity = True
+    global_path = "/applications/42/commands"
+    guild_path = f"/applications/42/guilds/{GUILD}/commands"
+    sent.commands[global_path] = json.loads(json.dumps([COMMAND, ENTRY_POINT]))
+    sent.commands[guild_path] = json.loads(json.dumps([COMMAND]))
+    asyncio.run(interactions.register("42", (str(GUILD),)))
+    # Migration updates the old global definition and preserves the existing guild command.
+    assert len(sent.of("PUT")) == 1 and sent.of("POST") == []
+    global_commands = sent.commands[global_path]
+    dindon = next(c for c in global_commands if c["name"] == "dindon")
+    assert dindon["contexts"] == [1] and dindon["integration_types"] == [0]
+    assert ENTRY_POINT in global_commands and ENTRY_POINT["contexts"] == [0]
+    assert sent.commands[guild_path] == [COMMAND]
+    # Subsequent restarts keep these definitions without recreating them.
+    sent.calls.clear()
+    asyncio.run(interactions.register("42", (str(GUILD),)))
+    assert all(c[0] == "GET" for c in sent.calls)

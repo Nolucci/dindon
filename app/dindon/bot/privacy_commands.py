@@ -8,7 +8,8 @@
   (messages, reactions, what was made from them, their traces in archive/ and inbox/). It is irreversible, so it asks for a click first.
 * `mes-donnees`: a JSON file with everything held of the person, sent to them alone (counts only if it is too big for Discord).
 * Commands are synchronized at READY and on joining a followed server. Guild commands update immediately; global commands remain for DMs
-  and the Activity. Unchanged definitions are not rewritten. This needs the `applications.commands` scope in the invitation link (api/invite.py).
+  and the Activity. The global slash command is restricted to bot DMs to avoid duplicates on servers. Unchanged definitions are not rewritten.
+  This needs the `applications.commands` scope in the invitation link (api/invite.py).
 * A person can act on **themselves** only (the id comes from Discord's interaction, and the button carries it and is checked again). Every
   action is rate-limited per person, and the database work is done one at a time.
 * Nothing here logs a message, a name or an id: counts only.
@@ -69,6 +70,10 @@ COMMAND = {
                      {"type": 5, "name": "retirer", "description": "Retirer le forum des débats et le salon des sondages"}]},
     ],
 }
+
+
+# Servers use their immediately updated guild command; the global copy is visible only in DMs with the bot.
+DM_COMMAND = {**COMMAND, "integration_types": [0], "contexts": [1]}
 
 
 # What makes the application appear in the rocket of a voice channel (the Activity, docs/fonctionnement.md): a command of type 4 that Discord itself handles. The list of
@@ -373,12 +378,12 @@ class Interactions:
         for guild_id in guild_ids:
             await self.register_guild(application_id, guild_id)
         async with self._sync_lock:
-            commands = [COMMAND, ENTRY_POINT] if self.activity else [COMMAND]
+            commands = [DM_COMMAND, ENTRY_POINT] if self.activity else [DM_COMMAND]
             path = f"/applications/{application_id}/commands"
             status = await self._sync_commands(path, commands)
             if status == 400 and self.activity:
                 log.warning("the entry point of the Activity was refused (HTTP %s): enable Activities in the Developer Portal", status)
-                status = await self._sync_commands(path, [COMMAND])
+                status = await self._sync_commands(path, [DM_COMMAND])
             self.registered = status == 200
             if self.registered:
                 log.info("the global command /dindon is synchronized")
