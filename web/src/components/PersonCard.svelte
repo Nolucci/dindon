@@ -238,6 +238,40 @@
     animation: fadeIn var(--transition-normal) both;
   }
 
+  /* A phone: the card is a sheet at the bottom (the map stays visible above it), its close button is easy to hit */
+  @media (max-width: 720px) {
+    aside {
+      top: auto;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 62%;
+      border-left: none;
+      border-top: 1px solid var(--border-strong);
+      border-radius: 1rem 1rem 0 0;
+      box-shadow: 0 -0.5rem 1.5rem rgba(0, 0, 0, 0.35);
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      padding-bottom: calc(1.75rem + env(safe-area-inset-bottom));
+    }
+
+    aside::before {
+      content: '';
+      position: sticky;
+      top: 0;
+      display: block;
+      width: 2.5rem;
+      height: 0.25rem;
+      margin: -0.5rem auto 0.5rem;
+      border-radius: 999px;
+      background: var(--border-strong);
+    }
+
+    .closeBtn { top: 0.5rem; right: 0.5rem; width: 3.5rem; height: 3.5rem; }
+    .closeIcon { width: 1.25rem; height: 1.25rem; }
+  }
+
   /* HistoryModal.module.css .closeBtn */
   .closeBtn {
     position: absolute;

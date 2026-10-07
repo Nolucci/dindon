@@ -768,6 +768,15 @@ export class MapGraph {
     this.renderer.getCamera().animatedReset({ duration: 500 });
   }
 
+  // The buttons for a finger: zoom in, zoom out (pinching is not always easy, nor a wheel)
+  zoomIn() {
+    this.renderer.getCamera().animatedZoom({ duration: 250 });
+  }
+
+  zoomOut() {
+    this.renderer.getCamera().animatedUnzoom({ duration: 250 });
+  }
+
   destroy() {
     this.container.removeEventListener('mousemove', this.onPointer);
     this.container.removeEventListener('mouseleave', this.onLeave);

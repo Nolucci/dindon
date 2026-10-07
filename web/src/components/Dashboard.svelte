@@ -396,6 +396,12 @@
       <main>
         <div class="canvas" class:with-card={selectedId} bind:this={container} aria-label="Carte des échanges"></div>
 
+        <div class="zoomPad" role="group" aria-label="Zoom de la carte">
+          <button type="button" class="zoomBtn" aria-label="Zoomer" onclick={() => map?.zoomIn()}>+</button>
+          <button type="button" class="zoomBtn" aria-label="Dézoomer" onclick={() => map?.zoomOut()}>−</button>
+          <button type="button" class="zoomBtn" aria-label="Recentrer la carte" onclick={() => map?.resetView()}>⌂</button>
+        </div>
+
         <label class="people" class:with-card={selectedId} title="Combien de personnes afficher sur la carte : les plus connectées d’abord. Moins de monde, c’est aussi une carte plus fluide.">
           <span>Personnes</span>
           <input type="range" min="0" max={PEOPLE_STEPS.length - 1} step="1" value={Math.max(PEOPLE_STEPS.indexOf(Number(people)), 0)} aria-label="Nombre de personnes affichées"
@@ -674,10 +680,44 @@
     box-shadow: 0 0 0.375rem var(--success);
   }
 
+  .zoomPad { display: none; }
+
   @media (max-width: 720px) {
     .mainContent {
       padding-top: calc(3.75rem + env(safe-area-inset-top));
+      padding-bottom: calc(4rem + env(safe-area-inset-bottom));      /* the bar of pages at the bottom */
     }
+
+    /* A finger: big buttons, in reach of the thumb, on the right of the map */
+    .zoomPad {
+      position: absolute;
+      right: 0.75rem;
+      bottom: 0.75rem;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .zoomBtn {
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: 50%;
+      border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.2));
+      background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
+      color: var(--text-primary);
+      font-size: 1.25rem;
+      line-height: 1;
+      box-shadow: var(--shadow-md);
+    }
+
+    .people { right: 0.75rem; justify-content: space-between; }
+    .people input { flex: 1; width: auto; min-width: 0; }
+    .legend { bottom: 0.75rem; max-width: calc(100% - 5.75rem); }
+
+    /* The card of a person opens as a sheet at the bottom: the map stays visible above it */
+    .canvas.with-card { right: 0; bottom: 62%; }
+    .zoomPad:has(~ aside) { display: none; }
   }
 
   /* On a phone the legend only keeps its first line: there is nothing to hover with a finger */

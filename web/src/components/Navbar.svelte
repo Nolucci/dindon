@@ -174,7 +174,23 @@
   </div>
 </nav>
 
+<!-- A phone: the main pages are one tap away at the bottom, within reach of the thumb; « Plus » opens the menu (server, import, privacy, invitation) -->
+<nav class="tabBar" aria-label="Pages">
+  {#each [['map', 'Carte', 'map'], ['debates', 'Débats', 'debates'], ['analyse', 'Analyse', 'themes'], ['system', 'Système', 'system']] as [name, label, icon]}
+    <button type="button" class:active={view === name} aria-current={view === name ? 'page' : undefined} onclick={() => showView(name)}>
+      <span class="tabIcon"><Icon name={icon} /></span>
+      <span>{label}</span>
+    </button>
+  {/each}
+  <button type="button" class:active={mobileOpen} aria-expanded={mobileOpen} aria-controls="dashboard-mobile-drawer" onclick={() => (mobileOpen = !mobileOpen)}>
+    <span class="tabIcon"><Icon name="menu" /></span>
+    <span>Plus</span>
+  </button>
+</nav>
+
 <style>
+  .tabBar { display: none; }
+
   /* Navbar.module.css, class for class */
   .navbar {
     width: 14.5rem;
@@ -554,6 +570,37 @@
   }
 
   @media (max-width: 720px) {
+    .tabBar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 42;
+      display: flex;
+      height: calc(4rem + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+      background: color-mix(in srgb, var(--bg-tertiary) 94%, transparent);
+      backdrop-filter: blur(0.875rem);
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .tabBar button {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.125rem;
+      min-width: 0;
+      color: var(--text-muted);
+      font-size: 0.6875rem;
+      font-weight: 600;
+    }
+
+    .tabBar button.active { color: var(--accent, var(--text-primary)); }
+    .tabIcon { display: inline-flex; width: 1.25rem; height: 1.25rem; }
+    .tabIcon :global(svg) { width: 100%; height: 100%; }
+
     .mobileTopbar {
       position: fixed;
       top: 0;
