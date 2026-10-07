@@ -52,7 +52,7 @@ def test_the_person_limits_the_machine_from_the_page_systeme(base, ingest_db):
         page.get_by_role("button", name="Système", exact=True).click()
         panel = page.get_by_role("region", name="Performance")
         panel.wait_for()
-        expect(panel.get_by_role("radio", name="Plein régime")).to_have_attribute("aria-checked", "true")           # the default: as before
+        expect(panel.get_by_role("radio", name="Équilibré")).to_have_attribute("aria-checked", "true")
         save = panel.get_by_role("button", name="Enregistrer")
         assert save.is_disabled()
 

@@ -74,7 +74,7 @@ def test_people_without_a_link_can_be_shown_hidden_searched_and_opened(app_port)
         page.click("button[type=submit]")
         page.wait_for_selector("footer span:has-text('personne')", timeout=20000)
 
-        box = page.get_by_label("Personnes sans lien")
+        box = page.get_by_label("Sans lien")
         assert box.is_checked()                                                         # on by default
         page.wait_for_selector("footer span:has-text('sans lien')")
         assert "3 personnes (dont 1 sans lien)" in squeeze(page.inner_text("footer"))   # Bob and Carol linked, Alice alone

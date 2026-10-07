@@ -121,6 +121,33 @@
       {:else if job?.state === 'failed' && job.guild === String(guild)}
         <p class="banner" role="alert">Analyse interrompue : {job.error}</p>
       {/if}
+      {#if job?.computers?.length > 1 && job.guild === String(guild)}
+        <section class="machines" aria-label="Activité de chaque ordinateur">
+          <h2>Ordinateurs</h2>
+          <ul>
+            {#each job.computers as machine}
+              <li class:busy={machine.active > 0} class:down={machine.failed}>
+                <span class="dot" aria-hidden="true"></span>
+                <strong>{machine.local ? 'Serveur' : machine.url.replace('http://', '')}</strong>
+                <span class="state">
+                  {#if machine.failed}Hors service pour cette analyse
+                  {:else if machine.active > 0}Calcule : {machine.kind}{machine.running_for !== null ? ` · depuis ${Math.round(machine.running_for)} s` : ''}
+                  {:else if machine.calls > 0}En attente
+                  {:else}Rien reçu pour l’instant{/if}
+                </span>
+                <span class="numbers">
+                  {fmt.format(machine.calls)} appels · {fmt.format(machine.items)} éléments{machine.average !== null ? ` · ${String(machine.average).replace('.', ',')} s en moyenne` : ''}
+                </span>
+                <span class="share" title="Part des appels reçus, comparée à la part demandée">
+                  {machine.observed} %{machine.share !== null ? ` / ${machine.share} % demandés` : ''}
+                </span>
+                <progress max="100" value={machine.observed} aria-label="Part des appels reçus"></progress>
+                {#if machine.errors}<span class="err">{machine.errors} erreur{machine.errors > 1 ? 's' : ''}{machine.last_error ? ` · ${machine.last_error}` : ''}</span>{/if}
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
 
       <nav class="sections" aria-label="Sections de l’analyse">
         <button type="button" class:active={section === 'themes'} aria-current={section === 'themes' ? 'page' : undefined} onclick={() => select('themes')}>Thèmes</button>
@@ -167,6 +194,21 @@
   .stepDetail { color: var(--text-secondary); font-size: .78rem; font-variant-numeric: tabular-nums; }
   .live { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; padding: .75rem 1rem; border-radius: var(--radius-lg); background: var(--bg-secondary); font-size: .8rem; font-variant-numeric: tabular-nums; }
   .live progress { flex: 1 1 10rem; height: .65rem; accent-color: var(--accent, #8b6cff); }
+  .machines h2 { margin: 0 0 .5rem; font-size: 1rem; color: var(--text-primary); }
+  .machines ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: .55rem; }
+  .machines li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .25rem .5rem; padding: .75rem .85rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--bg-secondary); font-size: .78rem; font-variant-numeric: tabular-nums; }
+  .machines li.busy { border-color: var(--accent, #8b6cff); }
+  .machines li.down { opacity: .7; }
+  .machines .dot { width: .6rem; height: .6rem; border-radius: 50%; background: var(--text-muted); }
+  .machines li.busy .dot { background: var(--accent, #8b6cff); animation: machine-pulse 1.1s ease-in-out infinite; }
+  .machines li.down .dot { background: var(--danger, #d9534f); }
+  .machines strong { color: var(--text-primary); overflow-wrap: anywhere; }
+  .machines .state, .machines .numbers { grid-column: 1 / -1; color: var(--text-secondary); }
+  .machines .share { color: var(--text-primary); }
+  .machines progress { grid-column: 1 / -1; width: 100%; height: .45rem; accent-color: var(--accent, #8b6cff); }
+  .machines .err { grid-column: 1 / -1; color: var(--danger, #d9534f); overflow-wrap: anywhere; }
+  @keyframes machine-pulse { 50% { opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) { .machines li.busy .dot { animation: none; } }
   .sections { position: sticky; top: 0; z-index: 2; display: flex; gap: .3rem; padding: .35rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--bg-primary); }
   .sections button { flex: 1; min-width: 0; padding: .65rem .75rem; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); font: inherit; font-weight: 600; cursor: pointer; }
   .sections button:hover, .sections button:focus-visible { color: var(--text-primary); background: var(--bg-secondary); }

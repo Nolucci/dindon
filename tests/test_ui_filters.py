@@ -99,7 +99,7 @@ def test_every_list_can_be_searched_and_filtered(base):
         page = open_page(browser, base, "Thèmes")
         page.on("pageerror", lambda e: errors.append(str(e)[:200]))
         expect(page.get_by_role("heading", name="Analyse", exact=True)).to_be_visible()
-        expect(page.get_by_label("Résumé de l’analyse")).to_be_visible()
+        expect(page.get_by_role("navigation", name="Sections de l’analyse")).to_be_visible()
         assert page.locator(".navItems .navItem").filter(has_text="Analyse").count() == 1
         page.wait_for_selector(".topic")
         assert page.locator(".topic").count() == 3

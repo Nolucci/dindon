@@ -156,8 +156,9 @@ def create_app(settings: Settings | None = None, background: bool = True) -> Fas
         await asyncio.to_thread(pool.open, True, 30)
         with pool.connection() as conn:
             configured = helpers.load(conn)
+            shares = helpers.load_shares(conn)
         if configured is not None:
-            app.state.analysis.configure_helpers(configured)
+            app.state.analysis.configure_helpers(configured, shares)
         tasks = [asyncio.create_task(hub.run())]
         if background:
             tasks += start_background_tasks(app, settings)

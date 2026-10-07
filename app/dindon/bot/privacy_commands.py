@@ -56,7 +56,9 @@ COMMAND = {
         {"type": 1, "name": "map", "description": "La carte du serveur : qui parle avec qui, en image, postée dans ce salon",
          "options": [{"type": 3, "name": "periode", "description": "La période (30 jours par défaut)", "required": False,
                       "choices": [{"name": label, "value": key} for key, (label, _) in discord_map.PERIODS.items()]},
-                     {"type": 6, "name": "personne", "description": "Se centrer sur une personne : ses liens les plus forts", "required": False}]},
+                     {"type": 6, "name": "personne", "description": "Se centrer sur une personne : ses liens les plus forts", "required": False},
+                     {"type": 3, "name": "forme", "description": "La forme du graphique autour de la personne (normale par défaut)", "required": False,
+                      "choices": [{"name": label, "value": key} for key, label in discord_map.SHAPES.items()]}]},
         {"type": 1, "name": "debat", "description": "Ouvrir un débat : une fenêtre pour choisir ses paramètres, des positions, des statistiques à la fin",
          "options": [{"type": 3, "name": "sujet", "description": "La question débattue (vide : vous pourrez choisir un axe dans la fenêtre)", "required": False, "min_length": 3, "max_length": 200}]},
         {"type": 1, "name": "forum", "description": "Choisir le forum où Dindon crée les débats (réservé aux modérateurs)",
@@ -214,7 +216,7 @@ class PrivacyService:
         with ThreadPoolExecutor(max_workers=8) as pool:
             return {uid: body for uid, body in pool.map(get, urls.items()) if body is not None}
 
-    def map(self, guild_id: int, period: str, focus: int | None) -> Reply:
+    def map(self, guild_id: int, period: str, focus: int | None, shape: str = "normal") -> Reply:
         """The picture of the map (see discord_map.py) with the menu of periods under it, or why there is none. Read only; what it shows follows the settings."""
         text = _text()
         days = discord_map.PERIODS[period][1]
@@ -242,9 +244,14 @@ class PrivacyService:
         pictures = self._pictures(guild_id, urls)
         who = next((p["label"] for p in data["people"] if p["id"] == focus), None)
         title = f"**{discord_map.PERIODS[period][0]}** · {len(data['people'])} personnes, {len(data['links'])} liens" + (f" · autour de **{who}**" if who else "")
-        menu = {"type": 3, "custom_id": f"dindon:map:{focus or 0}", "placeholder": "Changer la période",
+        shape = shape if focus is not None and shape in discord_map.SHAPES else "normal"
+        menu = {"type": 3, "custom_id": f"dindon:map:{focus or 0}" + (f":{shape}" if shape != "normal" else ""), "placeholder": "Changer la période",
                 "options": [{"label": label, "value": key, "default": key == period} for key, (label, _) in discord_map.PERIODS.items()]}
-        return Reply(title, file=("carte.png", discord_map.render(data, cfg["names"], pictures, card)), components=[{"type": 1, "components": [menu]}])
+        rows = [{"type": 1, "components": [menu]}]
+        if focus is not None:                                                    # the shape of the picture: only around a person
+            rows.append({"type": 1, "components": [{"type": 3, "custom_id": f"dindon:shape:{focus}:{period}", "placeholder": "Changer la forme",
+                                                    "options": [{"label": label, "value": key, "default": key == shape} for key, label in discord_map.SHAPES.items()]}]})
+        return Reply(title, file=("carte.png", discord_map.render(data, cfg["names"], pictures, card, shape)), components=rows)
 
     def run(self, user_id: int, sub: str) -> Reply:
         """Does what a member asked, and returns what to tell them."""
@@ -425,7 +432,7 @@ class Interactions:
                 await self._page(data)
             elif custom_id.startswith("dindon:mycard:"):
                 await self._mycard_component(data, user_id)
-            elif custom_id.startswith("dindon:map:"):
+            elif custom_id.startswith(("dindon:map:", "dindon:shape:")):
                 await self._map_period(data)
             elif custom_id.startswith("dindon:debat:"):
                 if self.debates is not None:
@@ -577,7 +584,7 @@ class Interactions:
         await self._mycard_screen(data, user_id, page, ("note", key, note), "Note enregistrée." if note else "Note retirée.", update=True)
 
     async def _map(self, data: dict, user_id: int, option: dict, text: dict) -> None:
-        """`/dindon map [periode] [personne]`: the picture is posted in the channel. Only the choices that the command offers are taken: anything else is ignored."""
+        """`/dindon map [periode] [personne] [forme]`: the picture is posted in the channel. Only the choices that the command offers are taken."""
         given = {o.get("name"): o.get("value") for o in option.get("options") or []}
         period = given.get("periode") if given.get("periode") in discord_map.PERIODS else "30"
         try:
@@ -590,20 +597,27 @@ class Interactions:
             await self._callback(data, CHANNEL_MESSAGE, text["wait"])
             return
         await self._callback(data, DEFERRED_MESSAGE, public=True)
-        await self._edit(data, await asyncio.to_thread(self.service.map, guild_id, period, focus))
+        shape = given.get("forme") if given.get("forme") in discord_map.SHAPES else "normal"
+        await self._edit(data, await asyncio.to_thread(self.service.map, guild_id, period, focus, shape))
 
     async def _map_period(self, data: dict) -> None:
-        """The menu under a map: the same message is drawn again for the period chosen (the person in focus is in the id of the menu, and read again)."""
+        """A menu under a map (the period, or the shape): the same message is drawn again for the choice (the person in focus, and the shape or the period that the
+        other menu holds, are in the id of the menu, and read again)."""
         try:
-            focus = int(str((data.get("data") or {})["custom_id"]).split(":")[2]) or None
-            period = (data["data"].get("values") or [""])[0]
+            parts = str((data.get("data") or {})["custom_id"]).split(":")
+            focus = int(parts[2]) or None
+            choice = (data["data"].get("values") or [""])[0]
             guild_id = int(data["guild_id"])
         except (IndexError, ValueError, KeyError, TypeError):
             return
-        if period not in discord_map.PERIODS:
+        if parts[1] == "shape":
+            period, shape = (parts[3] if len(parts) > 3 else "30"), choice
+        else:
+            period, shape = choice, (parts[3] if len(parts) > 3 else "normal")
+        if period not in discord_map.PERIODS or shape not in discord_map.SHAPES:
             return
         await self._callback(data, DEFERRED_UPDATE)
-        await self._edit(data, await asyncio.to_thread(self.service.map, guild_id, period, focus))
+        await self._edit(data, await asyncio.to_thread(self.service.map, guild_id, period, focus, shape))
 
     async def _page(self, data: dict) -> None:
         """A button of a card: the same message turns to another page. Anybody can turn the pages (the card is public); the person is read again, so that a card

@@ -15,7 +15,7 @@ Avant de le déployer auprès de vraies personnes, définir la durée de conserv
 | `/dindon reprendre` | autorise les enregistrements futurs, sans restaurer les données effacées |
 | `/dindon card pseudo:@personne` | publie une fiche dans le salon si la personne est enregistrée |
 | `/dindon mycard` | écran privé pour régler sa propre card : le contenu de chaque partie (blocs, positions montrées, petite note), avec les suggestions de Dindon |
-| `/dindon map [periode] [personne]` | publie l'image de la carte si l'administrateur l'a activée |
+| `/dindon map [periode] [personne] [forme]` | publie l'image de la carte si l'administrateur l'a activée. Avec une personne : seulement ses propres liens (pas ceux des autres entre eux), ceux avec qui elle échange le plus sont plus gros (jamais plus qu'elle) ; forme au choix : normale, spirale, étoile, carré, cœur, tête de dindon (aussi par un menu sous l'image) |
 | `/dindon debat [sujet]` | ouvre une fenêtre de paramètres ; le sujet peut être choisi à partir d'un axe actif |
 | `/dindon forum` | montre ou règle le forum des débats ; modification réservée aux modérateurs |
 

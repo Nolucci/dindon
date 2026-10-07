@@ -17,13 +17,13 @@ from dindon.debate.scope import Lookup
 from dindon.debate.search import FactCheckSearch, Hit, SearchError, SearxSearch
 from dindon.debate.trust import Trust
 from dindon.debate.verify import _fallback_query, decide, passages, verify_claim
+from dindon.debate.web import Page, WebError
 
 
 def test_false_predicate_does_not_hide_the_named_entity_from_second_search():
     assert _fallback_query("Marie Blachère est une enseigne d'équipements électroniques") == "Marie Blachère"
     assert _fallback_query("Le taux de chômage est de 12 %") == "Le taux de chômage est de 12 %"
     assert Trust().can_condemn("https://www.marieblachere.com/nos-produits/")
-from dindon.debate.web import Page, WebError
 
 
 class Model:

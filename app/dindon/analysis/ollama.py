@@ -172,7 +172,46 @@ class OllamaPool:
         self._failed: set[str] = set()
         self._cursor = 0
         self._busy: dict[str, int] = {}                  # calls in flight on each computer
+        self._activity: dict[str, dict] = {}              # what each computer is doing and has done since the last reset (counts only, never a text)
+        self._sent: dict[str, int] = {}                  # calls given to each computer since the last reset (for the shares)
+        self.shares: dict[str, int] = {}                 # percentage of the work by base_url; empty: equal split
         self._lock = threading.Lock()
+
+    def _act(self, url: str) -> dict:
+        return self._activity.setdefault(url, {"active": 0, "kind": None, "since": None, "calls": 0, "items": 0, "seconds": 0.0,
+                                               "errors": 0, "last_error": None, "last_at": None})
+
+    def activity(self) -> list[dict]:
+        """Live report for the analysis page: no network call, only what this pool has seen."""
+        now = time.time()
+        with self._lock:
+            total = sum(self._act(c.base_url)["calls"] for c in self.clients) or 1
+            rows = []
+            for client in self.clients:
+                a = self._act(client.base_url)
+                rows.append({"url": client.base_url, "local": client is self.local, "failed": client.base_url in self._failed,
+                             "active": a["active"], "kind": a["kind"] if a["active"] else None,
+                             "running_for": round(now - a["since"], 1) if a["active"] and a["since"] else None,
+                             "calls": a["calls"], "items": a["items"], "average": round(a["seconds"] / a["calls"], 2) if a["calls"] else None,
+                             "errors": a["errors"], "last_error": a["last_error"], "last_at": a["last_at"],
+                             "observed": round(100 * a["calls"] / total), "share": self.shares.get(client.base_url) if self.shares else None})
+            return rows
+
+    def set_shares(self, shares: dict[str, int] | None) -> None:
+        """Percentages by URL (the server included). A computer at 0 gets nothing unless it is the only one able to answer."""
+        with self._lock:
+            self.shares = {url: int(v) for url, v in (shares or {}).items()}
+            self._sent.clear()
+
+    def _pick(self, eligible: list[Ollama]) -> Ollama:
+        """The computer that is the furthest below its share. Without shares: the least busy one, a helper before the server. Call with the lock held."""
+        if not self.shares:
+            return min(eligible, key=lambda c: (self._busy.get(c.base_url, 0), c is self.local))
+        wanted = [c for c in eligible if self.shares.get(c.base_url, 0) > 0] or eligible
+        client = min(wanted, key=lambda c: ((self._sent.get(c.base_url, 0) + 1) / max(self.shares.get(c.base_url, 0), 1),
+                                            self._busy.get(c.base_url, 0), c is self.local))
+        self._sent[client.base_url] = self._sent.get(client.base_url, 0) + 1
+        return client
 
     @property
     def parallelism(self) -> int:
@@ -206,6 +245,8 @@ class OllamaPool:
         """Try previously failed helpers again for a new analysis."""
         with self._lock:
             self._failed.clear()
+            self._sent.clear()
+            self._activity.clear()
 
     def status(self, wanted: tuple[str, ...] = ()) -> list[dict]:
         """A fresh, content-free health report for the admin interface."""
@@ -232,17 +273,45 @@ class OllamaPool:
                 or self._digests.get(c.base_url, {}).get(f"{model}:latest")) == reference]
 
     def parallelism_for(self, model: str) -> int:
-        return max(1, len(self._eligible(model)))
+        eligible = self._eligible(model)
+        if self.shares:
+            eligible = [c for c in eligible if self.shares.get(c.base_url, 0) > 0] or eligible
+        return max(1, len(eligible))
+
+    def _timed(self, client: Ollama, method: str, *args):
+        """One call, recorded for the live report. `args[1]` is the list of texts for the vectors."""
+        kind, items = ("vecteurs", len(args[1])) if method == "embed" else ("nommage et lecture", 1)
+        started = time.monotonic()
+        with self._lock:
+            a = self._act(client.base_url)
+            a.update(active=a["active"] + 1, kind=kind, since=a["since"] if a["active"] else time.time())
+        try:
+            result = getattr(client, method)(*args)
+        except BaseException as error:
+            with self._lock:
+                a = self._act(client.base_url)
+                a["errors"] += 1
+                a["last_error"] = type(error).__name__ if isinstance(error, InterruptedError) else str(error)[:160]
+            raise
+        else:
+            with self._lock:
+                a = self._act(client.base_url)
+                a.update(calls=a["calls"] + 1, items=a["items"] + items, seconds=a["seconds"] + time.monotonic() - started, last_at=time.time())
+            return result
+        finally:
+            with self._lock:
+                a = self._act(client.base_url)
+                a["active"] -= 1
 
     def _call_on(self, client: Ollama, method: str, *args):
         try:
-            return getattr(client, method)(*args)
+            return self._timed(client, method, *args)
         except OllamaError:
             with self._lock:
                 self._failed.add(client.base_url)
             if client is self.local or self.local not in self._eligible(args[0]):
                 raise
-            return getattr(self.local, method)(*args)
+            return self._timed(self.local, method, *args)
 
     def embed(self, model: str, texts: list[str]) -> list[list[float]]:
         self._sync()
@@ -250,8 +319,11 @@ class OllamaPool:
         if not eligible:
             raise OllamaError(f"Le modèle {model} n'est installé sur aucun ordinateur d'analyse")
         with self._lock:
-            client = eligible[self._cursor % len(eligible)]
-            self._cursor += 1
+            if self.shares:
+                client = self._pick(eligible)
+            else:
+                client = eligible[self._cursor % len(eligible)]
+                self._cursor += 1
         return self._call_on(client, "embed", model, texts)
 
     def embed_batches(self, model: str, groups: list[list[str]]) -> list[list[list[float]]]:
@@ -269,7 +341,7 @@ class OllamaPool:
         # The computer with the fewest calls in flight; at equal load a helper (typically the Apple Silicon computer) before the server, which is the fallback.
         # With one call at a time this is the helper; with two at a time (see parallel.py) the second one goes to the server.
         with self._lock:
-            client = min(eligible, key=lambda candidate: (self._busy.get(candidate.base_url, 0), candidate is self.local))
+            client = self._pick(eligible)
             self._busy[client.base_url] = self._busy.get(client.base_url, 0) + 1
         try:
             return self._call_on(client, "chat_json", model, system, user, schema, num_ctx)

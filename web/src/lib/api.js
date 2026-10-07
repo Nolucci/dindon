@@ -69,6 +69,7 @@ export const api = {
   positionsPerson: (id, guild) => request(`/api/positions/person/${id}${query({ guild })}`),
   analysis: (guild) => request(`/api/analysis${query({ guild })}`),
   analysisWorkers: () => request('/api/performance/workers'),
+  analysisSharesSave: (shares) => request('/api/performance/workers/shares', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shares }) }),
   analysisWorkersSave: (urls) => request('/api/performance/workers', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ urls }) }),
   analysisStart: (body) => request('/api/analysis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   analysisReset: (guild, what) => request('/api/analysis/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guild, what }) }),

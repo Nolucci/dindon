@@ -16,12 +16,24 @@ from fastapi import HTTPException
 router = APIRouter(prefix="/api/performance", dependencies=[Depends(require_session)])
 
 
+def _equal(keys: list[str]) -> dict[str, int]:
+    """100 % split evenly; the remainder goes to the first ones (the server is listed first)."""
+    base, extra = divmod(100, len(keys))
+    return {key: base + (1 if index < extra else 0) for index, key in enumerate(keys)}
+
+
 @router.get("/workers")
 def workers(request: Request) -> dict:
     """Only the logged-in administrator can see the configured analysis computers."""
     client = request.app.state.analysis.client
-    return {"workers": client.status((request.app.state.analysis.embed_model, request.app.state.analysis.name_model)) if isinstance(client, OllamaPool) else [],
-            "configured": [c.base_url for c in client.clients if c is not client.local] if isinstance(client, OllamaPool) else []}
+    if not isinstance(client, OllamaPool):
+        return {"workers": [], "configured": [], "shares": {helpers.LOCAL: 100}}
+    configured = [c.base_url for c in client.clients if c is not client.local]
+    keys = [helpers.LOCAL, *configured]
+    with request.app.state.pool.connection() as conn:
+        stored = helpers.load_shares(conn)
+    shares = stored if stored and set(stored) == set(keys) else _equal(keys)
+    return {"workers": client.status((request.app.state.analysis.embed_model, request.app.state.analysis.name_model)), "configured": configured, "shares": shares}
 
 
 class WorkerList(BaseModel):
@@ -33,11 +45,30 @@ def set_workers(request: Request, body: WorkerList) -> dict:
     try:
         with request.app.state.pool.connection() as conn, conn.transaction():
             urls = helpers.save(conn, body.urls)
-            request.app.state.analysis.configure_helpers(urls)
+            request.app.state.analysis.configure_helpers(urls)      # a new list starts again from an equal split
+            helpers.clear_shares(conn)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from None
     except AnalysisBusy:
         raise HTTPException(status_code=409, detail="Attendez la fin de l'analyse avant de modifier les ordinateurs.") from None
+    return workers(request)
+
+
+class Shares(BaseModel):
+    shares: dict[str, int] = Field(max_length=9)
+
+
+@router.put("/workers/shares")
+def set_shares(request: Request, body: Shares) -> dict:
+    """The percentage of the work for the server ("local") and for each computer; it applies to the next calls, even during an analysis."""
+    client = request.app.state.analysis.client
+    configured = [c.base_url for c in client.clients if c is not client.local] if isinstance(client, OllamaPool) else []
+    try:
+        with request.app.state.pool.connection() as conn:
+            saved = helpers.save_shares(conn, body.shares, configured)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from None
+    request.app.state.analysis.set_shares(saved)
     return workers(request)
 
 

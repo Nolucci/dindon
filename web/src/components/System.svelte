@@ -158,6 +158,10 @@
   let workers = $state(null);
   let workerUrl = $state('');
   let workerNote = $state('');
+  let shareForm = $state(null);     // the percentage of the work by computer ("local" is the server), while it is edited
+  const shareKey = (worker) => (worker.local ? 'local' : worker.url);
+  const shareTotal = $derived(shareForm ? Object.values(shareForm).reduce((sum, v) => sum + (Number(v) || 0), 0) : 0);
+  const sharesChanged = $derived(shareForm && workers?.shares && JSON.stringify(shareForm) !== JSON.stringify(workers.shares));
   let form = $state(null);          // what the person is editing
   let saved = $state('');
   const PRESET_NAMES = { saver: 'Économe', balanced: 'Équilibré', full: 'Plein régime', custom: 'Personnalisé' };
@@ -177,6 +181,7 @@
   async function loadWorkers() {
     try {
       workers = await api.analysisWorkers();
+      shareForm = { ...workers.shares };
     } catch (error) {
       if (error instanceof AuthError) onAuthLost();
       else workerNote = error.message;
@@ -187,8 +192,31 @@
     workerNote = '';
     try {
       workers = await api.analysisWorkersSave(urls);
+      shareForm = { ...workers.shares };
       workerUrl = '';
       workerNote = 'Liste enregistrée. Les prochaines analyses utiliseront les ordinateurs connectés.';
+    } catch (error) {
+      if (error instanceof AuthError) onAuthLost();
+      else workerNote = error.message;
+    }
+  }
+
+  function setShare(key, value) {
+    shareForm = { ...shareForm, [key]: Math.max(0, Math.min(100, Math.round(Number(value) || 0))) };
+  }
+
+  function equalShares() {
+    const keys = Object.keys(shareForm);
+    const base = Math.floor(100 / keys.length);
+    shareForm = Object.fromEntries(keys.map((key, index) => [key, base + (index < 100 - base * keys.length ? 1 : 0)]));
+  }
+
+  async function saveShares() {
+    workerNote = '';
+    try {
+      workers = await api.analysisSharesSave(shareForm);
+      shareForm = { ...workers.shares };
+      workerNote = 'Répartition enregistrée. Elle s’applique dès les prochains calculs, même pendant une analyse.';
     } catch (error) {
       if (error instanceof AuthError) onAuthLost();
       else workerNote = error.message;
@@ -533,9 +561,24 @@
                   <code>{worker.local ? 'Serveur' : worker.url}</code>
                   {#if worker.online}<span class="muted small">{worker.usable?.length ? `Utilisé pour : ${worker.usable.join(', ')}` : 'Aucun modèle compatible avec le serveur'}</span>{/if}
                   {#if !worker.local}<button type="button" class="btn" onclick={() => saveWorkers(workers.configured.filter((url) => url !== worker.url))}>Retirer</button>{/if}
+                  {#if shareForm && workers.workers.length > 1}
+                    <label class="shareRow">
+                      <span class="muted small">Part du travail</span>
+                      <input type="range" min="0" max="100" step="5" value={shareForm[shareKey(worker)] ?? 0} oninput={(e) => setShare(shareKey(worker), e.currentTarget.value)} aria-label={`Part du travail de ${worker.local ? 'le serveur' : worker.url}, en pourcentage`} />
+                      <input class="field-input shareNumber" type="number" min="0" max="100" value={shareForm[shareKey(worker)] ?? 0} oninput={(e) => setShare(shareKey(worker), e.currentTarget.value)} aria-label="Pourcentage" /> %
+                    </label>
+                  {/if}
                 </li>
               {/each}
             </ul>
+            {#if shareForm && workers.workers.length > 1}
+              <div class="actions">
+                <span class="small" class:danger={shareTotal !== 100} role="status">Total : {shareTotal} %{shareTotal !== 100 ? ' (doit faire 100 %)' : ''}</span>
+                <button type="button" class="btn" onclick={equalShares}>Répartir également</button>
+                <button type="button" class="btn" disabled={shareTotal !== 100 || !sharesChanged} onclick={saveShares}>Enregistrer la répartition</button>
+              </div>
+              <p class="muted small">Un ordinateur à 0 % ne reçoit rien (le serveur reprend la main s’il est le seul à avoir le modèle). La répartition s’applique aux vecteurs et au nommage des thèmes.</p>
+            {/if}
           {:else}<p class="muted small">Le serveur travaille seul pour le moment.</p>{/if}
           <div class="actions">
             <input class="field-input" type="url" placeholder="http://100.x.y.z:11434" aria-label="Adresse Tailscale de l’ordinateur" bind:value={workerUrl} />
@@ -771,6 +814,9 @@
   .workerPanel .field-input { flex: 1 1 16rem; max-width: 25rem; }
   .workerList { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
   .workerList li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.625rem; }
+  .shareRow { display: flex; align-items: center; gap: 0.5rem; flex: 1 1 100%; }
+  .shareRow input[type="range"] { flex: 1 1 8rem; max-width: 18rem; }
+  .shareNumber { width: 4.5rem; flex: 0 0 auto; }
   .workerList code { overflow-wrap: anywhere; }
 
   .badge.small {

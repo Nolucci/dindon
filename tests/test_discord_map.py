@@ -22,8 +22,9 @@ def _small_png() -> bytes:
     return buffer.getvalue()
 
 
-def map_command(asker, *, period=None, person=None, id="950"):
-    options = ([{"type": 3, "name": "periode", "value": period}] if period else []) + ([{"type": 6, "name": "personne", "value": str(person)}] if person else [])
+def map_command(asker, *, period=None, person=None, shape=None, id="950"):
+    options = ([{"type": 3, "name": "periode", "value": period}] if period else []) + ([{"type": 6, "name": "personne", "value": str(person)}] if person else []) \
+        + ([{"type": 3, "name": "forme", "value": shape}] if shape else [])
     return {"id": id, "token": "tokm", "type": 2, "application_id": "42", "guild_id": GUILD, "member": {"user": {"id": str(asker)}},
             "data": {"name": "dindon", "options": [{"type": 1, "name": "map", "options": options}]}}
 
@@ -38,11 +39,12 @@ def posted(sent):
     return body, file
 
 
-def test_the_command_only_offers_periods_and_people(ingest_url, tmp_path):
+def test_the_command_offers_periods_people_and_shapes(ingest_url, tmp_path):
     option = next(o for o in COMMAND["options"] if o["name"] == "map")
-    periode, personne = option["options"]
+    periode, personne, forme = option["options"]
     assert [c["value"] for c in periode["choices"]] == ["7", "30", "90", "all"] and periode["type"] == 3
     assert personne["type"] == 6                                                          # Discord's picker of members: nothing typed freely
+    assert [c["value"] for c in forme["choices"]] == list(discord_map.SHAPES)
 
 
 def test_it_is_off_until_the_admins_switch_it_on(ingest_db, ingest_url, tmp_path):
@@ -84,6 +86,47 @@ def test_a_person_in_focus_shows_their_links_and_their_name(ingest_db, ingest_ur
     body, file = posted(sent)
     assert "autour de" in body["content"] and file is not None
     assert body["components"][0]["components"][0]["custom_id"] == f"dindon:map:{BOB_ID}"        # the menu keeps the person
+
+
+def test_a_person_in_focus_only_has_their_own_links(ingest_db, ingest_url, tmp_path):
+    talk(ingest_url)
+    cfg = discord_map.load(ingest_db) | {"enabled": True}
+    data = discord_map.collect(ingest_db, int(GUILD), 30, BOB_ID, cfg)
+    assert data["links"] and all(BOB_ID in (a, b) for a, b, _ in data["links"])
+
+
+def test_the_shape_is_chosen_with_the_command_and_a_menu(ingest_db, ingest_url, tmp_path):
+    talk(ingest_url)
+    switch_on(ingest_db)
+    interactions, service, sent, clock = commands(ingest_url, tmp_path)
+    asyncio.run(interactions.answer(map_command(CAROL_ID, person=BOB_ID, shape="heart")))
+    body, _ = posted(sent)
+    assert body["components"][0]["components"][0]["custom_id"] == f"dindon:map:{BOB_ID}:heart"      # changing the period keeps the shape
+    shape_menu = body["components"][1]["components"][0]
+    assert shape_menu["custom_id"] == f"dindon:shape:{BOB_ID}:30" and [o["value"] for o in shape_menu["options"] if o.get("default")] == ["heart"]
+    click = {"id": "952", "token": "tokm", "type": 3, "application_id": "42", "guild_id": GUILD, "member": {"user": {"id": str(CAROL_ID)}},
+             "data": {"custom_id": shape_menu["custom_id"], "component_type": 3, "values": ["star"]}}
+    asyncio.run(interactions.answer(click))
+    assert [o["value"] for o in posted(sent)[0]["components"][1]["components"][0]["options"] if o.get("default")] == ["star"]
+    period_click = {**click, "data": {**click["data"], "custom_id": f"dindon:map:{BOB_ID}:star", "values": ["7"]}}
+    asyncio.run(interactions.answer(period_click))
+    body, _ = posted(sent)
+    assert "7 derniers jours" in body["content"]
+    assert [o["value"] for o in body["components"][1]["components"][0]["options"] if o.get("default")] == ["star"]
+    assert body["components"][1]["components"][0]["custom_id"] == f"dindon:shape:{BOB_ID}:7"
+    count = len(sent.calls)
+    asyncio.run(interactions.answer({**click, "data": {**click["data"], "values": ["triangle"]}}))
+    assert len(sent.calls) == count                                                                   # a shape that is not offered: nothing
+
+
+def test_every_shape_places_everybody_around_the_person_and_the_closest_are_bigger():
+    people = [{"id": i, "label": f"p{i}", "color": None, "influence": 100 - i * 5 if i else 500} for i in range(12)]
+    data = {"people": people, "links": [(0, i, 100 - i * 5) for i in range(1, 12)], "focus": 0, "counts": {}}
+    for shape in discord_map.SHAPES:
+        assert Image.open(io.BytesIO(discord_map.render(data, 5, None, None, shape))).size == (discord_map.WIDTH, discord_map.HEIGHT)
+        if shape != "normal":
+            pos = discord_map._shaped(people, 0, shape)
+            assert tuple(pos[0]) == (0, 0) and len({tuple(p) for p in pos}) == len(people) and abs(pos).max() <= 1.0001
 
 
 def test_somebody_who_asked_to_stop_is_nowhere_on_the_map(ingest_db, ingest_url, tmp_path):

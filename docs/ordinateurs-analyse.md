@@ -69,6 +69,8 @@ Puis dans **Système → Performance → Ordinateurs d'analyse**, ajoutez `http:
 
 Ne mettez pas à jour le modèle de vecteurs du serveur juste pour rendre un ordinateur compatible si des vecteurs ont déjà été calculés : les anciens vecteurs restent associés au nom du modèle. Faites correspondre la version de l'auxiliaire à celle du serveur ou planifiez une reconstruction complète des vecteurs.
 
+Dès qu'il y a au moins deux machines (le serveur compte), le même panneau affiche un curseur **Part du travail** par ordinateur. Le total doit faire 100 %. « Répartir également » remet un partage égal, et un ordinateur à 0 % ne reçoit rien. La répartition s'applique aux vecteurs et au nommage des thèmes, et elle peut être changée pendant une analyse. Elle revient à un partage égal quand la liste des ordinateurs change.
+
 Lancez ensuite une analyse qui comporte des **vecteurs**. Le journal annonce le nombre d'ordinateurs configurés. Pour vérifier leur utilisation, observez l'activité d'Ollama sur les ordinateurs et le nombre de vecteurs terminés dans l'interface.
 
 Si un ordinateur s'éteint pendant une analyse, Dindon essaie de refaire sa requête sur l'Ollama du serveur si le même modèle y est installé. Une requête en cours peut attendre le délai d'expiration avant cette reprise ; retirez l'ordinateur hors ligne pour les analyses suivantes.

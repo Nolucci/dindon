@@ -4,7 +4,7 @@
   kinds of exchange. The settings are in `runtime_settings` like the automatic reading.
 * The data are the ones of the map of the interface (`api/routes.py`: same SQL, same weights), restricted to the settings. Whoever asked not to be recorded
   (`privacy_subjects`) is not on it, nor are bots. A picture is public in the channel: it shows only what the settings allow, never a message.
-* With a person in focus the map is their strongest links and the links between those people, so that a question about someone cannot show more than that.
+* With a person in focus the map shows only their strongest links, so that a question about someone cannot show more than that.
 * Drawn with Pillow (twice as large, then reduced, for smooth lines); the places come from a small force-directed layout (numpy), the same every time for the
   same data. The interactive version (Discord Activity) comes with the public URL of the production.
 """
@@ -47,6 +47,7 @@ WEIGHTS = (0.0, 0.5, 1.0, 3.0, 10.0)
 MIN_SCORE = 0.3          # an axis is shown when the person stands at least this far from the middle (as on the card of /dindon card)
 DEFAULT = {"enabled": False, "max_people": 40, "names": 15, "kinds": list(KINDS), "sections": ["activity", "months", "habits", "links"], "filters": ["weight"],
            "acknowledged": False}
+SHAPES = {"normal": "Normale", "spiral": "Spirale", "star": "Étoile", "square": "Carré", "heart": "Cœur", "dindon": "Tête de dindon"}
 WIDTH, HEIGHT, SCALE = 1280, 720, 2          # 16:9, like the background (and like the Activity)
 ASSETS = Path(__file__).parent / "assets"
 PANEL_WIDTH = 350                              # the card of the person, on the right
@@ -102,7 +103,7 @@ def collect(conn: psycopg.Connection, guild_id: int, days: int | None, focus: in
             if focus in (r["a"], r["b"]):
                 near[r["b"] if r["a"] == focus else r["a"]] = r["weight"]
         keep = {focus} | set(sorted(near, key=near.get, reverse=True)[:cfg["max_people"] - 1])
-        rows = [r for r in rows if r["a"] in keep and r["b"] in keep]
+        rows = [r for r in rows if focus in (r["a"], r["b"]) and r["a"] in keep and r["b"] in keep]     # only the links of the person: not the ones between the others
     influence: dict[int, float] = {}
     for r in rows:
         influence[r["a"]] = influence.get(r["a"], 0) + r["weight"]
@@ -218,6 +219,57 @@ def _layout(people: list[dict], links: list[tuple], focus: int | None, seed: int
         pos -= pos.mean(axis=0)
     span = np.abs(pos).max(axis=0)                  # (with a person in focus, they are at 0: the same scale on both sides keeps them at the center)
     return pos / np.where(span > 0, span, 1)
+
+
+def _outline(shape: str) -> list[tuple[float, float]]:
+    """The closed outline of a shape, as points (x right, y down) around (0, 0), where the person in focus stands."""
+    def arc(cx, cy, r, a0, a1, step=5):
+        count = max(int(abs(a1 - a0) / step), 1)
+        return [(cx + r * math.cos(math.radians(a0 + (a1 - a0) * i / count)), cy - r * math.sin(math.radians(a0 + (a1 - a0) * i / count))) for i in range(count)]
+    if shape == "square":
+        return [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+    if shape == "star":
+        return [(r * math.sin(math.radians(36 * i)), -r * math.cos(math.radians(36 * i))) for i, r in ((i, 1 if i % 2 == 0 else 0.42) for i in range(10))]
+    if shape == "heart":
+        pts = [(16 * math.sin(t) ** 3, -(13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t))) for t in (i * math.pi / 90 for i in range(180))]
+        cy = sum(y for _, y in pts) / len(pts)
+        return [(x, y - cy) for x, y in pts]
+    if shape == "dindon":                                           # the head, seen from the side: the crest, the beak to the right, the wattle under it
+        r = 0.75
+        crest = [(r * k * math.cos(math.radians(a)), -r * k * math.sin(math.radians(a))) for a, k in ((125, 1.0), (115, 1.4), (100, 1.05), (90, 1.5), (80, 1.05), (65, 1.4), (50, 1.0))]
+        beak = [(r * math.cos(math.radians(20)), -r * math.sin(math.radians(20))), (1.15, 0.0), (r * math.cos(math.radians(-18)), -r * math.sin(math.radians(-18)))]
+        wattle = [(0.5, 0.45), (0.62, 0.9), (0.3, 1.0), (0.12, 0.7)]
+        return crest + arc(0, 0, r, 40, 22, 6) + beak + wattle + arc(0, 0, r, -85, -235, 6)
+    return []
+
+
+def _along(outline: list[tuple[float, float]], count: int) -> list[tuple[float, float]]:
+    """`count` points spread evenly along the closed outline."""
+    closed = outline + outline[:1]
+    lengths = [math.dist(closed[i], closed[i + 1]) for i in range(len(outline))]
+    total = sum(lengths) or 1
+    out, edge, walked = [], 0, 0.0
+    for i in range(count):
+        target = total * i / count
+        while edge < len(lengths) - 1 and walked + lengths[edge] < target:
+            walked += lengths[edge]
+            edge += 1
+        t = (target - walked) / lengths[edge] if lengths[edge] else 0
+        out.append((closed[edge][0] + (closed[edge + 1][0] - closed[edge][0]) * t, closed[edge][1] + (closed[edge + 1][1] - closed[edge][1]) * t))
+    return out
+
+
+def _shaped(people: list[dict], focus: int, shape: str) -> np.ndarray:
+    """Places around the person in focus (at the center) the others along the shape, the ones they exchanged the most with first. A spiral starts close to them and widens."""
+    others = [p for p in people if p["id"] != focus]
+    n = max(len(others), 1)
+    if shape == "spiral":
+        spots = [((0.22 + 0.78 * t) * math.cos(t * 5 * math.pi), (0.22 + 0.78 * t) * math.sin(t * 5 * math.pi)) for t in ((i + 0.5) / n for i in range(n))]
+    else:
+        spots = _along(_outline(shape), n)
+    place = {p["id"]: spot for p, spot in zip(others, spots, strict=False)}
+    pos = np.array([place.get(p["id"], (0.0, 0.0)) for p in people], dtype=float)
+    return pos / (np.abs(pos).max() or 1)                          # the same scale on both axes: a heart stays a heart
 
 
 def _printable(label: str) -> str:
@@ -366,9 +418,10 @@ def _card(canvas: Image.Image, card: dict, x0: int, y0: int, x1: int, y1: int, p
     canvas.alpha_composite(layer)
 
 
-def render(data: dict, names: int, pictures: dict[int, bytes] | None = None, card: dict | None = None) -> bytes:
+def render(data: dict, names: int, pictures: dict[int, bytes] | None = None, card: dict | None = None, shape: str = "normal") -> bytes:
     """The PNG of the map, in the look of the Activity: the background, a panel with the people as their photo in a ring of the color of their name (a plain disc without
-    photo), their name for the most connected ones; with a person in focus, them at the center and, on the right, their card (`card`: what `person()` returns)."""
+    photo), their name for the most connected ones; with a person in focus, them at the center, the others on the `shape` and bigger the more they exchanged with them, and, on
+    the right, their card (`card`: what `person()` returns)."""
     pictures = pictures or {}
     people, focus = data["people"], data["focus"]
     S = SCALE
@@ -383,14 +436,24 @@ def render(data: dict, names: int, pictures: dict[int, bytes] | None = None, car
     canvas.alpha_composite(shapes)
 
     seed = zlib.crc32(json.dumps([p["id"] for p in people]).encode())
-    pos = _layout(people, data["links"], focus, seed)
+    shaped = focus is not None and shape in SHAPES and shape != "normal"
+    pos = _shaped(people, focus, shape) if shaped else _layout(people, data["links"], focus, seed)
     inset_x, inset_y = 70 * S, 62 * S
-    xy = {p["id"]: (margin + inset_x + (pos[i][0] + 1) / 2 * (map_right - margin - 2 * inset_x), margin + inset_y + (pos[i][1] + 1) / 2 * (h - 2 * margin - 2 * inset_y))
-          for i, p in enumerate(people)}
-    top = max((p["influence"] for p in people), default=1) or 1
+    room_x, room_y = map_right - margin - 2 * inset_x, h - 2 * margin - 2 * inset_y
+    if shaped:
+        room_x = room_y = min(room_x, room_y)                   # (the shape is not stretched to the panel)
+    center_x, center_y = (margin + map_right) / 2, h / 2
+    xy = {p["id"]: (center_x + pos[i][0] * room_x / 2, center_y + pos[i][1] * room_y / 2) for i, p in enumerate(people)} if shaped else \
+        {p["id"]: (margin + inset_x + (pos[i][0] + 1) / 2 * room_x, margin + inset_y + (pos[i][1] + 1) / 2 * room_y) for i, p in enumerate(people)}
+    top = max((p["influence"] for p in people if p["id"] != focus), default=1) or 1      # (the person in focus has the sum of all the links: the others are compared with each other)
     strongest = max((weight for *_, weight in data["links"]), default=1) or 1
     lines = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     line = ImageDraw.Draw(lines)
+    if shaped:                                                  # a thin line from one to the next along the shape, so that it can be recognized: it is not an exchange
+        ring = [p["id"] for p in people if p["id"] != focus]
+        for a, b in zip(ring, ring[1:] + ([ring[0]] if shape != "spiral" else []), strict=False):
+            if a != b:
+                line.line([xy[a], xy[b]], fill=EDGE + (60,), width=S)
     for a, b, weight in sorted(data["links"], key=lambda link: link[2]):
         strength = math.sqrt(weight / strongest)
         lit = focus is not None and focus in (a, b)
@@ -400,6 +463,9 @@ def render(data: dict, names: int, pictures: dict[int, bytes] | None = None, car
 
     colors = {p["id"]: _node_color(p["color"]) for p in people}
     sizes = {p["id"]: int((24 + 30 * math.sqrt(p["influence"] / top)) * S) if pictures.get(p["id"]) else int((10 + 14 * math.sqrt(p["influence"] / top)) * S) for p in people}
+    if focus is not None:                                       # the person in the middle is always the biggest, the others by how much they exchanged with them
+        sizes = {p["id"]: int((60 if pictures.get(p["id"]) else 28) * S) if p["id"] == focus else int(((22 + 24 * math.sqrt(p["influence"] / top)) if pictures.get(p["id"])
+                 else (9 + 12 * math.sqrt(p["influence"] / top))) * S) for p in people}
     for p in reversed(people):                                  # the least connected first: the most connected ones are drawn over
         x, y = xy[p["id"]]
         size = sizes[p["id"]] + (6 * S if p["id"] == focus else 0)

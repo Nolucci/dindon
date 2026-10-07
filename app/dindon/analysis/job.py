@@ -72,15 +72,23 @@ class AnalysisJobs:
 
     def status(self) -> dict:
         with self._lock:
-            return {**self._state, "lines": list(self._lines)}
+            return {**self._state, "lines": list(self._lines),
+                    "computers": self.client.activity() if isinstance(self.client, OllamaPool) and len(self.client.clients) > 1 else []}
 
-    def configure_helpers(self, urls: tuple[str, ...]) -> None:
-        """Change helpers between analyses; an active job keeps its current client."""
+    def configure_helpers(self, urls: tuple[str, ...], shares: dict[str, int] | None = None) -> None:
+        """Change helpers between analyses; an active job keeps its current client. `shares`: percentage by URL ("local" is the server)."""
         with self._lock:
             if self._thread is not None and self._thread.is_alive():
                 raise AnalysisBusy()
             self.client = OllamaPool(self._settings.ollama_url, urls) if urls else Ollama(self._settings.ollama_url)
             self._ready = None
+        self.set_shares(shares)
+
+    def set_shares(self, shares: dict[str, int] | None) -> None:
+        """Change the split of the work, also while an analysis runs (the next call follows it)."""
+        if isinstance(self.client, OllamaPool):
+            local = self.client.local.base_url
+            self.client.set_shares({(local if url == "local" else url.rstrip("/")): pct for url, pct in shares.items()} if shares else None)
 
     def start(self, guild_id: int, stages: tuple[str, ...] = STAGES, *, topics: int | None = None, rebuild: bool = False, limit: int | None = None,
               rounds: int | None = 1) -> None:

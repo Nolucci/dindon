@@ -42,6 +42,44 @@ def test_embedding_batches_use_both_computers_and_retry_locally():
         local.stop()
 
 
+def test_shares_split_the_work_in_percent_and_zero_gets_nothing():
+    local = FakeOllama().start()
+    helper = FakeOllama().start()
+    try:
+        pool = OllamaPool(local.url, (helper.url,), timeout=1)
+        pool.models()
+        pool.set_shares({local.url: 25, helper.url: 75})
+        pool.embed_batches("bge-m3", [[str(i)] for i in range(8)])
+        count = lambda fake: sum(path == "/api/embed" for path, _ in fake.requests)
+        assert (count(local), count(helper)) == (2, 6)
+        seen = {row["url"]: row for row in pool.activity()}
+        assert seen[local.url]["calls"] == 2 and seen[helper.url]["calls"] == 6 and seen[helper.url]["items"] == 6
+        assert seen[helper.url]["observed"] == 75 and seen[helper.url]["share"] == 75 and seen[helper.url]["active"] == 0
+        pool.set_shares({local.url: 100, helper.url: 0})
+        before = count(helper)
+        pool.embed_batches("bge-m3", [[str(i)] for i in range(4)])
+        assert count(helper) == before
+    finally:
+        local.stop()
+        helper.stop()
+
+
+def test_administrator_sets_shares_and_they_survive_a_restart(ingest_url, ingest_db, tmp_path, monkeypatch):
+    monkeypatch.setattr(OllamaPool, "status", lambda self, wanted: [{"url": c.base_url, "online": True, "models": [], "usable": [], "local": c is self.local} for c in self.clients])
+    url = "http://100.101.102.103:11434"
+    with TestClient(create_app(settings_for(ingest_url, tmp_path, "password"), background=False)) as web:
+        assert web.post("/api/login", json={"password": "password"}).status_code == 200
+        assert web.put("/api/performance/workers", json={"urls": [url]}).json()["shares"] == {"local": 50, url: 50}
+        assert web.put("/api/performance/workers/shares", json={"shares": {"local": 30, url: 70}}).json()["shares"] == {"local": 30, url: 70}
+        for bad in ({"local": 50, url: 40}, {"local": 100}, {"local": 120, url: -20}, {"local": 50, "http://100.1.1.1:11434": 50}):
+            assert web.put("/api/performance/workers/shares", json={"shares": bad}).status_code == 422
+    with TestClient(create_app(settings_for(ingest_url, tmp_path, "password"), background=False)) as restarted:
+        assert restarted.post("/api/login", json={"password": "password"}).status_code == 200
+        assert restarted.get("/api/performance/workers").json()["shares"] == {"local": 30, url: 70}
+        assert restarted.app.state.analysis.client.shares[url] == 70
+        assert restarted.put("/api/performance/workers", json={"urls": []}).status_code == 200
+
+
 def test_administrator_can_add_and_remove_helper_without_restarting(ingest_url, ingest_db, tmp_path, monkeypatch):
     monkeypatch.setattr(OllamaPool, "status", lambda self, wanted: [{"url": c.base_url, "online": True, "models": [], "usable": [], "local": c is self.local} for c in self.clients])
     app = create_app(settings_for(ingest_url, tmp_path, "password"), background=False)

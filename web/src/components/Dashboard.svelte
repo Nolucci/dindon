@@ -396,7 +396,7 @@
       <main>
         <div class="canvas" class:with-card={selectedId} bind:this={container} aria-label="Carte des échanges"></div>
 
-        <div class="zoomPad" role="group" aria-label="Zoom de la carte">
+        <div class="zoomPad" class:with-card={selectedId} role="group" aria-label="Zoom de la carte">
           <button type="button" class="zoomBtn" aria-label="Zoomer" onclick={() => map?.zoomIn()}>+</button>
           <button type="button" class="zoomBtn" aria-label="Dézoomer" onclick={() => map?.zoomOut()}>−</button>
           <button type="button" class="zoomBtn" aria-label="Recentrer la carte" onclick={() => map?.resetView()}>⌂</button>
@@ -717,7 +717,7 @@
 
     /* The card of a person opens as a sheet at the bottom: the map stays visible above it */
     .canvas.with-card { right: 0; bottom: 62%; }
-    .zoomPad:has(~ aside) { display: none; }
+    .zoomPad.with-card { display: none; }
   }
 
   /* On a phone the legend only keeps its first line: there is nothing to hover with a finger */
