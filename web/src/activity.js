@@ -268,17 +268,18 @@ let loader = null;
 
 // What the map asked for: the same words for the map and for a card, so that a card is read in the map that is on the screen
 const mapQuery = () => `guild=${guild}&period=${$('period').value}${kinds ? `&kinds=${[...kinds].join(',')}` : ''}${focused ? `&focus=${focused}` : ''}`
-  + `${narrowed.weight !== '0' ? `&weight=${narrowed.weight}` : ''}${narrowed.theme ? `&theme=${narrowed.theme}` : ''}${narrowed.ideology ? `&ideology=${narrowed.ideology}` : ''}`;
+  + `${narrowed.weight !== '0' ? `&weight=${narrowed.weight}` : ''}${narrowed.theme ? `&theme=${narrowed.theme}` : ''}${narrowed.ideology ? `&ideology=${narrowed.ideology}` : ''}${narrowed.people ? `&people=${narrowed.people}` : ''}`;
 
 // What the person narrowed the map to, among the filters that the admins offer (the server ignores any other)
-const narrowed = { weight: '0', theme: '', ideology: '' };
+const narrowed = { weight: '0', theme: '', ideology: '', people: '' };
+const PEOPLE_CHOICES = [10, 20, 40, 80, 150, 250];       // how many people the member may choose to see, below what the administrators allow
 const WEIGHT_CHOICES = [['0', 'Force : tous'], ['0.5', 'Force : ≥ 0,5'], ['1', 'Force : ≥ 1'], ['3', 'Force : ≥ 3'], ['10', 'Force : ≥ 10']];
 let filtersDrawn = '';
 
 function drawFilters(meta) {
   const allowed = meta.filters_allowed ?? [];
   const choices = meta.choices ?? {};
-  const signature = JSON.stringify([allowed, choices]);
+  const signature = JSON.stringify([allowed, choices, meta.max_people]);
   if (signature === filtersDrawn) return;                    // the same choices: the selects keep what the person picked
   filtersDrawn = signature;
   const select = (key, label, options) => {
@@ -289,6 +290,7 @@ function drawFilters(meta) {
     return box;
   };
   const boxes = [];
+  if (meta.max_people > PEOPLE_CHOICES[0]) boxes.push(select('people', 'Nombre de personnes affichées', [['', `Personnes : ${meta.max_people}`], ...PEOPLE_CHOICES.filter((n) => n < meta.max_people).map((n) => [String(n), `Personnes : ${n}`])]));
   if (allowed.includes('weight')) boxes.push(select('weight', 'Force minimale des liens', WEIGHT_CHOICES));
   if (allowed.includes('theme') && choices.themes?.length) boxes.push(select('theme', 'Thème', [['', 'Thème : tous'], ...choices.themes.map((t) => [String(t.id), t.label])]));
   if (allowed.includes('ideology') && choices.ideologies?.length) boxes.push(select('ideology', 'Rôle d’idées', [['', 'Rôle : tous'], ...choices.ideologies.map((i) => [String(i.id), i.name])]));
@@ -392,7 +394,7 @@ async function load() {
     people = data.nodes.filter((n) => n.label).sort((a, b) => b.influence - a.influence);
     for (const node of data.nodes) nodeColors.set(node.id, node.color || '#dbdee1');
     loader.show(data.nodes);
-    $('reset').hidden = !($('period').value !== '30' || (kinds && kinds.size < (data.meta.kinds_allowed ?? []).length) || narrowed.weight !== '0' || narrowed.theme || narrowed.ideology);
+    $('reset').hidden = !($('period').value !== '30' || (kinds && kinds.size < (data.meta.kinds_allowed ?? []).length) || narrowed.weight !== '0' || narrowed.theme || narrowed.ideology || narrowed.people);
     note(data.nodes.length ? `${data.nodes.length} personnes, ${data.edges.length} liens` : 'Rien à montrer pour cette période.');
     return true;
   } catch (error) {
@@ -421,7 +423,7 @@ async function start() {
   $('reset').onclick = () => {
     $('period').value = '30';
     kinds = null;
-    Object.assign(narrowed, { weight: '0', theme: '', ideology: '' });
+    Object.assign(narrowed, { weight: '0', theme: '', ideology: '', people: '' });
     filtersDrawn = '';
     shown = focused = null;
     $('card').hidden = true;

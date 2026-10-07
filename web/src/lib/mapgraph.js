@@ -502,23 +502,27 @@ export class MapGraph {
     this.islands = [];
     if (this.graph.order < 2) return;
     const inferred = forceAtlas2.inferSettings(this.graph);
+    const big = this.graph.order > 400;
+    // The cost of the placement grows fast with the number of people: beyond a few hundred, no overlap test between points (it is the heaviest part, and `spread` evens the
+    // distances out afterwards anyway), the tree approximation of the forces, and a shorter run
     const settings = {
       ...inferred,
       scalingRatio: Math.max(inferred.scalingRatio ?? 10, 8) * 1.8, // more repulsion: names need room
       slowDown: 3,
       gravity: 0.35,
       edgeWeightInfluence: 0.7,
-      adjustSizes: true,                                            // points do not overlap
+      adjustSizes: !big,                                            // points do not overlap (small maps only)
       getEdgeWeight: 'layoutWeight',
-      barnesHutOptimize: this.graph.order > 400,
+      barnesHutOptimize: this.graph.order > 150,
     };
     this.layout = new FA2Layout(this.graph, { settings });
     this.layout.start();
+    const duration = this.graph.order > 1500 ? milliseconds * 0.6 : milliseconds;
     this.layoutTimer = setTimeout(() => {
       this.layout?.kill();                                          // a worker that is gone cannot write over the next step
       this.layout = null;
       this.spread();
-    }, milliseconds);
+    }, duration);
   }
 
   // ForceAtlas2 piles the people up in the middle and leaves the edges empty. Once it has placed them, each one keeps their direction from the
@@ -617,7 +621,8 @@ export class MapGraph {
     this.nodeKinds.set(from, KIND_COLOR[kind] ?? FLASH_COLOR);
     this.nodeKinds.set(to, KIND_COLOR[kind] ?? FLASH_COLOR);
     this.pulses.push({ from, to, kind, since: now });
-    if (this.pulses.length > 80) this.pulses.splice(0, this.pulses.length - 80);   // a flood of messages: the oldest lights go out first
+    const maxPulses = this.graph.order > 1200 ? 30 : 80;
+    if (this.pulses.length > maxPulses) this.pulses.splice(0, this.pulses.length - maxPulses);   // a flood of messages: the oldest lights go out first
     this.container.dataset.flashes = String(++this.flashCount); // a counter, so that the page can be tested from outside
     this.animate();
     return true;
@@ -625,8 +630,14 @@ export class MapGraph {
 
   animate() {
     if (this.frame) return;
+    let last = 0;
     const tick = () => {
       const now = performance.now();
+      if (this.graph.order > 1200 && now - last < 33) {              // a big map is redrawn at 30 images a second at most: the lights lose nothing, the page stays light
+        this.frame = requestAnimationFrame(tick);
+        return;
+      }
+      last = now;
       for (const map of [this.flashes, this.nodeFlashes]) {
         for (const [key, since] of map) if (now - since >= FLASH_MS) map.delete(key);
       }

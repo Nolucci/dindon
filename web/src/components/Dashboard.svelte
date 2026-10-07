@@ -16,6 +16,8 @@
 
   let { onLogout } = $props();
 
+  const PEOPLE_STEPS = [10, 25, 50, 100, 200, 500, 1000, 3000];     // the slider on the map: how many people at most (the most connected first)
+  const PEOPLE_STEPS_DEFAULT = 3000;
   const PRESETS = [
     { id: 'all', label: 'Tout', days: null },
     { id: '90', label: '90 j', days: 90 },
@@ -44,6 +46,7 @@
   let role = $state('');
   let minWeight = $state('0');
   let mapOptions = $state({ channels: [], themes: [], roles: [] });
+  let people = $state(String(PEOPLE_STEPS_DEFAULT)); // how many people at most, the most connected first (a slider on the map itself)
   let density = $state('2500'); // how many links to draw at most: the strongest ones first
   let showImport = $state(false); // the window to import a part of the server
   let showInvite = $state(false); // the window to invite the bot to a server
@@ -85,9 +88,9 @@
   let showsPresent = $derived(preset !== 'custom' || !until);
   let noKind = $derived(!KINDS.some((k) => kinds[k.id]));
 
-  const DEFAULTS = { preset: 'all', density: '2500', minWeight: '0' };
+  const DEFAULTS = { preset: 'all', density: '2500', minWeight: '0', people: String(PEOPLE_STEPS_DEFAULT) };
   // Something differs from what the map shows when it is opened
-  let dirty = $derived(preset !== DEFAULTS.preset || since !== '' || until !== '' || !KINDS.every((k) => kinds[k.id]) || density !== DEFAULTS.density
+  let dirty = $derived(preset !== DEFAULTS.preset || since !== '' || until !== '' || !KINDS.every((k) => kinds[k.id]) || density !== DEFAULTS.density || people !== DEFAULTS.people
     || channel !== '' || theme !== '' || role !== '' || minWeight !== DEFAULTS.minWeight || !showIsolated || grouped || query !== '');
 
   function resetFilters() {
@@ -95,6 +98,7 @@
     since = until = '';
     kinds = { reply: true, mention: true, reaction: true };
     density = DEFAULTS.density;
+    people = DEFAULTS.people;
     channel = theme = role = '';
     minWeight = DEFAULTS.minWeight;
     showIsolated = true;
@@ -113,7 +117,7 @@
   }
 
   function graphParams() {
-    const params = { guild, kinds: KINDS.filter((k) => kinds[k.id]).map((k) => k.id).join(','), max_edges: density, isolated: showIsolated,
+    const params = { guild, kinds: KINDS.filter((k) => kinds[k.id]).map((k) => k.id).join(','), max_edges: density, limit: people, isolated: showIsolated,
       channels: channel || undefined, theme: theme || undefined, role: role || undefined, min_weight: Number(minWeight) || undefined };
     const days = PRESETS.find((p) => p.id === preset)?.days;
     if (days) params.since = new Date(Date.now() - days * 86400000).toISOString();
@@ -392,6 +396,13 @@
       <main>
         <div class="canvas" class:with-card={selectedId} bind:this={container} aria-label="Carte des échanges"></div>
 
+        <label class="people" class:with-card={selectedId} title="Combien de personnes afficher sur la carte : les plus connectées d’abord. Moins de monde, c’est aussi une carte plus fluide.">
+          <span>Personnes</span>
+          <input type="range" min="0" max={PEOPLE_STEPS.length - 1} step="1" value={Math.max(PEOPLE_STEPS.indexOf(Number(people)), 0)} aria-label="Nombre de personnes affichées"
+                 oninput={(e) => { people = String(PEOPLE_STEPS[Number(e.currentTarget.value)]); }} onchange={reloadSoon} />
+          <output>{meta ? `${fmt.format(meta.nodes_shown)} / ` : ''}{fmt.format(Number(people))}</output>
+        </label>
+
         {#if !loading && !guilds.length}
           <div class="empty">
             <h2>Aucun serveur importé</h2>
@@ -511,6 +522,24 @@
     overflow: hidden;
     background: var(--bg-primary);
   }
+
+  .people {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+  .people input { width: 7.5rem; accent-color: var(--accent, #5865f2); }
+  .people output { min-width: 5rem; font-variant-numeric: tabular-nums; color: var(--text-primary); }
 
   .canvas.with-card {
     right: min(22.5rem, 100%); /* the map stays whole, next to the card */

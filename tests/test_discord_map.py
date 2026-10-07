@@ -426,3 +426,14 @@ def test_the_member_narrows_the_map_only_with_the_filters_that_the_admins_offer(
     assert member_map(activity_web, theme=999999).json()["edges"] == []                        # no conversation about it
     assert member_map(activity_web, ideology=999).json()["edges"] == []                        # nobody has this role
     assert member_card(activity_web, BOB_ID, ideology=999).status_code == 404                  # the card follows the same filter
+
+
+def test_a_member_chooses_how_many_people_to_see_never_more_than_the_administrators_allow(ingest_db, ingest_url, activity_web):
+    talk(ingest_url)
+    discord_map.save(ingest_db, {"enabled": True, "max_people": 5, "names": 5})
+    everyone = member_map(activity_web).json()
+    assert len(everyone["nodes"]) == 3 and everyone["meta"]["max_people"] == 5 and everyone["meta"]["people"] == 5
+    two = member_map(activity_web, people=2).json()
+    assert len(two["nodes"]) == 2 and two["meta"]["people"] == 2 and sum(1 for n in two["nodes"] if n["label"]) <= 2
+    assert member_map(activity_web, people=300).json()["meta"]["people"] == 5                  # the ceiling is the administrators'
+    assert member_map(activity_web, people=0).status_code == 422 and member_map(activity_web, people="x").status_code == 422

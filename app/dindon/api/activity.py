@@ -102,6 +102,15 @@ def _kinds(cfg: dict, wanted: str) -> dict:
     return {**cfg, "kinds": chosen or cfg["kinds"]}
 
 
+def _people(cfg: dict, wanted: int | None) -> dict:
+    """The settings, with the number of people that the member chose to see on the page: never more than the administrators allow (their number stays the ceiling), and the names follow
+    (a name is shown only for a person who is shown)."""
+    if not wanted:
+        return cfg
+    people = max(1, min(int(wanted), cfg["max_people"]))
+    return {**cfg, "max_people": people, "names": min(cfg["names"], people)}
+
+
 def _narrow(weight: float, theme: int | None, ideology: int | None) -> dict:
     """What the member narrowed the map to. A strength that the page does not offer is refused; whether the admins allow each filter is decided in `discord_map.collect`."""
     if weight not in discord_map.WEIGHTS:
@@ -132,14 +141,16 @@ def _enabled(conn, guild: int) -> dict:
 
 @router.get("/map")
 def activity_map(request: Request, guild: int, period: str = Query("30", max_length=3), focus: int | None = None, kinds: str = Query("", max_length=40),
-                 weight: float = 0, theme: int | None = None, ideology: int | None = None, authorization: str = Header("")) -> dict:
+                 weight: float = 0, theme: int | None = None, ideology: int | None = None, people: int | None = Query(None, ge=1, le=1000),
+                 authorization: str = Header("")) -> dict:
     _read(request, guild, period, authorization)
     with request.app.state.pool.connection() as conn:
         allowed = _enabled(conn, guild)
-        cfg = _kinds(allowed, kinds)
+        cfg = _people(_kinds(allowed, kinds), people)
         data = discord_map.collect(conn, guild, discord_map.PERIODS[period][1], focus, cfg, _narrow(weight, theme, ideology))
         choices = _choices(conn, guild, cfg)
-    meta = {"period": period, "generated_at": iso(utc_now()), "kinds_allowed": allowed["kinds"], "kinds": cfg["kinds"], "filters_allowed": cfg["filters"], "choices": choices}
+    meta = {"period": period, "generated_at": iso(utc_now()), "kinds_allowed": allowed["kinds"], "kinds": cfg["kinds"], "filters_allowed": cfg["filters"], "choices": choices,
+            "max_people": allowed["max_people"], "people": cfg["max_people"]}
     if data is None:
         return {"meta": meta, "nodes": [], "edges": []}
     shown = discord_map.named(data, cfg)
@@ -155,11 +166,12 @@ def activity_map(request: Request, guild: int, period: str = Query("30", max_len
 
 @router.get("/person/{user_id}")
 def activity_person(request: Request, user_id: int, guild: int, period: str = Query("30", max_length=3), focus: int | None = None, kinds: str = Query("", max_length=40),
-                    weight: float = 0, theme: int | None = None, ideology: int | None = None, authorization: str = Header("")) -> dict:
+                    weight: float = 0, theme: int | None = None, ideology: int | None = None, people: int | None = Query(None, ge=1, le=1000),
+                    authorization: str = Header("")) -> dict:
     """The card of a person on the map (the period and the person in focus are those of the map being looked at, so that the names are the ones that it shows)."""
     _read(request, guild, period, authorization)
     with request.app.state.pool.connection() as conn:
-        cfg = _kinds(_enabled(conn, guild), kinds)
+        cfg = _people(_kinds(_enabled(conn, guild), kinds), people)
         data = discord_map.collect(conn, guild, discord_map.PERIODS[period][1], focus, cfg, _narrow(weight, theme, ideology))
         card = discord_map.person(conn, guild, user_id, data, cfg) if data else None
     if card is None:
