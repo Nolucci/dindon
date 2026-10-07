@@ -7,9 +7,38 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 from dindon import performance
+from dindon.analysis import helpers
+from dindon.analysis.job import AnalysisBusy
+from dindon.analysis.ollama import OllamaPool
 from dindon.api.auth import require_session
+from fastapi import HTTPException
 
 router = APIRouter(prefix="/api/performance", dependencies=[Depends(require_session)])
+
+
+@router.get("/workers")
+def workers(request: Request) -> dict:
+    """Only the logged-in administrator can see the configured analysis computers."""
+    client = request.app.state.analysis.client
+    return {"workers": client.status((request.app.state.analysis.embed_model, request.app.state.analysis.name_model)) if isinstance(client, OllamaPool) else [],
+            "configured": [c.base_url for c in client.clients if c is not client.local] if isinstance(client, OllamaPool) else []}
+
+
+class WorkerList(BaseModel):
+    urls: list[str] = Field(max_length=8)
+
+
+@router.put("/workers")
+def set_workers(request: Request, body: WorkerList) -> dict:
+    try:
+        with request.app.state.pool.connection() as conn, conn.transaction():
+            urls = helpers.save(conn, body.urls)
+            request.app.state.analysis.configure_helpers(urls)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from None
+    except AnalysisBusy:
+        raise HTTPException(status_code=409, detail="Attendez la fin de l'analyse avant de modifier les ordinateurs.") from None
+    return workers(request)
 
 
 class Settings(BaseModel):

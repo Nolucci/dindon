@@ -145,7 +145,7 @@ def test_with_the_checks_off_the_preflight_says_that_nothing_is_read_and_nothing
     from dindon.preflight import check_debates
 
     [only] = check_debates(settings)
-    assert only.level == "info" and "désactivée" in only.text and "rien ne sort" in only.text
+    assert only.level == "info" and "désactivée" in only.text and "aucun message de débat n'est lu" in only.text
 
 
 def test_with_the_checks_on_it_says_what_will_be_sent_and_that_the_model_is_there(settings, ollama):
@@ -183,4 +183,4 @@ def test_the_answer_level_says_that_dindon_speaks_without_a_source_and_works_wit
     with_search = debate_texts(check_debates(debate_settings(settings, ollama, debate_checks="answer", searxng_url="http://x")), "warn")
     assert "RÉPOND D'ABORD" in with_search and "sans source" in with_search and "Valide / Invalide" in with_search and "ne sont PAS actives" not in with_search
     alone = check_debates(debate_settings(settings, ollama, debate_checks="answer"))
-    assert "aucun service de recherche" in debate_texts(alone, "warn") and "Rien ne sort de la machine" in debate_texts(alone, "warn") and debate_texts(alone, "fail") == ""
+    assert "aucun service de recherche" in debate_texts(alone, "warn") and "La vérification n'envoie rien à Internet" in debate_texts(alone, "warn") and debate_texts(alone, "fail") == ""

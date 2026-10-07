@@ -96,6 +96,9 @@
 
   // Performance: what the bot and the AI may take of the machine, at the cost of speed
   let perf = $state(null);          // /api/performance: settings, presets, limits, keep_alive, cpu_count
+  let workers = $state(null);
+  let workerUrl = $state('');
+  let workerNote = $state('');
   let form = $state(null);          // what the person is editing
   let saved = $state('');
   const PRESET_NAMES = { saver: 'Économe', balanced: 'Équilibré', full: 'Plein régime', custom: 'Personnalisé' };
@@ -109,6 +112,27 @@
       form = { ...perf.settings };
     } catch (error) {
       if (error instanceof AuthError) onAuthLost();
+    }
+  }
+
+  async function loadWorkers() {
+    try {
+      workers = await api.analysisWorkers();
+    } catch (error) {
+      if (error instanceof AuthError) onAuthLost();
+      else workerNote = error.message;
+    }
+  }
+
+  async function saveWorkers(urls) {
+    workerNote = '';
+    try {
+      workers = await api.analysisWorkersSave(urls);
+      workerUrl = '';
+      workerNote = 'Liste enregistrée. Les prochaines analyses utiliseront les ordinateurs connectés.';
+    } catch (error) {
+      if (error instanceof AuthError) onAuthLost();
+      else workerNote = error.message;
     }
   }
 
@@ -155,6 +179,7 @@
   onMount(() => {
     refresh();
     loadPerf();
+    loadWorkers();
     loadAuto();
     loadDmap();
     timer = setInterval(() => { refresh(); loadAuto(); }, 10000);
@@ -407,6 +432,27 @@
           {#if changed}<button type="button" class="btn" onclick={() => { form = { ...perf.settings }; saved = ''; }}>Annuler</button>{/if}
           {#if saved}<span class="muted small" role="status">{saved}</span>{/if}
         </div>
+        <div class="workerPanel">
+          <h3>Ordinateurs d’analyse</h3>
+          <p class="muted small">Le serveur garde les données et répartit les calculs de vecteurs avec les ordinateurs reliés par Tailscale. Installez les mêmes modèles Ollama sur chacun.</p>
+          {#if workers?.workers?.length}
+            <ul class="workerList">
+              {#each workers.workers as worker}
+                <li><span class="badge" class:success={worker.online} class:danger={!worker.online}>{worker.online ? 'Connecté' : 'Hors ligne'}</span>
+                  <code>{worker.local ? 'Serveur' : worker.url}</code>
+                  {#if worker.online}<span class="muted small">{worker.usable?.length ? `Utilisé pour : ${worker.usable.join(', ')}` : 'Aucun modèle compatible avec le serveur'}</span>{/if}
+                  {#if !worker.local}<button type="button" class="btn" onclick={() => saveWorkers(workers.configured.filter((url) => url !== worker.url))}>Retirer</button>{/if}
+                </li>
+              {/each}
+            </ul>
+          {:else}<p class="muted small">Le serveur travaille seul pour le moment.</p>{/if}
+          <div class="actions">
+            <input class="field-input" type="url" placeholder="http://100.x.y.z:11434" aria-label="Adresse Tailscale de l’ordinateur" bind:value={workerUrl} />
+            <button type="button" class="btn" disabled={!workerUrl.trim()} onclick={() => saveWorkers([...(workers?.configured ?? []), workerUrl.trim()])}>Ajouter un ordinateur</button>
+            <button type="button" class="btn" onclick={loadWorkers}>Actualiser l’état</button>
+          </div>
+          {#if workerNote}<span class="muted small" role="status">{workerNote}</span>{/if}
+        </div>
       {:else}
         <p class="muted">Chargement…</p>
       {/if}
@@ -618,6 +664,12 @@
   .knobHead { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.8125rem; color: var(--text-primary); font-weight: 600; }
   .knobHead output { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
   .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+  .workerPanel { border-top: 1px solid var(--border-subtle); padding-top: 0.875rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .workerPanel h3 { font-size: 0.95rem; color: var(--text-primary); }
+  .workerPanel .field-input { flex: 1 1 16rem; max-width: 25rem; }
+  .workerList { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
+  .workerList li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.625rem; }
+  .workerList code { overflow-wrap: anywhere; }
 
   .badge.small {
     min-height: 1.5rem;

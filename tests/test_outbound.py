@@ -17,7 +17,7 @@ REACHING = {"socket", "ssl", "http.client", "urllib.request", "urllib3", "reques
 CALLS = {"urlopen", "create_connection", "open_connection", "create_datagram_endpoint"}
 
 ALLOWED = {
-    "analysis/ollama.py": "the local AI (OLLAMA_URL: this machine or its Docker network)",
+    "analysis/ollama.py": "the AI on this machine or an explicitly configured private helper (DINDON_ANALYSIS_WORKERS)",
     "health.py": "asks the local AI whether it answers",
     "bot/gateway.py": "Discord (Gateway)",
     "bot/rest.py": "Discord (what the bot posts in the thread of a debate)",

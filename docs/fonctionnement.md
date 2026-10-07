@@ -28,4 +28,4 @@ Le bot en direct reçoit les événements du Gateway, met à jour la base et ré
 
 Le bot propose `/dindon info`, `/dindon mes-donnees`, `/dindon stop`, `/dindon effacer` et `/dindon reprendre`. L'interface et la CLI offrent aussi les actions d'accès, d'arrêt et d'effacement. Une personne arrêtée est exclue des nouvelles lectures et des débats. Les anciens fichiers importés sont réécrits lors d'un effacement ; une sauvegarde déjà créée doit être gérée à part. La rétention automatique est désactivée si `DINDON_RETENTION_DAYS=0`.
 
-Les vérifications sur Internet et les publications du bot peuvent faire sortir des informations de la machine. Elles sont conditionnées par la configuration ; voir [Règles du bot](regles-du-bot.md) et [Architecture](architecture.md).
+Les vérifications sur Internet et les publications du bot peuvent faire sortir des informations de la machine. Elles sont conditionnées par la configuration ; voir [Règles du bot](regles-du-bot.md) et [Architecture](architecture.md). Si un administrateur ajoute un [ordinateur d'analyse](ordinateurs-analyse.md), le texte à calculer lui est transmis sur le réseau privé.

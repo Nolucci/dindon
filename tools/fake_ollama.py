@@ -31,6 +31,7 @@ def embed_text(text: str) -> list[float]:
 class FakeOllama:
     def __init__(self, models=("bge-m3:latest", "qwen3:14b"), port: int = 0):
         self.models = list(models)
+        self.digests = {name: hashlib.sha256(name.encode()).hexdigest() for name in self.models}
         self.requests: list[tuple[str, dict]] = []          # every call, for assertions: (path, body)
         self.fail_chat = 0                                    # the next chat calls answer an error
         self.garbage_chat = 0                                 # the next chat calls answer something that is not the asked JSON
@@ -55,7 +56,7 @@ class FakeOllama:
                 with outer._lock:
                     outer.requests.append((self.path, {}))
                 if self.path == "/api/tags":
-                    return self._send(200, {"models": [{"name": m} for m in outer.models]})
+                    return self._send(200, {"models": [{"name": m, "digest": outer.digests.get(m, "")} for m in outer.models]})
                 if self.path == "/api/version":
                     return self._send(200, {"version": "fake"})
                 self._send(404, {"error": "unknown"})

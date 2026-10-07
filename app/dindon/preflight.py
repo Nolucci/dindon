@@ -228,7 +228,7 @@ def check_debates(settings: Settings) -> list[Check]:
     only thing asked is the list of the local model's models, on this machine."""
     area = "Débats"
     if settings.debate_checks == "off":
-        return [_info(area, "La vérification des affirmations est désactivée (DINDON_DEBATE_CHECKS=off) : rien n'est lu et rien ne sort de la machine.")]
+        return [_info(area, "La vérification des affirmations est désactivée (DINDON_DEBATE_CHECKS=off) : aucun message de débat n'est lu pour une vérification.")]
     from dindon.analysis.ollama import Ollama, OllamaError
     from dindon.debate.checker import resolve_mode
 
@@ -239,10 +239,10 @@ def check_debates(settings: Settings) -> list[Check]:
         found.append(_fail(area, "DINDON_DEBATE_CHECKS=observe est activé mais aucun service de recherche n'est donné (DINDON_FACTCHECK_API_KEY ou DINDON_SEARXNG_URL) : rien ne sera vérifié."))
     elif not services:
         found.append(_warn(area, "Dindon répond avec son IA locale seulement : aucun service de recherche n'est donné (DINDON_FACTCHECK_API_KEY ou DINDON_SEARXNG_URL), il ne pourra pas chercher sur "
-                                 "Internet quand les participants jugeront sa réponse invalide. Rien ne sort de la machine."))
+                                 "Internet quand les participants jugeront sa réponse invalide. La vérification n'envoie rien à Internet."))
     else:
         found.append(_warn(area, f"La vérification est ACTIVE : une phrase de recherche neutre sera envoyée à {' et à '.join(services)}, et des pages de sources de confiance seront lues. "
-                                 "Les membres en sont informés par /dindon info et dans chaque débat vérifié. Rien d'autre ne sort de la machine."))
+                                 "Les membres en sont informés par /dindon info et dans chaque débat vérifié. La vérification n'envoie rien d'autre à Internet."))
     try:
         if not Ollama(settings.ollama_url).has(settings.debate_model):
             found.append(_fail(area, f"Le modèle {settings.debate_model} n'est pas installé dans Ollama : `ollama pull {settings.debate_model}`."))

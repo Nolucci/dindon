@@ -1,6 +1,6 @@
 # Dindon
 
-Dindon collecte les échanges d'un serveur Discord, affiche une carte des interactions et peut analyser localement les conversations, thèmes et positions. Le bot propose aussi des commandes de vie privée, des cartes et des débats. L'interface et PostgreSQL tournent sur votre machine ; Discord reste nécessaire pour la collecte et le bot. La vérification des débats peut consulter Internet **uniquement si elle est activée**.
+Dindon collecte les échanges d'un serveur Discord, affiche une carte des interactions et peut analyser les conversations, thèmes et positions. Le bot propose aussi des commandes de vie privée, des cartes et des débats. L'interface et PostgreSQL tournent sur votre machine ; Discord reste nécessaire pour la collecte et le bot. L'analyse se fait localement par défaut, avec la possibilité d'ajouter des ordinateurs de confiance sur un réseau privé. La vérification des débats peut consulter Internet **uniquement si elle est activée**.
 
 ## Démarrer
 
@@ -33,11 +33,12 @@ make demo                 # http://127.0.0.1:8011 ; mot de passe demo
 | [Règles du bot](docs/regles-du-bot.md) | commandes Discord, accès, débats et garde-fous |
 | [API et export](docs/api-export.md) | routes HTTP, sessions, Activity et export JSON v2 |
 | [Import des données](docs/import-des-donnees.md) | format, import manuel, backfill, collecte et reprise |
+| [Ordinateurs d'analyse](docs/ordinateurs-analyse.md) | partager les calculs entre Debian, Mac et Windows sur un réseau privé |
 
 Le contrat machine se trouve dans [JSON-format.schema.json](contracts/JSON-format.schema.json), avec un [exemple](contracts/JSON-format.template.json). Les données d'essai et résultats de mesure sont dans `political/` ; ce sont des jeux de travail, pas la documentation d'utilisation.
 
 ## Prudence
 
-Les messages, rôles et positions peuvent être des données sensibles, notamment des opinions politiques. L'accès à l'interface repose sur un mot de passe unique ; protégez la machine, les sauvegardes et le fichier `.env`, et informez les membres avant de collecter ou de montrer leurs données. Les positions déduites par l'IA sont des hypothèses à relire avec leurs citations. L'automatisation d'un compte personnel Discord enfreint ses conditions d'utilisation : utiliser un jeton de bot.
+Les messages, rôles et positions peuvent être des données sensibles, notamment des opinions politiques. L'accès à l'interface repose sur un mot de passe unique ; protégez la machine, les sauvegardes et le fichier `.env`, et informez les membres avant de collecter ou de montrer leurs données. L'ajout d'un ordinateur d'analyse lui transmet le texte des conversations qu'il calcule : ne connectez que vos propres machines de confiance. Les positions déduites par l'IA sont des hypothèses à relire avec leurs citations. L'automatisation d'un compte personnel Discord enfreint ses conditions d'utilisation : utiliser un jeton de bot.
 
 Le code comporte des tests sur un faux Discord et des données inventées. La présence d'une fonction ou d'un test ne garantit pas son comportement sur tous les serveurs Discord réels. Les corrections publiques automatiques des débats ont un verrou de précision configurable ; voir [Règles du bot](docs/regles-du-bot.md).

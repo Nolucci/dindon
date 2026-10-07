@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from dindon import __version__
 from dindon.analysis.job import AnalysisJobs
+from dindon.analysis import helpers
 from dindon.api.activity import router as activity_router
 from dindon.api.analysis import router as analysis_router
 from dindon.api.auth import COOKIE, LIFETIME, Auth, require_session
@@ -152,6 +153,10 @@ def create_app(settings: Settings | None = None, background: bool = True) -> Fas
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         await asyncio.to_thread(pool.open, True, 30)
+        with pool.connection() as conn:
+            configured = helpers.load(conn)
+        if configured is not None:
+            app.state.analysis.configure_helpers(configured)
         tasks = [asyncio.create_task(hub.run())]
         if background:
             tasks += start_background_tasks(app, settings)

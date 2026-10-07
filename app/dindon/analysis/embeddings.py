@@ -94,15 +94,17 @@ def embed_conversations(conn: psycopg.Connection, client: Ollama, model: str, gu
         if cancelled():
             break
         size = max(1, batch() if callable(batch) else batch)       # the size of a batch is a setting that can change while this runs
-        ids = todo[start:start + size]
+        # With helpers, collect enough work to keep each computer busy at once.
+        parallelism = client.parallelism_for(model) if hasattr(client, "parallelism_for") else 1
+        window = size * parallelism
+        ids = todo[start:start + window]
         chunks = conversation_chunks(conn, ids)
         ids = [i for i in ids if chunks.get(i)]
         if ids:
             pieces = [(cid, text) for cid in ids for text in chunks[cid]]
             by_id: dict[int, list[tuple[list[float], int]]] = {cid: [] for cid in ids}
-            for offset in range(0, len(pieces), size):
-                group = pieces[offset:offset + size]
-                vectors = client.embed(model, [text for _, text in group])
+            groups = [pieces[offset:offset + size] for offset in range(0, len(pieces), size)]
+            for group, vectors in zip(groups, client.embed_batches(model, [[text for _, text in group] for group in groups]), strict=True):
                 for (cid, piece), vector in zip(group, vectors, strict=True):
                     if len(vector) != 1024:
                         raise OllamaError(f"Le modèle de vecteurs « {model} » en donne de {len(vector)} nombres : la base en attend 1024 "
@@ -115,7 +117,7 @@ def embed_conversations(conn: psycopg.Connection, client: Ollama, model: str, gu
                     conn.execute("INSERT INTO conversation_embeddings (conversation_id, model, embedding) VALUES (%s, %s, %s::vector) "
                                  "ON CONFLICT DO NOTHING", (cid, model, vector_literal(vector)))
         done += len(ids)
-        start += size
+        start += window
         if progress:
             progress(min(start, len(todo)), len(todo))
     log.info("embeddings: %d conversations done with %s (of %d waiting)", done, model, len(todo))

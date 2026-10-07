@@ -16,7 +16,7 @@ from dindon.analysis.axes import assign_axes
 from dindon.analysis.conversations import build_conversations
 from dindon.analysis.embeddings import embed_conversations
 from dindon.analysis.extraction import extract_claims
-from dindon.analysis.ollama import Ollama, OllamaError
+from dindon.analysis.ollama import Ollama, OllamaError, OllamaPool
 from dindon.analysis.stances import verify_stances
 from dindon.analysis.themes import NotEnough, discover_themes
 from dindon.clock import utc_iso
@@ -39,7 +39,7 @@ class AnalysisJobs:
     def __init__(self, settings: Settings, client: Ollama | None = None, echo: Callable[[str], None] | None = None):
         self._settings = settings
         self._echo = echo                                   # where the command line shows the progress as it comes
-        self.client = client or Ollama(settings.ollama_url)
+        self.client = client or (OllamaPool(settings.ollama_url, settings.analysis_workers) if settings.analysis_workers else Ollama(settings.ollama_url))
         self.embed_model, self.name_model = settings.embed_model, settings.naming_model
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
@@ -65,8 +65,17 @@ class AnalysisJobs:
         with self._lock:
             return {**self._state, "lines": list(self._lines)}
 
+    def configure_helpers(self, urls: tuple[str, ...]) -> None:
+        """Change helpers between analyses; an active job keeps its current client."""
+        with self._lock:
+            if self._thread is not None and self._thread.is_alive():
+                raise AnalysisBusy()
+            self.client = OllamaPool(self._settings.ollama_url, urls) if urls else Ollama(self._settings.ollama_url)
+
     def start(self, guild_id: int, stages: tuple[str, ...] = STAGES, *, topics: int | None = None, rebuild: bool = False, limit: int | None = None) -> None:
         """Checks that the models are there, then starts. Raises NotReady or AnalysisBusy, before anything is started."""
+        if isinstance(self.client, OllamaPool):
+            self.client.reset()
         ready = self.readiness()
         needed = [m for stage, m in (("embeddings", self.embed_model), ("themes", self.name_model), ("claims", self.name_model), ("claims", self.embed_model), ("axes", self.name_model))
                   if stage in stages]
@@ -143,6 +152,8 @@ class AnalysisJobs:
                 limits = self._limits(conn)
                 self.client.limits, self.client.cancelled = limits, cancel.is_set          # the limits of the machine, read again while this runs
                 now = limits()
+                if isinstance(self.client, OllamaPool):
+                    self._line(f"{len(self.client.clients)} ordinateurs d'analyse configurés (dont le serveur) ; les vecteurs sont calculés en parallèle")
                 if now["ai_max_load"] < 100:
                     self._line(f"vitesse limitée : l'IA travaille {now['ai_max_load']} % du temps (réglage Performance de la page Système)")
                 if "conversations" in stages:

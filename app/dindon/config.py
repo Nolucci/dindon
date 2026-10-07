@@ -66,6 +66,8 @@ class Settings:
     debate_precision: float | None = None     # the precision of « contredit » that tools/measure_claims.py measured: the owner copies it here, it is what unlocks `live`
     debate_min_precision: float = 0.90
     debate_model: str = "qwen3:14b"
+    # Optional Ollama instances on trusted computers, reached over a private network.
+    analysis_workers: tuple[str, ...] = ()
     factcheck_api_key: str = field(default="", repr=False)   # a secret: never in a log or a repr
     searxng_url: str = ""
 
@@ -119,6 +121,7 @@ def load_settings() -> Settings:
         host=env.get("DINDON_HOST", "127.0.0.1"),
         port=int(env.get("DINDON_PORT", "8000")),
         ollama_url=env.get("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/"),
+        analysis_workers=tuple(url.strip().rstrip("/") for url in env.get("DINDON_ANALYSIS_WORKERS", "").split(",") if url.strip()),
         password=env.get("DINDON_PASSWORD", ""),
         inbox_dir=Path(env.get("DINDON_INBOX", REPO_ROOT / "inbox")),
         archive_dir=Path(env.get("DINDON_ARCHIVE", REPO_ROOT / "archive")),
