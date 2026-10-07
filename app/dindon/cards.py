@@ -57,6 +57,13 @@ def save(conn: psycopg.Connection, values: dict) -> dict:
     return cfg
 
 
+def effective_blocks(cfg: dict, prefs: dict | None, page: str) -> list[str]:
+    """The blocks shown on a page: those that the person chose, within what the administrator allows (the administrator's settings always win)."""
+    allowed = cfg["blocks"][page]
+    chosen = ((prefs or {}).get("blocks") or {}).get(page)
+    return [b for b in allowed if b in chosen] if isinstance(chosen, list) else list(allowed)
+
+
 def person_card(conn: psycopg.Connection, guild_id: int, user_id: int) -> dict | None:
     """Everything the four pages need, or None (never seen, a bot, or somebody who asked not to be recorded)."""
     who = conn.execute(f"""SELECT {LABEL}, m.color, u.is_bot, u.name FROM users u LEFT JOIN members m ON m.guild_id = %s AND m.user_id = u.id
@@ -155,10 +162,11 @@ def _positions(conn: psycopg.Connection, card: dict) -> None:
         (g, u, MIN_SCORE)).fetchall()
     rows = conn.execute(
         """SELECT p.text, s.stance, s.confidence::float8, s.stated_at, s.claim_id FROM current_stances s JOIN propositions p ON p.id = s.proposition_id
-           WHERE s.guild_id = %s AND s.user_id = %s AND p.status NOT IN ('rejected', 'merged') ORDER BY s.confidence DESC, s.stated_at DESC LIMIT 5""", (g, u)).fetchall()
+           WHERE s.guild_id = %s AND s.user_id = %s AND p.status NOT IN ('rejected', 'merged') ORDER BY s.confidence DESC, s.stated_at DESC LIMIT 25""", (g, u)).fetchall()
     card["total_positions"] = conn.execute("SELECT count(*) FROM current_stances WHERE guild_id = %s AND user_id = %s", (g, u)).fetchone()[0]
     proofs = _evidence(conn, g, [r[4] for r in rows])
-    card["positions"] = [(text, stance, confidence, at, proofs.get(claim)) for text, stance, confidence, at, claim in rows]
+    card["positions"] = [(text, stance, confidence, at, proofs.get(claim)) for text, stance, confidence, at, claim in rows[:5]]
+    card["all_positions"] = [{"id": claim, "text": text, "stance": stance, "confidence": confidence, "at": at, "proof": proofs.get(claim)} for text, stance, confidence, at, claim in rows]   # what the person may choose from (mycard)
 
 
 def _contradictions(conn: psycopg.Connection, card: dict) -> None:
@@ -276,17 +284,32 @@ _EMPTY = "*Rien à montrer ici.*"
 STANCE = {1: "✅ pour", -1: "❌ contre", 0: "➖ nuancé"}
 
 
-def _page_positions(card: dict, on: tuple | list = BLOCKS["positions"]) -> str:
+def _note(prefs: dict, key: str) -> str:
+    text = (prefs.get("notes") or {}).get(key)
+    return f"\n📝 *{text}*" if text else ""
+
+
+def shown_positions(card: dict, prefs: dict | None = None) -> list[dict]:
+    """The positions the page shows: the ones the person chose from what was read of them (`pinned`, in their order), else the three clearest."""
+    every = card.get("all_positions") or [{"id": None, "text": t, "stance": st, "confidence": c, "at": at, "proof": pr} for t, st, c, at, pr in card["positions"]]
+    pinned = [pid for pid in (prefs or {}).get("pinned") or []]
+    chosen = [p for pid in pinned for p in every if p["id"] == pid]
+    return chosen[:3] or every[:3]
+
+
+def _page_positions(card: dict, on: tuple | list = BLOCKS["positions"], prefs: dict | None = None) -> str:
+    prefs = prefs or {}
     blocks = []
     if card["axes"] and "axes" in on:
         blocks.append(_section("Où il·elle se situe", [f"{negative} `{_gauge(score)}` {positive}" for _, negative, positive, score, _, _ in card["axes"][:3]]))
-    for text, stance, _confidence, _at, proof in (card["positions"][:3] if "positions" in on else []):
-        blocks.append(f"**{STANCE.get(stance, '❔')}** · {_cut(text, 160)}\n{_proof(proof)}")
+    shown = shown_positions(card, prefs) if "positions" in on else []
+    for p in shown:
+        blocks.append(f"**{STANCE.get(p['stance'], '❔')}** · {_cut(p['text'], 160)}\n{_proof(p['proof'])}" + _note(prefs, f"pos:{p['id']}"))
     if not card["positions"] and not card["axes"]:
         return "*L'analyse n'a pas encore lu de position de cette personne.*"
     if not blocks:
         return _EMPTY
-    more = card["total_positions"] - len(card["positions"][:3]) if "positions" in on else 0
+    more = card["total_positions"] - len(shown) if "positions" in on else 0
     blocks.append("*Lecture automatique de ses messages, pas un verdict.*" + (f" {_plural(more, 'autre position non montrée', 'autres positions non montrées')}." if more > 0 else ""))
     return "\n\n".join(blocks)
 
@@ -314,12 +337,16 @@ def _page_contradictions(card: dict, on: tuple | list = BLOCKS["contradictions"]
     return "\n\n".join(blocks) or _EMPTY
 
 
-def card_page(card: dict, page: int = 0, avatar: str | None = None, cfg: dict | None = None) -> dict:
+def card_page(card: dict, page: int = 0, avatar: str | None = None, cfg: dict | None = None, prefs: dict | None = None) -> dict:
     """One page of the card as a Discord embed (https://discord.com/developers/docs/resources/message#embed-object): one block of text, titles in bold,
     a blank line between the blocks, never more than three items in a list."""
     cfg = cfg or DEFAULT
     page = page if 0 <= page < len(PAGES) and PAGE_KEYS[page] in cfg["pages"] else PAGE_KEYS.index(cfg["pages"][0])    # a page that the administrator switched off is never shown
-    description = (_page_profile, _page_interactions, _page_positions, _page_contradictions)[page](card, cfg["blocks"][PAGE_KEYS[page]])
+    prefs = prefs or {}
+    builders = (_page_profile, _page_interactions, _page_positions, _page_contradictions)
+    on = effective_blocks(cfg, prefs, PAGE_KEYS[page])
+    description = builders[page](card, on, prefs) if page == 2 else builders[page](card, on)
+    description += _note(prefs, f"section:{PAGE_KEYS[page]}")
     color = COLORS[page] if page else _color(card["color"])
     if page == 3 and not (card["against"] or card["conflicts"] or card["changes"]):
         color = 0x2ECC71

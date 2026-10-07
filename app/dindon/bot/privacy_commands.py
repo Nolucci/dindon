@@ -36,7 +36,7 @@ log = logging.getLogger("dindon.bot.privacy")
 EPHEMERAL = 64
 CHANNEL_MESSAGE, DEFERRED_MESSAGE, UPDATE_MESSAGE, MODAL = 4, 5, 7, 9
 DEFERRED_UPDATE = 6
-SUBCOMMANDS = ("info", "mes-donnees", "stop", "effacer", "reprendre", "card", "map", "debat", "forum")
+SUBCOMMANDS = ("info", "mes-donnees", "stop", "effacer", "reprendre", "card", "mycard", "map", "debat", "forum")
 COOLDOWN_SECONDS = 15
 MAX_FILE_BYTES = 7_000_000          # under every limit of Discord for an attachment
 
@@ -52,6 +52,7 @@ COMMAND = {
         {"type": 1, "name": "reprendre", "description": "Accepter de nouveau l'enregistrement de mes messages"},
         {"type": 1, "name": "card", "description": "La carte d'une personne : un résumé de ce que Dindon sait d'elle, postée dans ce salon",
          "options": [{"type": 6, "name": "pseudo", "description": "La personne", "required": True}]},
+        {"type": 1, "name": "mycard", "description": "Régler ma propre card : le contenu de chaque partie, avec les suggestions de Dindon (privé)"},
         {"type": 1, "name": "map", "description": "La carte du serveur : qui parle avec qui, en image, postée dans ce salon",
          "options": [{"type": 3, "name": "periode", "description": "La période (30 jours par défaut)", "required": False,
                       "choices": [{"name": label, "value": key} for key, (label, _) in discord_map.PERIODS.items()]},
@@ -168,13 +169,34 @@ class PrivacyService:
             try:
                 data = cards.person_card(self._connection(), guild_id, user_id)
                 cfg = cards.load(self._connection())
+                from dindon import mycard
+                prefs = mycard.clean(mycard.load(self._connection(), guild_id, user_id), cfg)
             except (psycopg.OperationalError, psycopg.InterfaceError):
                 self._conn = None
                 return Reply(text["card_failed"])
             except Exception as error:
                 log.error("a card could not be made (%s)", type(error).__name__)
                 return Reply(text["card_failed"])
-        return Reply(text["card_none"]) if data is None else Reply("", embed=cards.card_page(data, page, avatar, cfg), components=cards.card_buttons(user_id, page, cfg))
+        return Reply(text["card_none"]) if data is None else Reply("", embed=cards.card_page(data, page, avatar, cfg, prefs), components=cards.card_buttons(user_id, page, cfg))
+
+    def mycard(self, guild_id: int, user_id: int, avatar: str | None, page: int = 0, change: tuple | None = None, note: str | None = None) -> dict | None:
+        """The private screen of `/dindon mycard` (see mycard.py), after a change if there is one. None: this person has no card (never seen, or asked not to be recorded)."""
+        from dindon import mycard
+
+        if str(user_id) in self.blocked:
+            return None
+        with self._lock:
+            try:
+                conn = self._connection()
+                if change is not None:
+                    mycard.apply(conn, guild_id, user_id, change)
+                return mycard.view(conn, guild_id, user_id, page, avatar, note)
+            except (psycopg.OperationalError, psycopg.InterfaceError):
+                self._conn = None
+                raise
+            except Exception as error:
+                log.error("the screen of a card could not be made (%s)", type(error).__name__)
+                raise
 
     @staticmethod
     def _pictures(guild_id: int, urls: dict[int, str]) -> dict[int, bytes]:
@@ -394,11 +416,15 @@ class Interactions:
                 await self.debates.modal_submit(data, user_id)
             elif self.debates is not None and custom_id.startswith("dindon:debat:rate:"):
                 await self.debates.rating_submit(data, user_id)
+            elif custom_id.startswith("dindon:mycard:note:"):
+                await self._mycard_note(data, user_id)
             return
         if data.get("type") == 3:                                                 # a button: `effacer`, or a page of a card
             custom_id = str((data.get("data") or {}).get("custom_id", ""))
             if custom_id.startswith("dindon:card:"):
                 await self._page(data)
+            elif custom_id.startswith("dindon:mycard:"):
+                await self._mycard_component(data, user_id)
             elif custom_id.startswith("dindon:map:"):
                 await self._map_period(data)
             elif custom_id.startswith("dindon:debat:"):
@@ -420,6 +446,8 @@ class Interactions:
                 await self._followup(data, f"**{NOTICE_TITLE}.** {notice(self.live)}")
         elif sub == "card":
             await self._card(data, user_id, options[0], text)
+        elif sub == "mycard":
+            await self._mycard(data, user_id, text)
         elif sub == "map":
             await self._map(data, user_id, options[0], text)
         elif sub in ("debat", "forum"):
@@ -455,6 +483,98 @@ class Interactions:
 
         await self._callback(data, DEFERRED_MESSAGE, public=True)
         await self._edit(data, await asyncio.to_thread(self.service.card, guild_id, target, avatar_url(resolved.get(str(target)))))
+
+    async def _mycard_screen(self, data: dict, user_id: int, page: int, change: tuple | None = None, note: str | None = None, *, update: bool) -> None:
+        """Shows (or shows again, after a change) the private screen of `/dindon mycard`."""
+        from dindon.cards import avatar_url
+
+        try:
+            guild_id = int(data["guild_id"])
+            avatar = avatar_url((data.get("member") or {}).get("user") or data.get("user"))
+            payload = await asyncio.to_thread(self.service.mycard, guild_id, user_id, avatar, page, change, note)
+        except (KeyError, ValueError, TypeError):
+            await self._callback(data, CHANNEL_MESSAGE, _text()["card_none"])
+            return
+        except Exception:
+            await self._callback(data, CHANNEL_MESSAGE, _text()["card_failed"])
+            return
+        if payload is None:
+            await self._callback(data, CHANNEL_MESSAGE, _text()["card_none"])
+        elif update:
+            await self.show(data, payload)
+        else:
+            body = {"type": CHANNEL_MESSAGE, "data": {**payload, "flags": EPHEMERAL}}
+            status = await asyncio.to_thread(self._request, "POST", f"/interactions/{data['id']}/{data['token']}/callback", body, False)
+            if status >= 300 or status == 0:
+                log.warning("the screen of a card was refused (HTTP %s)", status)
+
+    async def _mycard(self, data: dict, user_id: int, text: dict) -> None:
+        """`/dindon mycard`: only for the person, private. Cooldown like the other commands."""
+        if self.service.too_soon(user_id):
+            await self._callback(data, CHANNEL_MESSAGE, text["wait"])
+            return
+        await self._mycard_screen(data, user_id, 0, update=False)
+
+    async def _mycard_component(self, data: dict, user_id: int) -> None:
+        """A button or a list of the screen: change the page, the blocks, the positions, apply a suggestion, open the popup of a note, go back to the start."""
+        from dindon import cards
+
+        parts = str((data.get("data") or {}).get("custom_id", "")).split(":")
+        values = (data.get("data") or {}).get("values") or []
+        try:
+            kind, arg = parts[2], int(parts[3])
+            page_key = cards.PAGE_KEYS[arg if kind != "s" else 2]
+            if kind == "p":
+                await self._mycard_screen(data, user_id, arg, update=True)
+            elif kind == "b":
+                await self._mycard_screen(data, user_id, arg, ("blocks", page_key, [str(v) for v in values]), update=True)
+            elif kind == "s":
+                await self._mycard_screen(data, user_id, 2, ("pinned", [int(v) for v in values]), update=True)
+            elif kind == "r":
+                await self._mycard_screen(data, user_id, arg, ("reset", page_key), update=True)
+            elif kind == "n":
+                await self.modal(data, self._note_modal(arg, "s", None))
+            elif kind == "a":
+                todo = await asyncio.to_thread(self._suggestion, int(data["guild_id"]), user_id, page_key, int(values[0]))
+                if todo is not None and todo[0] == "note":
+                    target = "s" if todo[1].startswith("section:") else f"p{todo[1].split(':')[1]}"
+                    await self.modal(data, self._note_modal(arg, target, None))
+                else:
+                    await self._mycard_screen(data, user_id, arg, ("suggestion", page_key, int(values[0])), update=True)
+        except (IndexError, ValueError, TypeError, KeyError):
+            await self._callback(data, CHANNEL_MESSAGE, _text()["card_failed"])
+
+    def _suggestion(self, guild_id: int, user_id: int, page_key: str, index: int):
+        from dindon import cards, mycard
+
+        with self._lock:
+            conn = self._connection()
+            cfg = cards.load(conn)
+            card = cards.person_card(conn, guild_id, user_id)
+            if card is None:
+                return None
+            todo = mycard.suggestions(card, cfg, mycard.clean(mycard.load(conn, guild_id, user_id), cfg))[page_key]
+            return todo[index]["action"] if 0 <= index < len(todo) else None
+
+    @staticmethod
+    def _note_modal(page: int, target: str, current: str | None) -> dict:
+        return {"custom_id": f"dindon:mycard:note:{page}:{target}", "title": "Note sous votre card", "components": [
+            {"type": 1, "components": [{"type": 4, "custom_id": "note", "style": 2, "label": "Note (200 caractères, vide : l'enlever)", "required": False, "max_length": 200,
+                                        **({"value": current} if current else {})}]}]}
+
+    async def _mycard_note(self, data: dict, user_id: int) -> None:
+        """The popup of a note was sent: it is kept (empty: removed), and the screen is shown again."""
+        from dindon import cards, mycard
+        from dindon.debate.texts import modal_values
+
+        parts = str((data.get("data") or {}).get("custom_id", "")).split(":")
+        try:
+            page, target = int(parts[3]), parts[4]
+            key = f"section:{cards.PAGE_KEYS[page]}" if target == "s" else f"pos:{int(target[1:])}"
+            note = mycard.clean_note(modal_values((data.get("data") or {}).get("components")).get("note"))
+        except (IndexError, ValueError, TypeError):
+            return
+        await self._mycard_screen(data, user_id, page, ("note", key, note), "Note enregistrée." if note else "Note retirée.", update=True)
 
     async def _map(self, data: dict, user_id: int, option: dict, text: dict) -> None:
         """`/dindon map [periode] [personne]`: the picture is posted in the channel. Only the choices that the command offers are taken: anything else is ignored."""

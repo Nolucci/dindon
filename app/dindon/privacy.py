@@ -90,6 +90,7 @@ def erase_person(conn: psycopg.Connection, user_id: int, *, reason: str = "erasu
         counts["debate_traces"] = sum(cur.execute(f"DELETE FROM {table} WHERE {column} = %s", (user_id,)).rowcount
                                       for table, column in DEBATE_PERSON_COLUMNS)
         cur.execute("UPDATE debates SET created_by = NULL WHERE created_by = %s", (user_id,))
+        counts["card_prefs"] = cur.execute("DELETE FROM card_prefs WHERE user_id = %s", (user_id,)).rowcount          # the card that they set up for themselves
         cur.execute("SELECT forget_user(%s)", (user_id,))     # the person, their messages, names, links; what others quoted of them
         cur.execute("UPDATE privacy_subjects SET erased_at = now() WHERE user_id = %s", (user_id,))
         _log(cur, user_id, "erase", source, counts)
@@ -121,6 +122,7 @@ def erase_server(conn: psycopg.Connection, guild_id: int, *, source: str = "remo
         known = cur.execute("SELECT 1 FROM guilds WHERE id = %s", (guild_id,)).fetchone() is not None
         cur.execute("DELETE FROM guilds WHERE id = %s", (guild_id,))
         counts["debates"] = cur.execute("DELETE FROM debates WHERE guild_id = %s", (guild_id,)).rowcount   # their messages, positions and claims go with them
+        cur.execute("DELETE FROM card_prefs WHERE guild_id = %s", (guild_id,))                              # the cards that people set up there
         cur.execute("DELETE FROM runtime_settings WHERE key = %s", (f"debate_forum.{guild_id}",))        # the forum that was chosen for its debates
         cur.execute("DELETE FROM identity_history WHERE guild_id = %s", (guild_id,))      # the nicknames used there
         counts["people"] = cur.execute(
@@ -232,6 +234,7 @@ def export_person(conn: psycopg.Connection, user_id: int) -> dict:
         mentions = cur.execute("SELECT message_id FROM mentions WHERE user_id = %s ORDER BY message_id", (user_id,)).fetchall()
         register = cur.execute("SELECT status, reason, requested_at FROM privacy_subjects WHERE user_id = %s", (user_id,)).fetchone()
         debates = _debates_of(cur, user_id)
+        card_prefs = cur.execute("SELECT guild_id, prefs FROM card_prefs WHERE user_id = %s ORDER BY guild_id", (user_id,)).fetchall()
         _log(cur, user_id, "export", "interface", {"messages": len(messages), "debates": len(debates)})
     iso = lambda value: value.astimezone(UTC).isoformat() if value else None  # noqa: E731
     return {
@@ -244,6 +247,7 @@ def export_person(conn: psycopg.Connection, user_id: int) -> dict:
         "reactions": [{"message_id": str(i), "emoji": e} for i, e in reactions],
         "mentioned_in_messages": [str(i[0]) for i in mentions],
         "register": None if register is None else {"status": register[0], "reason": register[1], "requested_at": iso(register[2])},
+        "card_settings": [{"server_id": str(g), **prefs} for g, prefs in card_prefs],
         "debates": [{**d, "started_at": iso(d["started_at"]), "positions": [{"position": p, "at": iso(t)} for p, t in d["positions"]],
                      "votes_on_answers": [{**v, "at": iso(v["at"])} for v in d["votes_on_answers"]]} for d in debates],
     }

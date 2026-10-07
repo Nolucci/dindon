@@ -409,6 +409,7 @@ export class MapGraph {
     this.maxWeight = Math.max(1e-9, ...data.edges.map((e) => e.weight));
     this.edgeCount = data.edges.length;
     const known = graph.order;
+    const newcomers = [];
     const spread = 60 + 9 * Math.sqrt(data.nodes.length);
     for (const node of data.nodes) {
       const look = this.nodeLook(node);
@@ -418,6 +419,7 @@ export class MapGraph {
         graph.mergeNodeAttributes(node.id, attributes);
       } else {
         graph.addNode(node.id, { ...attributes, x: (Math.random() - 0.5) * spread, y: (Math.random() - 0.5) * spread });
+        newcomers.push(node.id);
       }
     }
     for (const edge of data.edges) {
@@ -433,7 +435,50 @@ export class MapGraph {
     this.renderer.setSetting('labelDensity', 0.45 + 0.9 * crowd);
     this.renderer.setSetting('labelGridCellSize', (64 + 56 * (1 - crowd)) * UI);
     this.renderer.refresh();
-    this.settle(known === 0 ? 6000 : 2500);
+    if (known === 0 || this.layout) this.settle(known === 0 ? 6000 : 2500);     // the first placement (or one still running) is done over
+    else if (newcomers.length) this.placeNewcomers(newcomers);                   // afterwards nobody moves, except the people who just appeared
+  }
+
+  // Once the map is placed, the points stay where they are: a new person goes to the center of the people they talk to (or of the map if they talk to
+  // nobody yet), then to the nearest free spot along a spiral, so that they sit with their group, never on top of a point or a name. The spot only depends
+  // on the map and on the person (no randomness): the same newcomer always lands at the same place. In the grouped mode, where the islands depend on
+  // who is there, everything is placed again.
+  placeNewcomers(ids) {
+    if (this.grouped) {
+      this.placeGroups();
+      return;
+    }
+    const graph = this.graph;
+    const fresh = new Set(ids);
+    const placed = [];
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    graph.forEachNode((id, a) => {
+      if (fresh.has(id)) return;
+      placed.push(a);
+      minX = Math.min(minX, a.x); maxX = Math.max(maxX, a.x);
+      minY = Math.min(minY, a.y); maxY = Math.max(maxY, a.y);
+    });
+    const center = placed.length ? { x: (minX + maxX) / 2, y: (minY + maxY) / 2 } : { x: 0, y: 0 };
+    // The room a point has on this map: what the first placement left between neighbors
+    const gap = placed.length > 1 ? 0.7 * Math.sqrt(Math.max((maxX - minX) * (maxY - minY), 1) / placed.length) : 10;
+    const free = (x, y) => placed.every((a) => Math.hypot(a.x - x, a.y - y) >= gap);
+    for (const id of ids) {
+      let x = 0, y = 0, near = 0;
+      graph.forEachNeighbor(id, (other, a) => { if (!fresh.has(other) || placed.includes(a)) { x += a.x; y += a.y; near++; } });
+      const base = near ? { x: x / near, y: y / near } : center;
+      let turn = 0;
+      for (const ch of String(id)) turn = (turn * 31 + ch.charCodeAt(0)) % 360;
+      let spot = base;
+      for (let i = 0; i < 400; i++) {
+        const r = gap * 0.35 * Math.sqrt(i);                                       // an even spiral out of the base
+        const angle = (turn * Math.PI) / 180 + i * 2.399963229728653;               // the golden angle
+        spot = { x: base.x + r * Math.cos(angle), y: base.y + r * Math.sin(angle) };
+        if (free(spot.x, spot.y)) break;
+      }
+      graph.mergeNodeAttributes(id, spot);
+      placed.push(graph.getNodeAttributes(id));
+    }
+    this.renderer.refresh();
   }
 
   // Places the points: a few seconds of ForceAtlas2 in a worker, then it stops (the points keep their places)

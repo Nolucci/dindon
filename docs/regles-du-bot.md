@@ -14,11 +14,18 @@ Avant de le déployer auprès de vraies personnes, définir la durée de conserv
 | `/dindon effacer` | demande une confirmation, puis cesse l'enregistrement et efface l'existant |
 | `/dindon reprendre` | autorise les enregistrements futurs, sans restaurer les données effacées |
 | `/dindon card pseudo:@personne` | publie une fiche dans le salon si la personne est enregistrée |
+| `/dindon mycard` | écran privé pour régler sa propre card : le contenu de chaque partie (blocs, positions montrées, petite note), avec les suggestions de Dindon |
 | `/dindon map [periode] [personne]` | publie l'image de la carte si l'administrateur l'a activée |
 | `/dindon debat [sujet]` | ouvre une fenêtre de paramètres ; le sujet peut être choisi à partir d'un axe actif |
 | `/dindon forum` | montre ou règle le forum des débats ; modification réservée aux modérateurs |
 
 Les actions sur les données personnelles portent seulement sur l'auteur de la commande, identifié par Discord. Leurs réponses sont privées ; `card` et `map` sont volontairement publiques. Une personne ayant choisi `stop` ou `effacer` n'est plus enregistrée ni incluse dans les débats. L'effacement touche aussi les fichiers d'import, mais une ancienne sauvegarde doit être gérée séparément.
+
+## Ma card
+
+Avec `/dindon mycard`, chaque personne règle **sa propre card**, dans un message visible d'elle seule. Les quatre parties (Profil, Interactions, Positions, Contradictions) ne bougent pas ; seul leur contenu change, **dans les limites de ce que l'administrateur a laissé activé** dans le panneau web : quels blocs s'affichent, lesquelles de ses positions lues par Dindon sont montrées (3 au plus, à choisir parmi celles de la base), et une courte note (200 caractères, sans lien) sous une partie ou sous une position. Ces réglages sont ceux que tout le salon voit avec `/dindon card @personne`, notes comprises.
+
+Sous chaque partie, Dindon propose des **suggestions d'amélioration** tirées de ce qu'il a analysé, par règles fixes : une position lue avec peu de certitude ou gardée sans preuve (à préciser par une note), une position plus claire qui n'est pas montrée, un rôle en contradiction avec les propos ou un changement d'avis à expliquer, un bloc masqué alors qu'il y a des données. Chaque suggestion applicable l'est en un clic. Les réglages sont effacés avec `/dindon effacer`, figurent dans `/dindon mes-donnees` et disparaissent avec le serveur.
 
 ## Débats
 
