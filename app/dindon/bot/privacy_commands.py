@@ -7,8 +7,8 @@
 * `stop`: nothing more is recorded of the person; what is held stays (reversible with `reprendre`). `effacer`: stop AND delete what is held
   (messages, reactions, what was made from them, their traces in archive/ and inbox/). It is irreversible, so it asks for a click first.
 * `mes-donnees`: a JSON file with everything held of the person, sent to them alone (counts only if it is too big for Discord).
-* The commands are registered at each READY (a global command; Discord takes a little while to show it on a new server). This needs the
-  `applications.commands` scope in the invitation link (api/invite.py).
+* Commands are synchronized at READY and on joining a followed server. Guild commands update immediately; global commands remain for DMs
+  and the Activity. Unchanged definitions are not rewritten. This needs the `applications.commands` scope in the invitation link (api/invite.py).
 * A person can act on **themselves** only (the id comes from Discord's interaction, and the button carries it and is checked again). Every
   action is rate-limited per person, and the database work is done one at a time.
 * Nothing here logs a message, a name or an id: counts only.
@@ -30,6 +30,7 @@ import psycopg
 
 from dindon import discord_map, privacy
 from dindon.db import connect
+from dindon.bot.rest import DiscordREST
 
 log = logging.getLogger("dindon.bot.privacy")
 
@@ -71,8 +72,24 @@ COMMAND = {
 
 
 # What makes the application appear in the rocket of a voice channel (the Activity, docs/fonctionnement.md): a command of type 4 that Discord itself handles. The list of
-# commands is replaced as a whole at each start, so a command that is not in it is deleted: the entry point must be in it, or the Activity disappears from the channels.
+# global commands is replaced as a whole when changed: the entry point must remain in it, or the Activity disappears from the channels.
 ENTRY_POINT = {"name": "carte", "description": "Ouvrir la carte de Dindon dans le salon vocal", "type": 4, "handler": 2, "integration_types": [0], "contexts": [0]}
+
+
+def _command_matches(actual: dict, wanted: dict) -> bool:
+    """Compare our writable fields, ignoring Discord IDs and default option values."""
+    def canonical(value):
+        if isinstance(value, list):
+            return [canonical(item) for item in value]
+        if isinstance(value, dict):
+            return {key: canonical(item) for key, item in value.items()
+                    if not (key in ("name_localizations", "description_localizations") and item is None)
+                    and not (key in ("required", "autocomplete") and item is False)
+                    and not (key in ("options", "choices") and item == [])}
+        return value
+
+    return all(canonical(actual.get(key, 1 if key == "type" else [] if key == "options" else None)) == canonical(value)
+               for key, value in wanted.items())
 
 
 @dataclass
@@ -305,6 +322,8 @@ class Interactions:
         self._api = api_url.rstrip("/")
         self.service = service
         self.registered = False
+        self._command_rest = DiscordREST(token, api_url)
+        self._sync_lock = asyncio.Lock()
         self.debates = None             # the debates (bot/debate_commands.py), or None: their command and buttons are then not answered
         self.live = False               # …and the corrections are posted in public
         self.verification = False       # the claims of the debates are checked on the Internet: `/dindon info` then says what leaves the machine (debate/texts.py NOTICE)
@@ -333,17 +352,47 @@ class Interactions:
         except OSError:
             return 0
 
-    async def register(self, application_id: str) -> None:
-        commands = [COMMAND, ENTRY_POINT] if self.activity else [COMMAND]
-        status = await asyncio.to_thread(self._request, "PUT", f"/applications/{application_id}/commands", commands, True)
-        if status != 200 and self.activity:                 # the Activity is not enabled in the Developer Portal: the members' command must still be there
-            log.warning("the entry point of the Activity was refused (HTTP %s): enable Activities in the Developer Portal", status)
-            status = await asyncio.to_thread(self._request, "PUT", f"/applications/{application_id}/commands", [COMMAND], True)
-        self.registered = status == 200
-        if self.registered:
-            log.info("the command /dindon is registered")
-        else:
-            log.warning("the command /dindon could not be registered (HTTP %s)", status)
+    async def _sync_commands(self, path: str, commands: list[dict], *, bulk: bool = True) -> int:
+        listed = await asyncio.to_thread(self._command_rest.call, "GET", path)
+        if listed.status != 200 or not isinstance(listed.data, list):
+            return listed.status if listed.status != 200 else 0
+        have = {(c.get("name"), c.get("type", 1)): c for c in listed.data}
+        changed = [c for c in commands if not _command_matches(have.get((c["name"], c["type"]), {}), c)]
+        if not changed and (not bulk or len(listed.data) == len(commands)):
+            return 200
+        if bulk:
+            return (await asyncio.to_thread(self._command_rest.call, "PUT", path, commands)).status
+        for command in changed:
+            answer = await asyncio.to_thread(self._command_rest.call, "POST", path, command)
+            if answer.status not in (200, 201):
+                return answer.status
+        return 200
+
+    async def register(self, application_id: str, guild_ids: tuple[str, ...] = ()) -> None:
+        # Update the guild definitions first: they are immediately usable on servers.
+        for guild_id in guild_ids:
+            await self.register_guild(application_id, guild_id)
+        async with self._sync_lock:
+            commands = [COMMAND, ENTRY_POINT] if self.activity else [COMMAND]
+            path = f"/applications/{application_id}/commands"
+            status = await self._sync_commands(path, commands)
+            if status == 400 and self.activity:
+                log.warning("the entry point of the Activity was refused (HTTP %s): enable Activities in the Developer Portal", status)
+                status = await self._sync_commands(path, [COMMAND])
+            self.registered = status == 200
+            if self.registered:
+                log.info("the global command /dindon is synchronized")
+            else:
+                log.warning("the global command /dindon could not be synchronized (HTTP %s)", status)
+
+    async def register_guild(self, application_id: str, guild_id: str) -> None:
+        async with self._sync_lock:
+            # Only upsert our slash command. The Activity entry point is global-only.
+            status = await self._sync_commands(f"/applications/{application_id}/guilds/{guild_id}/commands", [COMMAND], bulk=False)
+            if status == 200:
+                log.info("the server command /dindon is synchronized")
+            else:
+                log.warning("the server command /dindon could not be synchronized (HTTP %s)", status)
 
     async def _callback(self, data: dict, kind: int, content: str | None = None, components: list | None = None, public: bool = False) -> None:
         body: dict = {"type": kind}

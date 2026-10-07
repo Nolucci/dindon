@@ -135,6 +135,7 @@ class BotRunner:
         self._ingest = ingest
         self._erase_server = erase_server                # called with the id of a server that the bot was removed from, or None: keep the data
         self.interactions = interactions                # privacy commands (bot/privacy_commands.py), or None
+        self._application_id: str | None = None
         self.debates = debates                          # the debates (bot/debate_commands.py), or None
         if debates is not None:
             debates.guild_info = self.directory.guild
@@ -193,13 +194,17 @@ class BotRunner:
         if kind in DIRECTORY_EVENTS:
             if self.directory.apply(kind, data) and kind == "GUILD_CREATE":
                 guild = self.directory.guild(data["id"])
+                if self.interactions is not None and self._application_id is not None:
+                    self._spawn(self.interactions.register_guild(self._application_id, str(data["id"])))
                 log.info("server %s is ready: %d channels and threads, %d roles", data["id"], len(guild.channels), len(guild.roles))
         elif kind == "MESSAGE_CREATE":
             if self.debates is not None and self.debates.is_debate_thread(data.get("channel_id")):
                 self.debates.on_message(data)           # counted for the debate; it also goes on to the map like any message
             self._message(data)
         elif kind == "READY" and self.interactions is not None and (data.get("application") or {}).get("id"):
-            self._spawn(self.interactions.register(str(data["application"]["id"])))
+            self._application_id = str(data["application"]["id"])
+            guild_ids = tuple(dict.fromkeys(str(g["id"]) for g in data.get("guilds", []) if self.directory.is_allowed(g.get("id"))))
+            self._spawn(self.interactions.register(self._application_id, guild_ids))
         elif kind == "INTERACTION_CREATE" and self.interactions is not None:
             self._spawn(self.interactions.answer(data))
         elif kind == "MESSAGE_UPDATE":

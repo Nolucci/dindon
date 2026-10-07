@@ -13,6 +13,7 @@ from dindon import privacy
 from dindon.api.main import create_app
 from dindon.bot.privacy_commands import COMMAND, EPHEMERAL, Interactions, PrivacyService
 from dindon.bot.runner import BotRunner, Writer
+from dindon.bot.rest import Response
 from gateway_fixtures import ALICE, BOB, CAROL, GUILD, guild_create, message_create
 from synthetic import settings_for
 from test_bot import create, event, flush, messages
@@ -158,6 +159,19 @@ def test_old_messages_are_deleted_after_the_retention_and_nothing_if_there_is_no
 class Sent:
     def __init__(self):
         self.calls = []
+        self.commands = {}
+
+    def command_call(self, method, path, body=None):
+        self.calls.append((method, path, body, True, None))
+        if method == "GET":
+            return Response(200, self.commands.get(path, []))
+        saved = json.loads(json.dumps(body))
+        if method == "PUT":
+            self.commands[path] = saved
+        elif method == "POST":
+            kept = [c for c in self.commands.get(path, []) if (c["name"], c.get("type", 1)) != (saved["name"], saved["type"])]
+            self.commands[path] = [*kept, saved]
+        return Response(200)
 
     def __call__(self, method, path, body, authorized, attachment=None):
         self.calls.append((method, path, body, authorized, attachment))
@@ -190,13 +204,14 @@ def commands(ingest_url, tmp_path):
     service = PrivacyService(ingest_url, (tmp_path,), clock=clock)
     interactions = Interactions("tok", "http://api", service)
     sent = interactions._request = Sent()
+    interactions._command_rest.call = sent.command_call
     return interactions, service, sent, clock
 
 
 def test_the_command_is_registered_and_info_answers_at_once(ingest_url, tmp_path):
     interactions, service, sent, clock = commands(ingest_url, tmp_path)
     asyncio.run(interactions.register("42"))
-    assert sent.calls[0][:2] == ("PUT", "/applications/42/commands") and sent.calls[0][2] == [COMMAND] and sent.calls[0][3] is True
+    assert sent.of("PUT")[0][:2] == ("PUT", "/applications/42/commands") and sent.of("PUT")[0][2] == [COMMAND] and sent.of("PUT")[0][3] is True
     asyncio.run(interactions.answer(interaction(CAROL_ID, "info")))
     method, path, body, authorized, _ = sent.calls[-1]
     assert (method, path, authorized) == ("POST", "/interactions/777/tok/callback", False)   # the token is in the URL: no authorization
@@ -215,7 +230,7 @@ def test_the_entry_point_of_the_activity_is_kept_when_the_activity_is_set_up(ing
     interactions, service, sent, clock = commands(ingest_url, tmp_path)
     interactions.activity = True
     asyncio.run(interactions.register("42"))
-    assert sent.calls[0][2] == [COMMAND, ENTRY_POINT]
+    assert sent.of("PUT")[0][2] == [COMMAND, ENTRY_POINT]
     assert ENTRY_POINT["type"] == 4 and ENTRY_POINT["handler"] == 2 and interactions.registered      # Discord opens the Activity itself: no answer to give
 
 
@@ -289,6 +304,7 @@ def test_the_engine_gives_the_events_to_the_commands_and_reads_the_register(inge
     service = PrivacyService(ingest_url)
     interactions = Interactions("tok", "http://api", service)
     sent = interactions._request = Sent()
+    interactions._command_rest.call = sent.command_call
     runner = BotRunner([GUILD], Writer(ingest_url), batch_seconds=0, interactions=interactions)
 
     async def go():
@@ -298,7 +314,7 @@ def test_the_engine_gives_the_events_to_the_commands_and_reads_the_register(inge
         privacy.stop_recording(ingest_db, ALICE_ID)
         await runner._beat()
     asyncio.run(go())
-    assert [c[0] for c in sent.calls] == ["PUT", "POST"] and str(ALICE_ID) in service.blocked
+    assert sorted(c[0] for c in sent.calls) == ["GET", "POST", "PUT"] and str(ALICE_ID) in service.blocked
 
 
 def test_a_failing_command_still_answers_and_says_nothing_was_done(ingest_url, tmp_path, monkeypatch):
@@ -591,3 +607,127 @@ def test_removed_from_a_server_the_bot_erases_it_only_when_asked_and_not_in_an_o
     talk(ingest_url)
     assert Writer(ingest_url).erase_server(int(GUILD), ())["messages"] == 3                  # what the bot really calls
     assert ingest_db.execute("SELECT count(*) FROM messages").fetchone()[0] == 0
+
+
+def test_server_commands_are_synced_first_and_unchanged_commands_are_not_rewritten(ingest_url, tmp_path):
+    interactions, _service, sent, _clock = commands(ingest_url, tmp_path)
+    guild_path = f"/applications/42/guilds/{GUILD}/commands"
+    global_path = "/applications/42/commands"
+    other = {"name": "other", "type": 1, "description": "Another command"}
+    sent.commands[guild_path] = [other]
+    asyncio.run(interactions.register("42", (str(GUILD),)))
+    assert sent.calls[0][:2] == ("GET", guild_path)
+    assert sent.calls[1][:3] == ("POST", guild_path, COMMAND)
+    assert other in sent.commands[guild_path]
+    assert sent.commands[global_path] == [COMMAND]
+    writes = [c for c in sent.calls if c[0] != "GET"]
+    # A new bot process reads Discord's definitions and still avoids unnecessary writes.
+    rebuilt, _service, after, _clock = commands(ingest_url, tmp_path)
+    after.commands = sent.commands
+    asyncio.run(rebuilt.register("42", (str(GUILD),)))
+    assert all(c[0] == "GET" for c in after.calls) and rebuilt.registered
+    assert len(writes) == 2
+    # Discord adds identifiers and default fields in the response.
+    after.commands[global_path][0].update(id="100", version="200", application_id="42")
+    after.commands[global_path][0]["options"][0].update(required=False, options=[], name_localizations=None)
+    asyncio.run(rebuilt.register("42", (str(GUILD),)))
+    assert all(c[0] == "GET" for c in after.calls)
+
+
+def test_changed_options_are_updated_after_a_rebuild(ingest_url, tmp_path):
+    interactions, _service, sent, _clock = commands(ingest_url, tmp_path)
+    old = json.loads(json.dumps(COMMAND))
+    old["options"][-1]["name"] = "old-command"
+    guild_path = f"/applications/42/guilds/{GUILD}/commands"
+    sent.commands[guild_path] = [old]
+    sent.commands["/applications/42/commands"] = [old]
+    asyncio.run(interactions.register("42", (str(GUILD),)))
+    assert sent.of("POST")[0][1:3] == (guild_path, COMMAND)
+    assert sent.of("PUT")[0][2] == [COMMAND]
+
+
+def test_ready_and_new_server_events_sync_only_followed_servers(ingest_url, tmp_path):
+    interactions, _service, sent, _clock = commands(ingest_url, tmp_path)
+    runner = BotRunner([GUILD], Writer(ingest_url), interactions=interactions)
+
+    async def go():
+        runner.handle(event("READY", {"application": {"id": "42"}, "guilds": [{"id": str(GUILD)}, {"id": "99"}]}))
+        runner.handle(event("GUILD_CREATE", guild_create()))
+        other = {**guild_create(), "id": "99"}
+        runner.handle(event("GUILD_CREATE", other))
+        await asyncio.gather(*list(runner._tasks))
+    asyncio.run(go())
+    guild_writes = [c for c in sent.of("POST") if "/guilds/" in c[1]]
+    assert len(guild_writes) == 1 and f"/guilds/{GUILD}/" in guild_writes[0][1]
+    assert all("/guilds/99/" not in c[1] for c in sent.calls)
+
+
+def test_new_server_is_synced_when_following_all_servers(ingest_url, tmp_path):
+    interactions, _service, sent, _clock = commands(ingest_url, tmp_path)
+    runner = BotRunner(None, Writer(ingest_url), interactions=interactions)
+
+    async def go():
+        runner.handle(event("READY", {"application": {"id": "42"}, "guilds": []}))
+        await asyncio.gather(*list(runner._tasks))
+        runner.handle(event("GUILD_CREATE", guild_create()))
+        await asyncio.gather(*list(runner._tasks))
+    asyncio.run(go())
+    assert sent.of("POST")[0][1] == f"/applications/42/guilds/{GUILD}/commands"
+
+
+def test_failed_server_registration_can_be_retried_and_activity_is_global_only(ingest_url, tmp_path):
+    from dindon.bot.privacy_commands import ENTRY_POINT
+
+    interactions, _service, sent, _clock = commands(ingest_url, tmp_path)
+    interactions.activity = True
+    original = sent.command_call
+    failures = [True]
+
+    def request(method, path, body=None):
+        if "/guilds/" in path and method == "POST" and failures:
+            failures.pop()
+            return Response(503)
+        return original(method, path, body)
+
+    interactions._command_rest.call = request
+
+    async def go():
+        await interactions.register("42", (str(GUILD),))
+        await interactions.register_guild("42", str(GUILD))
+    asyncio.run(go())
+    assert sent.commands[f"/applications/42/guilds/{GUILD}/commands"] == [COMMAND]
+    assert sent.commands["/applications/42/commands"] == [COMMAND, ENTRY_POINT]
+    assert interactions.registered
+
+
+def test_failed_command_read_does_not_rewrite_definitions(ingest_url, tmp_path):
+    interactions, _service, sent, _clock = commands(ingest_url, tmp_path)
+    interactions.activity = True
+    methods = []
+
+    def request(method, _path, _body=None):
+        methods.append(method)
+        return Response(503)
+
+    interactions._command_rest.call = request
+    asyncio.run(interactions.register("42", (str(GUILD),)))
+    assert methods == ["GET", "GET"] and not interactions.registered
+
+
+def test_refused_activity_does_not_prevent_slash_command_registration(ingest_url, tmp_path):
+    from dindon.bot.privacy_commands import ENTRY_POINT
+
+    interactions, _service, sent, _clock = commands(ingest_url, tmp_path)
+    interactions.activity = True
+    original = sent.command_call
+
+    def request(method, path, body=None):
+        if method == "PUT" and ENTRY_POINT in body:
+            return Response(400)
+        return original(method, path, body)
+
+    interactions._command_rest.call = request
+    asyncio.run(interactions.register("42", (str(GUILD),)))
+    assert interactions.registered
+    assert sent.commands[f"/applications/42/guilds/{GUILD}/commands"] == [COMMAND]
+    assert sent.commands["/applications/42/commands"] == [COMMAND]
