@@ -67,18 +67,30 @@ def _contradictions(conn: psycopg.Connection, guild_id: int, limit: int) -> dict
             "changed_mind": [{"person": who, "position": text} for who, text, _ in changes]}
 
 
+PARTS = ("themes", "positions", "contradictions")
+
+
+def only(digest: dict, part: str) -> dict:
+    """The digest cut to one part ("all" keeps everything)."""
+    return digest if part == "all" else {"guild": digest["guild"], part: digest[part]}
+
+
 def to_markdown(digest: dict) -> str:
-    """The digest as short Markdown: a title and a few bullets per part."""
-    lines = [f"# Synthèse du serveur {digest['guild']}", "", "## Thèmes"]
-    lines += [f"- **{t['theme']}** : {t['propositions']} positions, {t['people']} personnes" for t in digest["themes"]] or ["- aucun thème"]
-    lines += ["", "## Positions"]
-    lines += [f"- {p['position']} : {p['for']} pour, {p['against']} contre, {p['nuanced']} nuancé" + (f" ({p['theme']})" if p["theme"] else "")
-              for p in digest["positions"]] or ["- aucune position"]
-    c = digest["contradictions"]
-    lines += ["", "## Contradictions"]
-    lines += [f"- {x['person']} : rôle « {x['role']} » incompatible avec ses propos sur « {x['axis']} »" for x in c["against_own_roles"]]
-    lines += [f"- {x['person']} : rôles opposés {x['roles'][0]} / {x['roles'][1]} sur « {x['axis']} »" for x in c["opposed_roles"]]
-    lines += [f"- {x['person']} : a changé d'avis sur « {x['position']} »" for x in c["changed_mind"]]
-    if not (c["against_own_roles"] or c["opposed_roles"] or c["changed_mind"]):
-        lines.append("- aucune contradiction trouvée")
+    """The digest as short Markdown: a title and a few bullets per part present."""
+    lines = [f"# Synthèse du serveur {digest['guild']}"]
+    if "themes" in digest:
+        lines += ["", "## Thèmes"]
+        lines += [f"- **{t['theme']}** : {t['propositions']} positions, {t['people']} personnes" for t in digest["themes"]] or ["- aucun thème"]
+    if "positions" in digest:
+        lines += ["", "## Positions"]
+        lines += [f"- {p['position']} : {p['for']} pour, {p['against']} contre, {p['nuanced']} nuancé" + (f" ({p['theme']})" if p["theme"] else "")
+                  for p in digest["positions"]] or ["- aucune position"]
+    if "contradictions" in digest:
+        c = digest["contradictions"]
+        lines += ["", "## Contradictions"]
+        lines += [f"- {x['person']} : rôle « {x['role']} » incompatible avec ses propos sur « {x['axis']} »" for x in c["against_own_roles"]]
+        lines += [f"- {x['person']} : rôles opposés {x['roles'][0]} / {x['roles'][1]} sur « {x['axis']} »" for x in c["opposed_roles"]]
+        lines += [f"- {x['person']} : a changé d'avis sur « {x['position']} »" for x in c["changed_mind"]]
+        if not (c["against_own_roles"] or c["opposed_roles"] or c["changed_mind"]):
+            lines.append("- aucune contradiction trouvée")
     return "\n".join(lines) + "\n"

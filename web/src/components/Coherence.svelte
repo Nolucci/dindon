@@ -56,6 +56,10 @@
         <div class="metric"><dt>Cohérents</dt><dd>{data.totals.concordant}</dd></div>
         <div class="metric"><dt>Pas assez de propos</dt><dd>{data.totals.not_verifiable}</dd></div>
       </dl>
+      <div class="actions">
+        <a class="btn" href={api.digestUrl(guild, 'md', 'contradictions')} download>Exporter les contradictions (.md)</a>
+        <a class="btn" href={api.digestUrl(guild, 'json', 'contradictions')} download>JSON</a>
+      </div>
       <div class="toolbar" role="search" aria-label="Chercher dans la liste">
         <input class="field-input" type="search" placeholder="Chercher une personne ou un rôle… (/)" bind:value={q} aria-label="Chercher une personne ou un rôle" use:slash />
         <select class="select" bind:value={verdictFilter} aria-label="Filtrer par verdict">

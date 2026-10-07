@@ -52,7 +52,7 @@ export const api = {
   privacyFind: (q) => request(`/api/privacy/find${query({ q })}`),
   privacyAct: (action, user_id, reason) =>
     request(`/api/privacy/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: String(user_id), reason: reason || '' }) }),
-  digestUrl: (guild, format) => `/api/digest${query({ guild, format })}`,
+  digestUrl: (guild, format, part = 'all') => `/api/digest${query({ guild, format, part })}`,
   positions: (guild, filters = {}) => request(`/api/positions${query({ guild, ...filters })}`),
   positionsProposition: (id, guild) => request(`/api/positions/proposition/${id}${query({ guild })}`),
   positionsReview: (id, guild, rejected) =>

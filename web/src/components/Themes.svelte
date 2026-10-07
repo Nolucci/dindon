@@ -193,6 +193,8 @@
           <button class="btn btn-primary" onclick={start} disabled={!canStart || busy}>Lancer l’analyse</button>
         {/if}
         <button type="button" class="btn" onclick={onAutomate}>Automatiser les prochaines analyses</button>
+        <a class="btn" href={api.digestUrl(guild, 'md', 'themes')} download>Exporter les thèmes (.md)</a>
+        <a class="btn" href={api.digestUrl(guild, 'json', 'themes')} download>JSON</a>
       </div>
       <details class="advanced">
         <summary>Réglages et détails de l’analyse</summary>

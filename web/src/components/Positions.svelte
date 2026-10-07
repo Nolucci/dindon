@@ -233,8 +233,8 @@
             <button class="btn btn-primary" onclick={start} disabled={!canStart || busy}>Lire les positions</button>
           {/if}
           <button type="button" class="btn" onclick={onAutomate}>Automatiser les prochaines lectures</button>
-          <a class="btn" href={api.digestUrl(guild, 'md')} download>Exporter la synthèse (.md)</a>
-          <a class="btn" href={api.digestUrl(guild, 'json')} download>JSON</a>
+          <a class="btn" href={api.digestUrl(guild, 'md', 'positions')} download>Exporter les positions (.md)</a>
+          <a class="btn" href={api.digestUrl(guild, 'json', 'positions')} download>JSON</a>
         </div>
         <p class="muted hint">{fmt.format(remaining)} conversation{remaining > 1 ? 's' : ''} restante{remaining > 1 ? 's' : ''}. Les conversations déjà lues ne sont pas relues.</p>
         <details class="advanced"><summary>Options de lecture</summary>

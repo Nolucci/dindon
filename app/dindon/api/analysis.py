@@ -187,15 +187,16 @@ def merge(request: Request, topic_id: int, body: Merge) -> dict:
 
 
 @router.get("/digest")
-def digest(request: Request, guild: int | None = None, format: Literal["md", "json"] = "md", limit: int = Query(10, ge=1, le=100)) -> Response:
+def digest(request: Request, guild: int | None = None, format: Literal["md", "json"] = "md", part: Literal["all", "themes", "positions", "contradictions"] = "all",
+           limit: int = Query(10, ge=1, le=100)) -> Response:
     """The themes, the positions and the contradictions in a few lines, as a file to download (Markdown or JSON)."""
     import json
 
     with request.app.state.pool.connection() as conn:
         guild_id = resolve_guild(conn, guild)
-        result = digest_of.build(conn, guild_id, limit=limit)
+        result = digest_of.only(digest_of.build(conn, guild_id, limit=limit), part)
     if format == "json":
         body, media = json.dumps(result, ensure_ascii=False, indent=2), "application/json"
     else:
         body, media = digest_of.to_markdown(result), "text/markdown"
-    return Response(body, media_type=f"{media}; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="synthese-{guild_id}.{format}"'})
+    return Response(body, media_type=f"{media}; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="synthese-{guild_id}{'' if part == 'all' else '-' + part}.{format}"'})

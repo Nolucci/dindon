@@ -231,3 +231,6 @@ def test_the_digest_is_a_file_to_download_in_markdown_or_json(me):
     assert "## Thèmes" in page.text and "## Positions" in page.text and "## Contradictions" in page.text
     data = me.get("/api/digest", params={"format": "json", "limit": 3}).json()
     assert set(data) == {"guild", "themes", "positions", "contradictions"}
+    only = me.get("/api/digest", params={"part": "themes"})
+    assert "## Thèmes" in only.text and "## Positions" not in only.text and only.headers["content-disposition"].endswith('themes.md"')
+    assert set(me.get("/api/digest", params={"part": "contradictions", "format": "json"}).json()) == {"guild", "contradictions"}
