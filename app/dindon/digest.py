@@ -6,6 +6,7 @@ Every line is a reading made by a program of the messages, not a fact: the proof
 from __future__ import annotations
 
 import psycopg
+from psycopg.rows import tuple_row
 
 from dindon.api.common import LABEL
 
@@ -15,8 +16,13 @@ LIVE = "p.status NOT IN ('rejected', 'merged')"
 
 def build(conn: psycopg.Connection, guild_id: int, *, limit: int = 10) -> dict:
     """The themes, positions and contradictions of one server, each list cut to `limit` lines (the most telling first)."""
-    return {"guild": guild_id, "themes": _themes(conn, guild_id, limit), "positions": _positions(conn, guild_id, limit),
-            "contradictions": _contradictions(conn, guild_id, limit)}
+    previous = conn.row_factory           # the web pool gives dictionaries; the queries below read tuples
+    conn.row_factory = tuple_row
+    try:
+        return {"guild": guild_id, "themes": _themes(conn, guild_id, limit), "positions": _positions(conn, guild_id, limit),
+                "contradictions": _contradictions(conn, guild_id, limit)}
+    finally:
+        conn.row_factory = previous
 
 
 def _themes(conn: psycopg.Connection, guild_id: int, limit: int) -> list[dict]:

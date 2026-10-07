@@ -62,7 +62,7 @@ def analyze(client, **body) -> dict:
     return finished(client)
 
 
-@pytest.mark.parametrize("method, path", [("get", "/api/analysis"), ("post", "/api/analysis"), ("post", "/api/analysis/cancel"), ("get", "/api/topics"),
+@pytest.mark.parametrize("method, path", [("get", "/api/analysis"), ("post", "/api/analysis"), ("post", "/api/analysis/cancel"), ("get", "/api/topics"), ("get", "/api/digest"),
                                           ("patch", "/api/topics/1"), ("post", "/api/topics/1/merge"), ("post", "/api/topics/validate-batch")])
 def test_nothing_of_the_analysis_is_available_without_the_session(app, method, path):
     assert getattr(app, method)(path, **({"json": {}} if method != "get" else {})).status_code == 401
@@ -223,3 +223,11 @@ def test_what_the_person_does_to_a_proposal_protects_it_from_the_next_run(me):
     assert "Mon nom" in labels                                                       # the renamed one is still there
     with_merged = [t for t in me.get("/api/topics").json() if t["conversations"]]
     assert len(labels) == 6 + 2 and with_merged                                      # six new proposals, and the two that were touched
+
+
+def test_the_digest_is_a_file_to_download_in_markdown_or_json(me):
+    page = me.get("/api/digest")
+    assert page.status_code == 200 and "attachment" in page.headers["content-disposition"] and page.headers["content-disposition"].endswith('.md"')
+    assert "## Thèmes" in page.text and "## Positions" in page.text and "## Contradictions" in page.text
+    data = me.get("/api/digest", params={"format": "json", "limit": 3}).json()
+    assert set(data) == {"guild", "themes", "positions", "contradictions"}

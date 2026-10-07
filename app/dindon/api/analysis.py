@@ -7,8 +7,10 @@ proposal: validated, rejected, renamed, merged into another. The code never vali
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
+from dindon import digest as digest_of
 from dindon.analysis.embeddings import conversation_texts
 from dindon.analysis.job import STAGES, AnalysisBusy, NotReady
 from dindon.api.auth import require_session
@@ -182,3 +184,18 @@ def merge(request: Request, topic_id: int, body: Merge) -> dict:
         conn.execute("UPDATE topics SET merged_into = %s WHERE merged_into = %s", (body.into, topic_id))   # what was merged into it follows
         conn.execute("UPDATE topics SET touched_at = now() WHERE id = %s", (body.into,))
         return _one(conn, body.into)
+
+
+@router.get("/digest")
+def digest(request: Request, guild: int | None = None, format: Literal["md", "json"] = "md", limit: int = Query(10, ge=1, le=100)) -> Response:
+    """The themes, the positions and the contradictions in a few lines, as a file to download (Markdown or JSON)."""
+    import json
+
+    with request.app.state.pool.connection() as conn:
+        guild_id = resolve_guild(conn, guild)
+        result = digest_of.build(conn, guild_id, limit=limit)
+    if format == "json":
+        body, media = json.dumps(result, ensure_ascii=False, indent=2), "application/json"
+    else:
+        body, media = digest_of.to_markdown(result), "text/markdown"
+    return Response(body, media_type=f"{media}; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="synthese-{guild_id}.{format}"'})
