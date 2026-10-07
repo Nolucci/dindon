@@ -75,7 +75,10 @@ def test_people_without_a_link_can_be_shown_hidden_searched_and_opened(app_port)
         page.wait_for_selector("footer span:has-text('personne')", timeout=20000)
 
         box = page.get_by_label("Sans lien")
-        assert box.is_checked()                                                         # on by default
+        assert not box.is_checked()                                                     # off by default
+        page.wait_for_selector("footer span:has-text('2 personnes')", timeout=5000)
+        assert "sans lien" not in page.inner_text("footer")
+        box.check()
         page.wait_for_selector("footer span:has-text('sans lien')")
         assert "3 personnes (dont 1 sans lien)" in squeeze(page.inner_text("footer"))   # Bob and Carol linked, Alice alone
         assert "2 liens" not in squeeze(page.inner_text("footer")) and "1 lien" in squeeze(page.inner_text("footer")) and "1 liens" not in squeeze(page.inner_text("footer"))
@@ -90,7 +93,7 @@ def test_people_without_a_link_can_be_shown_hidden_searched_and_opened(app_port)
         page.wait_for_selector("aside h2")
         assert "Ali" in page.inner_text("aside h2") and "1" in page.inner_text("aside")
 
-        box.uncheck()                                                                   # hidden: as before, at once
+        box.uncheck()                                                                   # hidden again, at once
         page.wait_for_selector("footer span:has-text('2 personnes')", timeout=5000)
         assert "sans lien" not in page.inner_text("footer")
         box.check()

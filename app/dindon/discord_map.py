@@ -45,7 +45,7 @@ FILTERS = ("weight", "theme", "ideology")
 SENSITIVE_FILTERS = ("theme", "ideology")
 WEIGHTS = (0.0, 0.5, 1.0, 3.0, 10.0)
 MIN_SCORE = 0.3          # an axis is shown when the person stands at least this far from the middle (as on the card of /dindon card)
-DEFAULT = {"enabled": False, "max_people": 40, "names": 15, "kinds": list(KINDS), "sections": ["activity", "months", "habits", "links"], "filters": ["weight"],
+DEFAULT = {"enabled": False, "max_people": 100, "names": 15, "kinds": list(KINDS), "sections": ["activity", "months", "habits", "links"], "filters": ["weight"],
            "acknowledged": False}
 SHAPES = {"normal": "Normale", "spiral": "Spirale", "star": "Étoile", "square": "Carré", "heart": "Cœur", "dindon": "Tête de dindon"}
 WIDTH, HEIGHT, SCALE = 1280, 720, 2          # 16:9, like the background (and like the Activity)

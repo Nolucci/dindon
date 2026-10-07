@@ -82,17 +82,38 @@ export const api = {
 
 // Live events. The browser reconnects by itself; `onState` says whether the line is open.
 export function openEvents(onEvent, onState) {
-  const source = new EventSource('/events');
-  source.onopen = () => onState(true);
-  source.onerror = () => onState(false);
-  source.onmessage = (message) => {
-    try {
-      onEvent(JSON.parse(message.data));
-    } catch {
-      /* an event that is not understood is ignored */
-    }
+  let source = null;
+  let retry = null;
+  let stopped = false;
+  const connect = () => {
+    clearTimeout(retry);
+    source?.close();
+    source = new EventSource('/events');
+    source.onopen = () => onState(true);
+    source.onerror = () => {
+      onState(false);
+      // The browser retries by itself, except when the server answered with an error: then the line is closed for good and is opened again here
+      if (!stopped && source.readyState === EventSource.CLOSED) retry = setTimeout(connect, 3000);
+    };
+    source.onmessage = (message) => {
+      try {
+        onEvent(JSON.parse(message.data));
+      } catch {
+        /* an event that is not understood is ignored */
+      }
+    };
   };
-  return () => source.close();
+  const wake = () => {
+    if (!stopped && document.visibilityState === 'visible' && source?.readyState !== EventSource.OPEN) connect();
+  };
+  document.addEventListener('visibilitychange', wake);
+  connect();
+  return () => {
+    stopped = true;
+    clearTimeout(retry);
+    document.removeEventListener('visibilitychange', wake);
+    source?.close();
+  };
 }
 
 /** A function that runs a call to the application and, if it fails, tells what to do: `onAuthLost` when the session is gone, `onProblem(message)` otherwise. It returns what the call returns, or undefined. */

@@ -17,7 +17,7 @@
   let { onLogout } = $props();
 
   const PEOPLE_STEPS = [10, 25, 50, 100, 200, 500, 1000, 3000];     // the slider on the map: how many people at most (the most connected first)
-  const PEOPLE_STEPS_DEFAULT = 3000;
+  const PEOPLE_STEPS_DEFAULT = 100;
   const PRESETS = [
     { id: 'all', label: 'Tout', days: null },
     { id: '90', label: '90 j', days: 90 },
@@ -54,7 +54,7 @@
   let analysisSection = $state('themes');
   let stale = false;              // something happened to the map while it was hidden: it is brought up to date when it comes back
   let grouped = $state(false);     // placed by role and by resemblance of names instead of by exchanges
-  let showIsolated = $state(true); // also the people who wrote and have no link on the map (points on their own)
+  let showIsolated = $state(false); // also the people who wrote and have no link on the map (points on their own)
   let lastExchange = $state(null);
   let exchangeTimer;
   let recent = [];                // the exchanges of the last seconds, to name the people who talk together
@@ -91,7 +91,7 @@
   const DEFAULTS = { preset: 'all', density: '2500', minWeight: '0', people: String(PEOPLE_STEPS_DEFAULT) };
   // Something differs from what the map shows when it is opened
   let dirty = $derived(preset !== DEFAULTS.preset || since !== '' || until !== '' || !KINDS.every((k) => kinds[k.id]) || density !== DEFAULTS.density || people !== DEFAULTS.people
-    || channel !== '' || theme !== '' || role !== '' || minWeight !== DEFAULTS.minWeight || !showIsolated || grouped || query !== '');
+    || channel !== '' || theme !== '' || role !== '' || minWeight !== DEFAULTS.minWeight || showIsolated || grouped || query !== '');
 
   function resetFilters() {
     preset = DEFAULTS.preset;
@@ -101,7 +101,7 @@
     people = DEFAULTS.people;
     channel = theme = role = '';
     minWeight = DEFAULTS.minWeight;
-    showIsolated = true;
+    showIsolated = false;
     query = '';
     suggestions = [];
     if (grouped) {
@@ -432,7 +432,7 @@
       </main>
 
       <footer>
-        <span class="live" class:on={live} title={live ? 'Les nouveaux échanges s’allument sur la carte dès qu’ils arrivent.' : 'Le flux en direct (/events) est coupé : la carte ne s’allume plus toute seule, mais elle reste juste à chaque rechargement. Elle se reconnecte seule.'}><i></i>{live ? 'En direct' : 'Hors ligne'}</span>
+        <span class="live on" class:reconnecting={!live} title={live ? 'Les nouveaux échanges s’allument sur la carte dès qu’ils arrivent.' : 'Le flux en direct est en train de se reconnecter : la carte reste juste, elle se rallumera seule.'}><i></i>En direct</span>
         {#if meta}
           <span>{fmt.format(meta.nodes_shown)} {plural(meta.nodes_shown, 'personne', 'personnes')}{#if meta.isolated_shown > 0}&nbsp;(dont {fmt.format(meta.isolated_shown)} sans lien{#if meta.isolated_hidden > 0}, + {fmt.format(meta.isolated_hidden)} masquées{/if}){/if}{#if meta.nodes_hidden > 0}&nbsp;(+ {fmt.format(meta.nodes_hidden)} moins connectées, masquées){/if}</span>
           <span>{fmt.format(meta.edges_shown)} {plural(meta.edges_shown, 'lien', 'liens')}{#if meta.edges_hidden > 0}&nbsp;(+ {fmt.format(meta.edges_hidden)} plus faibles, masqués){/if}</span>
@@ -679,6 +679,8 @@
     background: var(--success);
     box-shadow: 0 0 0.375rem var(--success);
   }
+
+  .live.reconnecting i { opacity: 0.35; box-shadow: none; }
 
   .zoomPad { display: none; }
 
