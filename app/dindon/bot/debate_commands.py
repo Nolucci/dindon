@@ -69,7 +69,7 @@ TEXT = {
     "forum_not_forum": "Ce salon n'est pas un forum de ce serveur : choisissez un salon de type forum.",
     "forum_unreachable": "Dindon ne peut pas lire ce forum. Donnez-lui l'accès : voir le salon, envoyer des messages, envoyer des messages dans les posts.",
     "forum_tag_unknown": "Je ne connais pas l'étiquette « {tag} » dans ce forum. Étiquettes : {tags}.",
-    "forum_tag_required": "Ce forum exige une étiquette sur chaque post : indiquez celle des débats avec `etiquette:`. Étiquettes : {tags}.",
+    "forum_tag_required": "Ce forum exige une étiquette. Ajoutez une étiquette générale non réservée aux modérateurs (Politique ou Philosophie), ou indiquez une étiquette de secours avec `etiquette:`. Étiquettes : {tags}.",
     "forum_tag_moderated": " Cette étiquette est réservée aux modérateurs : Dindon n'y arrivera que s'il peut gérer les fils.",
     "no_topic": "Écrivez un sujet, ou choisissez un axe : Dindon posera sa question.",
     "no_axis": "Cet axe n'est plus proposé : choisissez-en un autre, ou écrivez un sujet.",
@@ -372,7 +372,10 @@ class Debates:
         if not channel.ok or not isinstance(channel.data, dict) or channel.data.get("type") != forum.FORUM_CHANNEL:
             log.warning("the forum of the debates could not be read (HTTP %s): the debate goes in a thread", channel.status)
             return "failed"
-        tags = forum.pick_tags(channel.data.get("available_tags") or [], where.tag_id, (debate.axis or {}).get("name"))
+        tags = forum.pick_tags(channel.data.get("available_tags") or [], where.tag_id, (debate.axis or {}).get("name"), debate.topic,
+                               required=bool(int(channel.data.get("flags") or 0) & forum.REQUIRE_TAG))
+        if not tags and int(channel.data.get("flags") or 0) & forum.REQUIRE_TAG:
+            return "failed"
         body = {"name": texts.thread_name(debate.topic), "auto_archive_duration": AUTO_ARCHIVE_MINUTES, "applied_tags": tags,
                 "message": texts.question(debate, dict.fromkeys(rules.POSITIONS, 0), verifying=self.verifying, live=self.notice_mode)}
         made = await self._rest("POST", f"/channels/{where.channel_id}/threads", body)
@@ -417,7 +420,7 @@ class Debates:
             if chosen is None:
                 await say(data, TEXT["forum_tag_unknown"].format(tag=wanted, tags=forum.tag_names(available) or "aucune"))
                 return
-        elif int(found.data.get("flags") or 0) & forum.REQUIRE_TAG:
+        elif int(found.data.get("flags") or 0) & forum.REQUIRE_TAG and forum.general_tag(available) is None:
             await say(data, TEXT["forum_tag_required"].format(tags=forum.tag_names(available) or "aucune"))
             return
         saved = forum.Forum(int(channel_id), str(found.data.get("name") or ""), str(chosen["id"]) if chosen else None, str(chosen["name"]) if chosen else None)

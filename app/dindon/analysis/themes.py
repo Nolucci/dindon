@@ -30,6 +30,8 @@ log = logging.getLogger("dindon.analysis")
 
 MIN_SIZE = 3            # conversations: below this a group is noise
 MIN_CONVERSATIONS = 16  # below this there is not enough to find topics
+MIN_SIMILARITY = 0.35   # a distant conversation has no topic
+MIN_MARGIN = 0.01       # a borderline tie between two topics is left unclassified
 TOKEN = re.compile(r"[a-zàâäçéèêëîïôöùûüÿœæ]{4,}")
 STOPWORDS = frozenset(["alors", "aucun", "aussi", "autre", "autres", "avec", "avez", "avoir", "avons", "beaucoup", "bien", "cela", "celle", "celles", "celui", "cependant", "certains", "chaque", "comme", "comment", "contre", "dans", "depuis", "dire", "dont", "donc", "elle", "elles", "encore", "entre", "était", "étaient", "être", "faire", "fait", "faut", "fois", "haha", "leur", "leurs", "lors", "mais", "même", "mdr", "merci", "moins", "notre", "nous", "oui", "parce", "pareil", "peut", "peuvent", "plus", "plutôt", "pour", "pourquoi", "pourtant", "puis", "quand", "quel", "quelle", "quelles", "quels", "quelque", "quoi", "sans", "selon", "sera", "seront", "ses", "sont", "sous", "tellement", "tout", "toute", "toutes", "tous", "très", "trop", "vous", "votre", "vraiment", "voir", "voilà", "autant", "bonjour", "bonsoir", "ceci", "chez", "déjà", "être", "jamais", "jusqu", "juste", "lorsque", "ouais", "parfois", "peut-être", "pense", "penses", "pourrait", "sinon", "souvent", "tant", "toujours", "veut", "veux", "vois", "vers", "ceux", "ainsi", "après", "avant", "avait", "avaient", "cette", "cettes", "ces", "ils", "ilsa", "non", "pas", "pareil", "quand", "quelqu", "rien", "suis", "tiens", "vais", "voulais", "allez", "aller", "ailleurs", "apres", "aucune", "aurait", "autres", "bref", "bon", "bonne", "car", "cas", "cela", "chose", "choses", "dit", "dites", "disait", "donne", "entre", "eux", "facon", "gens", "grand", "grande", "hier", "ici", "jour", "jours", "lequel", "mieux", "moi", "mon", "mes", "mêmes", "nos", "nouvelle", "part", "pense", "petit", "peu", "peux", "pris", "pu", "quoi", "sais", "savoir", "sera", "sommes", "soit", "sur", "tes", "ton", "trois", "très", "une", "unes", "vas", "veux", "vieux", "vite", "vois", "vos"])
 
@@ -133,6 +135,18 @@ def choose_topics(x: np.ndarray, rng: np.random.Generator, forced: int | None = 
     return best[1], best[2], {"k": int(len(best[2])), "chosen_by": "silhouette", "scores": scores}
 
 
+def confident_assignments(similarities: np.ndarray, labels: np.ndarray) -> list[int]:
+    """Indices with a credible topic; K-means labels alone always assign noise."""
+    chosen = similarities[np.arange(len(labels)), labels]
+    runner_up = np.partition(similarities, -2, axis=1)[:, -2]
+    minimum = {g: max(MIN_SIMILARITY, float(np.quantile(chosen[labels == g], 0.10)))
+               for g in np.unique(labels)}
+    median = {g: float(np.median(chosen[labels == g])) for g in minimum}
+    return [i for i, g in enumerate(labels)
+            if chosen[i] >= minimum[g] and
+            (chosen[i] - runner_up[i] >= MIN_MARGIN or chosen[i] >= median[g])]
+
+
 # ---------------------------------------------------------------------------------------------
 # Naming
 # ---------------------------------------------------------------------------------------------
@@ -172,6 +186,18 @@ def fallback_label(words: list[str]) -> str:
     return ", ".join(words[:3]) if words else "Sujet sans nom"
 
 
+def representative_excerpt(text: str, words: list[str], limit: int = 400) -> str:
+    """Show the model lines about this group, not the arbitrary start of a chat."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        return ""
+    marks = set(words)
+    ranked = sorted(enumerate(lines), key=lambda item: (-len(tokens(item[1]) & marks), item[0]))
+    relevant = [i for i, line in ranked if tokens(line) & marks]
+    selected = sorted((relevant or [i for i, _ in ranked])[:4])
+    return " / ".join(lines[i] for i in selected)[:limit]
+
+
 def name_topic(client: Ollama, model: str, words: list[str], excerpts: list[str]) -> tuple[str, str | None, bool]:
     """(label, description, named by the model). The model gets keywords and excerpts, never a name of a person."""
     listing = "\n".join(f"{i}. {e}" for i, e in enumerate(excerpts, 1))
@@ -209,7 +235,8 @@ def load_vectors(conn: psycopg.Connection, guild_id: int, model: str) -> tuple[l
 
 
 def discover_themes(conn: psycopg.Connection, client: Ollama, guild_id: int, *, embed_model: str, name_model: str, topics: int | None = None,
-                    seed: int = 0, progress: Callable[[str], None] | None = None, cancelled: Callable[[], bool] = lambda: False) -> dict:
+                    seed: int = 0, progress: Callable[[str], None] | None = None,
+                    step_progress: Callable[[int, int], None] | None = None, cancelled: Callable[[], bool] = lambda: False) -> dict:
     """Finds the topics of the conversations that have a vector, and records them as proposals. Returns what was found."""
     say = progress or (lambda _text: None)
     ids, x = load_vectors(conn, guild_id, embed_model)
@@ -218,10 +245,16 @@ def discover_themes(conn: psycopg.Connection, client: Ollama, guild_id: int, *, 
     rng = np.random.default_rng(seed)
     say(f"regroupement de {len(ids)} conversations")
     labels, centers, how = choose_topics(x, rng, topics)
-    similarity = (x @ centers.T)[np.arange(len(ids)), labels]
+    all_similarity = x @ centers.T
+    similarity = all_similarity[np.arange(len(ids)), labels]
 
-    groups = {g: [i for i in range(len(ids)) if labels[i] == g] for g in range(len(centers))}
+    # K-means always gives every point a label, even when the point is unrelated
+    # to that centre. Admit a low-fit point only if its closest topic is clear.
+    useful = confident_assignments(all_similarity, labels)
+    groups = {g: [i for i in useful if labels[i] == g] for g in range(len(centers))}
     groups = {g: members for g, members in groups.items() if len(members) >= MIN_SIZE}
+    if step_progress:
+        step_progress(0, len(groups))
     group_of = {ids[i]: g for g, members in groups.items() for i in members}
     keyword_counter = Keywords()
     ordered = sorted(group_of)
@@ -237,10 +270,12 @@ def discover_themes(conn: psycopg.Connection, client: Ollama, guild_id: int, *, 
         if cancelled():
             raise InterruptedError("annulé")
         nearest = nearest_of[g]
-        excerpts = [texts.get(ids[i], "").replace("\n", " / ")[:400] for i in nearest]
+        excerpts = [representative_excerpt(texts.get(ids[i], ""), words.get(g, [])) for i in nearest]
         say(f"nom du thème {n}/{len(groups)}")
         label, description, named = name_topic(client, name_model, words.get(g, []), excerpts)
         found.append({"group": g, "members": members, "label": label, "description": description, "named": named, "keywords": words.get(g, [])})
+        if step_progress:
+            step_progress(n, len(groups))
 
     with conn.transaction():
         # The proposals that nobody has touched are replaced; one that the person renamed, or that another was merged into, stays
@@ -250,16 +285,18 @@ def discover_themes(conn: psycopg.Connection, client: Ollama, guild_id: int, *, 
         run_id = conn.execute(
             "INSERT INTO topic_runs (guild_id, method, model, parameters, message_count) VALUES (%s, %s, %s, %s::jsonb, %s) RETURNING id",
             (guild_id, "embeddings clustering + model naming", f"{embed_model} + {name_model}",
-             json.dumps({**how, "seed": seed, "min_size": MIN_SIZE, "named_by_model": sum(f["named"] for f in found)}), len(ids))).fetchone()[0]
+             json.dumps({**how, "seed": seed, "min_size": MIN_SIZE, "min_similarity": MIN_SIMILARITY,
+                         "min_margin": MIN_MARGIN, "unassigned": len(ids) - sum(len(f["members"]) for f in found),
+                         "named_by_model": sum(f["named"] for f in found)}), len(ids))).fetchone()[0]
         for f in found:
             topic_id = conn.execute(
                 """INSERT INTO topics (guild_id, label, description, keywords, origin, status, run_id)
                    VALUES (%s, %s, %s, %s, 'discovered', 'proposed', %s) RETURNING id""",
                 (guild_id, f["label"], f["description"], f["keywords"], run_id)).fetchone()[0]
             f["topic_id"] = topic_id
-            for i in f["members"]:
-                conn.execute("INSERT INTO topic_assignments (run_id, conversation_id, topic_id, similarity) VALUES (%s, %s, %s, %s)",
-                             (run_id, ids[i], topic_id, float(similarity[i])))
+            with conn.cursor() as cur:
+                cur.executemany("INSERT INTO topic_assignments (run_id, conversation_id, topic_id, similarity) VALUES (%s, %s, %s, %s)",
+                                [(run_id, ids[i], topic_id, float(similarity[i])) for i in f["members"]])
     log.info("themes: %d topics from %d conversations (k=%s, %s); %d earlier proposals replaced", len(found), len(ids), how["k"],
              how["chosen_by"], removed)
     return {"run_id": run_id, "topics": len(found), "conversations": len(ids), "assigned": sum(len(f["members"]) for f in found),

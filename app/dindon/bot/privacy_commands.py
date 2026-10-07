@@ -60,7 +60,7 @@ COMMAND = {
          "options": [{"type": 3, "name": "sujet", "description": "La question débattue (vide : vous pourrez choisir un axe dans la fenêtre)", "required": False, "min_length": 3, "max_length": 200}]},
         {"type": 1, "name": "forum", "description": "Choisir le forum où Dindon crée les débats (réservé aux modérateurs)",
          "options": [{"type": 7, "name": "salon", "description": "Le forum des débats : chaque débat y devient un post", "channel_types": [15]},
-                     {"type": 3, "name": "etiquette", "description": "L'étiquette que porte chaque débat (une de celles du forum)", "max_length": 20},
+                     {"type": 3, "name": "etiquette", "description": "Étiquette de secours si le sujet ne correspond à aucune", "max_length": 20},
                      {"type": 5, "name": "retirer", "description": "Les débats reviennent dans des fils sous le salon"}]},
     ],
 }

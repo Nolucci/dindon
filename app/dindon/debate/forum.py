@@ -4,9 +4,8 @@ Many servers keep their debates in a **forum channel** (Discord's type 15): ever
 once, with `/dindon forum`, which forum it is; from then on a debate that is opened in a thread is created there, as a post, instead of a thread under the channel where the command was
 used: the channel is not polluted. Nothing is stored of a person: the channel, its name and, if asked, the label that every debate carries.
 
-**The labels.** A post may carry up to 5. Dindon puts the one that the moderator chose (every debate carries it), and, for a debate opened from an axis, the labels of the forum whose name is a
-word of the axis (« Religion » for « Religion et État », « International » for « Commerce international »). It never guesses further, and never uses a label that only moderators may apply, unless
-the moderator chose that one himself. A forum that requires a label (`REQUIRE_TAG`) is not accepted without a chosen label.
+**The labels.** Dindon matches the debate topic and axis to the labels actually present in the forum. The optional label chosen by a
+moderator is a fallback. A required-label forum without a fallback needs an open general label (Politique or Philosophie).
 """
 from __future__ import annotations
 
@@ -21,6 +20,29 @@ FORUM_CHANNEL = 15                     # Discord's GUILD_FORUM
 REQUIRE_TAG = 1 << 4                   # the flag of a forum that wants a label on every post
 MAX_TAGS = 5
 KEY = "debate_forum.{}"                # in runtime_settings, one row per server
+GENERAL_TAGS = ("politique", "philosophie")
+# Distinctive words only: generic words such as « droit » or « état » cause false matches.
+HINTS = {
+    "economie": {"economie", "economique", "salaire", "smic", "impot", "taxe", "budget", "inflation", "emploi", "travail"},
+    "religion": {"religion", "religieux", "laicite", "eglise", "islam", "christianisme"},
+    "philosophie": {"philosophie", "philosophique", "morale", "ethique", "liberte"},
+    "legislation": {"legislation", "loi", "lois", "juridique", "justice", "legalisation"},
+    "international": {"international", "europe", "europeen", "etranger", "diplomatie", "geopolitique", "commerce"},
+    "immigration": {"immigration", "immigre", "migrants", "migration", "frontiere", "asile"},
+    "service public": {"fonctionnaire", "administration", "collectivite"},
+    "ecologie": {"ecologie", "ecologique", "climat", "carbone", "pollution", "biodiversite", "environnement"},
+    "sante": {"sante", "hopital", "hopitaux", "medecin", "medical", "soins", "vaccin"},
+    "identite": {"identite", "nationalite", "culture", "tradition"},
+    "genre": {"genre", "femmes", "hommes", "feminisme", "sexiste"},
+    "lgbt": {"lgbt", "lgbtq", "homosexualite", "homophobie", "transgenre"},
+    "education": {"education", "ecole", "enseignant", "universite", "scolaire", "bac"},
+    "securite": {"securite", "police", "criminalite", "delinquance", "violence"},
+    "politique": {"politique", "election", "democratie", "parti", "gouvernement"},
+    "sport": {"sport", "sportif", "football", "olympique"},
+    "territoire": {"territoire", "rural", "region", "commune", "urbanisme"},
+    "numerique": {"numerique", "internet", "informatique", "donnees", "algorithme"},
+    "jeunesse": {"jeunesse", "jeunes", "adolescent", "mineurs"},
+}
 
 
 @dataclass(frozen=True)
@@ -73,15 +95,37 @@ def tag_names(available: list) -> str:
     return ", ".join(f"« {t['name']} »" for t in available if isinstance(t, dict) and t.get("name"))
 
 
-def pick_tags(available: list, default_id: str | None, axis_name: str | None) -> list[str]:
-    """The labels that a debate carries: the one chosen by the moderator, first, then the (unmoderated) labels whose whole name is made of words of the axis's name. At most 5."""
+def general_tag(available: list) -> str | None:
+    """An honest, open fallback when a forum requires a label and the subject has no clear match."""
+    for name in GENERAL_TAGS:
+        for tag in available:
+            if isinstance(tag, dict) and not tag.get("moderated") and words(tag.get("name", "")) == set(name.split()) and tag.get("id"):
+                return str(tag["id"])
+    return None
+
+
+def pick_tags(available: list, default_id: str | None, axis_name: str | None, topic: str | None = None,
+              *, required: bool = False) -> list[str]:
+    """Match the topic and axis to available open labels. The moderator's label is used when none match."""
     by_id = {str(t["id"]): t for t in available if isinstance(t, dict) and t.get("id")}
     picked: list[str] = []
-    if default_id and str(default_id) in by_id:
+    subject = words(" ".join((axis_name or "", topic or "")))
+    matches = []
+    for tag_id, tag in by_id.items():
+        if tag.get("moderated"):
+            continue
+        name = " ".join(sorted(words(tag.get("name", ""))))
+        tag_words = words(tag.get("name", ""))
+        exact = bool(tag_words and tag_words <= subject)
+        hints = HINTS.get(name, set()) & subject
+        if exact or hints:
+            matches.append((2 if exact else 1, len(hints), tag_id))
+    matches.sort(key=lambda match: (-match[0], -match[1], match[2]))
+    picked.extend(tag_id for _, _, tag_id in matches[:MAX_TAGS])
+    if default_id and str(default_id) in by_id and str(default_id) not in picked:
         picked.append(str(default_id))
-    if axis_name:
-        axis_words = words(axis_name)
-        for tag_id, tag in by_id.items():
-            if tag_id not in picked and not tag.get("moderated") and words(tag.get("name", "")) and words(tag["name"]) <= axis_words:
-                picked.append(tag_id)
+    if not picked and required:
+        fallback = general_tag(available)
+        if fallback:
+            picked.append(fallback)
     return picked[:MAX_TAGS]

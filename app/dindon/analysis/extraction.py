@@ -26,12 +26,13 @@ import psycopg
 from psycopg.rows import tuple_row
 
 from dindon.analysis.chunks import split_long
+from dindon.analysis.compact import clean
 from dindon.analysis.embeddings import vector_literal
 from dindon.analysis.ollama import Ollama, OllamaError
 
 log = logging.getLogger("dindon.analysis")
 
-PROMPT_VERSION = "extract-4"
+PROMPT_VERSION = "extract-5"
 MAX_CHARS = 7000
 SAME_PROPOSITION = 0.80
 MAX_CLAIMS_PER_PERSON = 3
@@ -51,7 +52,9 @@ SYSTEM = (
     "- `confidence` : de 0 à 1, à quel point c'est net ;\n"
     "- `evidence` : une ou deux preuves, chacune avec `ref` (le numéro #n du message) et `quote`, un extrait de 5 à 15 mots COPIÉ MOT POUR MOT depuis ce message, "
     "écrit par le participant lui-même.\n"
-    "Un participant qui ne prend pas de position n'apparaît pas. Une position sans preuve exacte sera refusée."
+    "La preuve doit permettre de comprendre la position : « il a raison », « pareil », un pronom sans référent, une simple question ou "
+    "une réponse vague ne suffisent pas. N'invente pas une opinion générale à partir d'un récit personnel ou d'un fait médical. "
+    "Un participant qui ne prend pas de position n'apparaît pas. Une position sans preuve autonome sera refusée."
 )
 SCHEMA = {"type": "object", "properties": {"claims": {"type": "array", "items": {"type": "object", "properties": {
     "participant": {"type": "string"}, "proposition": {"type": "string"}, "stance": {"type": ["integer", "null"]},
@@ -64,6 +67,10 @@ _TODO = """
 SELECT c.id FROM conversations c JOIN channels ch ON ch.id = c.channel_id
 WHERE ch.guild_id = %(guild)s AND c.kept AND c.participants >= 1
   AND NOT EXISTS (SELECT 1 FROM conversation_extractions e WHERE e.conversation_id = c.id)
+  AND (NOT EXISTS (SELECT 1 FROM topic_assignments a JOIN topic_runs r ON r.id = a.run_id
+                   WHERE r.guild_id = %(guild)s)
+       OR EXISTS (SELECT 1 FROM topic_assignments a JOIN topics t ON t.id = a.topic_id
+                  WHERE a.conversation_id = c.id AND t.status IN ('proposed', 'validated', 'merged')))
 ORDER BY c.importance DESC, c.id
 """
 _MESSAGES = """
@@ -113,7 +120,7 @@ def prepare_windows(rows: list[tuple]) -> list[Read]:
         lines, messages, ids, size = [], {}, {}, 0
 
     for message_id, author, content, when in rows:
-        text = _SPACES.sub(" ", _URL.sub(" ", content or "")).strip()
+        text = clean(content)
         if not text:
             continue
         if author not in label_of:
@@ -171,6 +178,8 @@ def validate(answer: dict, read: Read) -> tuple[list[Claim], int]:
             message = read.messages.get(ref) if isinstance(ref, int) else None
             if message is None or message[0] != user_id or len(_norm(quote)) < 6 or _norm(quote) not in _norm(message[1]):
                 continue                                                  # not a message of that person, or not in it
+            if kind == "opinion" and not substantial_evidence(quote):
+                continue
             if all(p[0] != ref for p in proofs):
                 proofs.append((ref, quote[:400]))
         if not proofs or per_person.get(user_id, 0) >= MAX_CLAIMS_PER_PERSON:
@@ -183,6 +192,15 @@ def validate(answer: dict, read: Read) -> tuple[list[Claim], int]:
             confidence = 0.5
         kept.append(Claim(user_id, proposition, stance, kind, _SPACES.sub(" ", str(raw.get("claim", ""))).strip()[:400] or proposition, confidence, proofs))   # (`claim`: optional)
     return kept, refused
+
+
+_VAGUE = re.compile(r"^(?:il|elle|ils|elles|tu|vous|on|ça|ca|c'|c’est|c'est|je|j’|j')?\s*(?:a raison|ont raison|est vrai|est faux|suis d'accord|suis pas d'accord|pareil|exact|oui|non|mdr|bien sûr|bien sur)[.!? ]*$", re.I)
+
+
+def substantial_evidence(quote: str) -> bool:
+    """A short assent cannot support an independently worded political claim."""
+    words = re.findall(r"[\wÀ-ÿ]+", quote.casefold())
+    return len(words) >= 5 and not _VAGUE.fullmatch(quote.strip()) and not quote.strip().endswith("?")
 
 
 def _proposition_ids(conn: psycopg.Connection, client: Ollama, embed_model: str, texts: list[str], model: str) -> dict[str, int]:

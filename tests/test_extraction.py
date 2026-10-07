@@ -101,6 +101,13 @@ def test_a_quote_is_found_whatever_the_case_the_spaces_and_the_punctuation_at_th
     assert read(ingest_db, client, ollama, answer)["claims"] == 1
 
 
+def test_a_short_assent_does_not_become_a_political_position():
+    r = prepare([(1, 10, "il a raison", None)])
+    claim_about_vote = claim(proposition="Les électeurs doivent soutenir Marine Le Pen", evidence=((1, "il a raison"),))
+    kept, refused = validate({"claims": [claim_about_vote]}, r)
+    assert kept == [] and refused == 1
+
+
 def test_irony_and_questions_are_no_position(ingest_db, client, ollama):
     debate(ingest_db)
     answer = [claim(stance=1, kind="humour", evidence=((3, "comme si les patrons étaient des saints"),))]

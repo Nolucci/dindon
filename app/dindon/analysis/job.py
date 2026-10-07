@@ -49,7 +49,8 @@ class AnalysisJobs:
 
     @staticmethod
     def _idle() -> dict:
-        return {"state": "idle", "guild": None, "stage": None, "started_at": None, "finished_at": None, "done": 0, "of": None, "error": None}
+        return {"state": "idle", "guild": None, "stage": None, "stages": [], "completed_stages": [],
+                "started_at": None, "finished_at": None, "done": 0, "of": None, "error": None}
 
     def readiness(self) -> dict:
         """What the person needs to know before starting: is Ollama running, and are the two models installed."""
@@ -79,7 +80,8 @@ class AnalysisJobs:
                 raise AnalysisBusy()
             self._cancel = threading.Event()
             self._lines.clear()
-            self._state = {**self._idle(), "state": "running", "guild": str(guild_id), "started_at": utc_iso()}
+            planned = (["compacteur : conversations"] if "conversations" in stages else []) + (["partitionneur : vecteurs"] if "embeddings" in stages else []) + (["partitionneur : thèmes"] if "themes" in stages else []) + (["classeur : positions"] if "claims" in stages else []) + (["classeur : vérification des positions", "juge : liens aux axes"] if "claims" in stages or "axes" in stages else [])
+            self._state = {**self._idle(), "state": "running", "guild": str(guild_id), "started_at": utc_iso(), "stages": planned}
             self._thread = threading.Thread(target=self._run, args=(guild_id, stages, topics, rebuild, self._cancel, limit), daemon=True, name="analysis")
             self._thread.start()
 
@@ -107,6 +109,9 @@ class AnalysisJobs:
 
     def _stage(self, name: str) -> None:
         with self._lock:
+            previous = self._state["stage"]
+            if previous and previous not in self._state["completed_stages"]:
+                self._state["completed_stages"] = [*self._state["completed_stages"], previous]
             self._state.update(stage=name, done=0, of=None)
         self._line(name)
 
@@ -141,30 +146,30 @@ class AnalysisJobs:
                 if now["ai_max_load"] < 100:
                     self._line(f"vitesse limitée : l'IA travaille {now['ai_max_load']} % du temps (réglage Performance de la page Système)")
                 if "conversations" in stages:
-                    self._stage("conversations")
+                    self._stage("compacteur : conversations")
                     r = build_conversations(conn, guild_id, rebuild=rebuild)
                     self._line(f"{r['made']} conversations faites ({r['messages']} messages) ; {r['kept']} retenues sur {r['total']}")
                 if "embeddings" in stages and not cancel.is_set():
-                    self._stage("vecteurs")
+                    self._stage("partitionneur : vecteurs")
                     r = embed_conversations(conn, self.client, self.embed_model, guild_id, batch=lambda: limits()["ai_batch"], progress=self._progress, cancelled=cancel.is_set)
                     self._line(f"{r['done']} vecteurs calculés")
                 if "themes" in stages and not cancel.is_set():
-                    self._stage("thèmes")
+                    self._stage("partitionneur : thèmes")
                     r = discover_themes(conn, self.client, guild_id, embed_model=self.embed_model, name_model=self.name_model, topics=topics,
-                                        progress=self._line, cancelled=cancel.is_set)
+                                        progress=self._line, step_progress=self._progress, cancelled=cancel.is_set)
                     self._line(f"{r['topics']} thèmes proposés pour {r['assigned']} conversations (k={r['k']}, {r['named_by_model']} nommés par le modèle)")
                 if "claims" in stages and not cancel.is_set():
-                    self._stage("positions")
+                    self._stage("classeur : positions")
                     r = extract_claims(conn, self.client, self.name_model, self.embed_model, guild_id, limit=limit, progress=self._progress, cancelled=cancel.is_set)
                     self._line(f"{r['done']} conversations lues : {r['claims']} positions retenues avec preuve, {r['refused']} refusées"
                                + (f", {r['failed']} à reprendre (le modèle n'a pas répondu)" if r["failed"] else ""))
                 if ("claims" in stages or "axes" in stages) and not cancel.is_set():
-                    self._stage("positions : relecture du sens")
+                    self._stage("classeur : vérification des positions")
                     r = verify_stances(conn, self.client, self.name_model, guild_id, progress=self._progress, cancelled=cancel.is_set)
                     self._line(f"{r['checked']} positions relues : {r['changed']} corrigées, {r['questions']} écartées (une question n'est pas une position)"
                                + (f", {r['failed']} à reprendre" if r["failed"] else ""))
                 if ("claims" in stages or "axes" in stages) and not cancel.is_set():
-                    self._stage("axes")
+                    self._stage("juge : liens aux axes")
                     r = assign_axes(conn, self.client, self.name_model, guild_id, progress=self._progress, cancelled=cancel.is_set, embed_model=self.embed_model)
                     self._line(f"{r['done']} propositions reliées aux axes ({r['links']} liens), {r['scores']} scores de personnes calculés"
                                + (f", {r['failed']} à reprendre" if r["failed"] else ""))
@@ -178,6 +183,8 @@ class AnalysisJobs:
             error = f"erreur inattendue ({type(problem).__name__})"
         self.client.limits, self.client.cancelled = None, lambda: False
         with self._lock:
+            if not error and not cancel.is_set() and self._state["stage"]:
+                self._state["completed_stages"] = [*self._state["completed_stages"], self._state["stage"]]
             self._state["finished_at"] = utc_iso()
             self._state["error"] = error
             self._state["state"] = "failed" if error else "cancelled" if cancel.is_set() else "done"

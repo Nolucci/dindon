@@ -13,6 +13,7 @@ from psycopg.rows import tuple_row
 
 from dindon.analysis.ollama import Ollama, OllamaError
 from dindon.analysis.chunks import pack_lines
+from dindon.analysis.compact import clean, distinct_messages
 
 log = logging.getLogger("dindon.analysis")
 
@@ -45,6 +46,7 @@ def clean_text(content: str, names: list[str]) -> str:
     """A message as the analysis reads it: without links, custom emoji, and mentions. A mention is "@" and the name of a person, which
     can have several words ("@Jean Dupont"): the names of the people that the message mentions are removed whole (longest first), and
     whatever else follows an "@" is removed up to the next space."""
+    content = clean(content)
     for name in sorted(names, key=len, reverse=True):
         content = re.sub("@" + re.escape(name), " ", content, flags=re.IGNORECASE)
     for pattern in (_URL, _EMOJI, _MENTION):
@@ -64,7 +66,7 @@ def conversation_chunks(conn: psycopg.Connection, ids: list[int]) -> dict[int, l
             text = clean_text(content, names)
             if text:
                 parts.setdefault(cid, []).append(text)
-    return {cid: pack_lines(texts, MAX_CHARS) for cid, texts in parts.items()}
+    return {cid: pack_lines(distinct_messages(texts), MAX_CHARS) for cid, texts in parts.items()}
 
 
 def conversation_texts(conn: psycopg.Connection, ids: list[int]) -> dict[int, str]:

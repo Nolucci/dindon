@@ -6,11 +6,13 @@ messages are invented. What a real model makes of real conversations is measured
 from datetime import datetime, timedelta, timezone, UTC
 
 import pytest
+import numpy as np
 
 from dindon.analysis.conversations import build_conversations
+from dindon.analysis.compact import clean, distinct_messages
 from dindon.analysis.embeddings import embed_conversations
 from dindon.analysis.ollama import Ollama, OllamaError
-from dindon.analysis.themes import MIN_CONVERSATIONS, NotEnough, discover_themes, silhouette, spherical_kmeans
+from dindon.analysis.themes import MIN_CONVERSATIONS, NotEnough, confident_assignments, discover_themes, representative_excerpt, silhouette, spherical_kmeans
 from dindon.bot.adapter import Directory, build_document, digest
 from dindon.ingest.loader import GATEWAY_SOURCE, ingest_document
 from fake_ollama import FakeOllama
@@ -139,6 +141,17 @@ def test_a_conversation_is_kept_with_two_things_said_or_one_long(ingest_db):
     assert [(c[2], c[4]) for c in conversations(ingest_db)] == [(0, False), (1, False), (2, True), (1, True)]
 
 
+def test_suspended_account_placeholder_does_not_enter_analysis(ingest_db):
+    talk = Talk()
+    placeholder = "One message removed from a suspended account."
+    ingest(ingest_db, [talk.say(placeholder), talk.say(placeholder, BOB)])
+    build_conversations(ingest_db, GUILD_ID, now=NOW)
+    assert conversations(ingest_db)[0][4] is False
+    assert clean(placeholder + " Il faut financer les écoles") == "Il faut financer les écoles"
+    assert distinct_messages(["Il faut financer les écoles", "il faut financer les écoles", "Il faut réduire les impôts"]) == [
+        "Il faut financer les écoles", "Il faut réduire les impôts"]
+
+
 # ---------------------------------------------------------------------------------------------
 # Vectors
 # ---------------------------------------------------------------------------------------------
@@ -159,7 +172,7 @@ def test_the_vectors_are_made_once_without_the_names_of_the_people(ingest_db, cl
 def test_a_long_conversations_vector_includes_its_end(ingest_db, client, ollama):
     talk = Talk()
     ending = "une proposition écologique singulière à la fin"
-    ingest(ingest_db, [talk.say("argument " * 170), talk.say("argument " * 170, BOB), talk.say("argument " * 170),
+    ingest(ingest_db, [talk.say("argument un " * 170), talk.say("argument deux " * 170, BOB), talk.say("argument trois " * 170),
                        talk.say("argument " * 160 + ending, BOB)])
     build_conversations(ingest_db, GUILD_ID, now=NOW)
     assert embed_conversations(ingest_db, client, "bge-m3", GUILD_ID)["done"] == 1
@@ -224,6 +237,19 @@ def test_the_topics_follow_the_subjects_that_people_talk_about(ingest_db, client
             by_topic.setdefault(topic, {})[channel] = n
     purity = sum(max(v.values()) for v in by_topic.values()) / sum(sum(v.values()) for v in by_topic.values())
     assert purity > 0.9, purity                                  # a topic is, almost always, one channel's subject (invented text: easy)
+
+
+def test_topic_examples_focus_on_the_words_of_the_topic():
+    excerpt = representative_excerpt("Quelqu'un arrive demain ?\nLes écoles ont besoin de financement.\nIl faut mieux financer les écoles.", ["écoles", "financer"])
+    assert excerpt.startswith("Les écoles")
+
+
+def test_partition_does_not_force_distant_or_ambiguous_conversations_into_a_theme():
+    sims = np.array([[0.82, 0.25], [0.73, 0.725], [0.31, 0.30], [0.20, 0.80], [0.79, 0.77]])
+    labels = sims.argmax(axis=1)
+    assert 0 in confident_assignments(sims, labels)
+    assert 2 not in confident_assignments(sims, labels)
+    assert 1 not in confident_assignments(sims, labels)
 
 
 def test_every_proposal_is_a_proposal_and_says_how_it_was_made(ingest_db, client, server):

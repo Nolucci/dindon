@@ -30,8 +30,9 @@ SYSTEM = (
     "- `desaccord` : la personne dit le contraire de la proposition, ou la rejette (« Non », « Au contraire », « Faux »…) ;\n"
     "- `nuance` : la personne hésite, dit que ça dépend, que les deux côtés ont des arguments (« les deux côtés ont des points » → nuance, même si la proposition dit "
     "la même chose), ou dit qu'elle n'a pas d'avis ;\n"
-    "- `aucune` : ce n'est pas une position : une simple question (« tu as une source ? », « et tu fais comment pour financer ça ? », « c'est pas un peu simpliste comme "
-    "vision ? », « tu parles de quel pays ? »), une demande de précision, une salutation.\n"
+    "- `aucune` : les citations ne prouvent pas que cette personne soutient, rejette ou nuance CETTE proposition. C'est le cas d'une "
+    "question, d'un symptôme personnel, d'un simple fait sans avis, d'une réponse vague (« il a raison », « pareil »), ou d'un propos "
+    "dont le sujet manque. N'utilise pas la proposition pour inventer le sens absent de la citation.\n"
     "Réponds seulement par le JSON demandé."
 )
 SCHEMA = {"type": "object", "properties": {"relation": {"type": "string", "enum": ["accord", "desaccord", "nuance", "aucune"]}}, "required": ["relation"]}

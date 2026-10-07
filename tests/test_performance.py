@@ -28,9 +28,9 @@ def ollama():
 
 
 def test_settings_are_always_complete_and_inside_their_limits():
-    assert performance.clean({}) == performance.DEFAULT                     # nothing saved: full speed, as before this existed
+    assert performance.clean({}) == performance.DEFAULT                     # leave headroom for the bot by default
     odd = performance.clean({"ai_max_load": 3, "ai_threads": 9999, "ai_batch": "x", "bot_batch_seconds": 99, "ai_keep_alive": "jamais"})
-    assert odd == {"preset": "custom", "ai_max_load": 10, "ai_threads": 64, "ai_batch": 16, "bot_batch_seconds": 10.0, "ai_keep_alive": "10m"}
+    assert odd == {"preset": "custom", "ai_max_load": 10, "ai_threads": 64, "ai_batch": 8, "bot_batch_seconds": 10.0, "ai_keep_alive": "5m"}
     for name, preset in performance.PRESETS.items():                       # a preset gives its own values, whatever else was sent with it
         got = performance.clean({"preset": name, "ai_max_load": 77})
         assert got["preset"] == name and got["ai_max_load"] == preset["ai_max_load"] and got["bot_batch_seconds"] == preset["bot_batch_seconds"]
@@ -116,6 +116,7 @@ def test_the_analysis_works_at_the_speed_that_was_set_and_says_so(ingest_url, in
     jobs.wait(30)
     status = jobs.status()
     assert status["state"] == "done" and any("25 % du temps" in line for line in status["lines"])
+    assert status["stages"] == status["completed_stages"] == ["compacteur : conversations", "partitionneur : vecteurs"]
     assert client.limits is None                                            # the limits are only for the time of a run
     body = [b for p, b in ollama.requests if p == "/api/embed"][0]
     assert body["keep_alive"] == "0" and body["options"]["num_thread"] == performance.PRESETS["saver"]["ai_threads"]
@@ -129,7 +130,7 @@ def test_the_bot_groups_its_writes_for_as_long_as_it_was_asked(ingest_db, ingest
     assert runner._batch_seconds == performance.PRESETS["saver"]["bot_batch_seconds"] and runner.heartbeat_data()["batch_seconds"] == 3.0
     ingest_db.execute("DROP TABLE runtime_settings")                        # a database that does not know the table yet
     asyncio.run(runner._beat())
-    assert runner._batch_seconds == 0.3                                     # no table: the defaults, as before this existed
+    assert runner._batch_seconds == performance.DEFAULT["bot_batch_seconds"]  # no table: balanced default
 
 
 @pytest.fixture
@@ -141,7 +142,7 @@ def web(ingest_url, ingest_db, tmp_path):
 
 def test_the_page_reads_and_saves_the_limits(web, ingest_db):
     first = web.get("/api/performance").json()
-    assert first["settings"]["ai_max_load"] == 100 and set(first["presets"]) == {"saver", "balanced", "full"} and first["cpu_count"]
+    assert first["settings"]["ai_max_load"] == 60 and set(first["presets"]) == {"saver", "balanced", "full"} and first["cpu_count"]
     saved = web.put("/api/performance", json={"preset": "balanced"}).json()["settings"]
     assert saved["preset"] == "balanced" and saved["ai_max_load"] == 60 and performance.load(ingest_db) == saved           # kept for the bot and the analysis
     custom = web.put("/api/performance", json={"preset": "custom", "ai_max_load": 40, "ai_threads": 2, "ai_keep_alive": "30s", "ai_batch": 5, "bot_batch_seconds": 2.5}).json()["settings"]

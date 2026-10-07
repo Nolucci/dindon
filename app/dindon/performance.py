@@ -22,11 +22,11 @@ KEEP_ALIVE = ("0", "30s", "5m", "10m", "30m")
 LIMITS = {"ai_max_load": (10, 100), "ai_threads": (0, 64), "ai_batch": (1, 32), "bot_batch_seconds": (0.1, 10.0)}
 MAX_PAUSE = 300.0       # seconds: a very slow setting never makes the analysis look dead for longer than this between two calls
 
-DEFAULT = {"preset": "full", "ai_max_load": 100, "ai_threads": 0, "ai_keep_alive": "10m", "ai_batch": 16, "bot_batch_seconds": 0.3}
+DEFAULT = {"preset": "balanced", "ai_max_load": 60, "ai_threads": 0, "ai_keep_alive": "5m", "ai_batch": 8, "bot_batch_seconds": 1.0}
 PRESETS = {
     "saver": {"ai_max_load": 25, "ai_threads": max(1, (os.cpu_count() or 4) // 4), "ai_keep_alive": "0", "ai_batch": 4, "bot_batch_seconds": 3.0},
     "balanced": {"ai_max_load": 60, "ai_threads": 0, "ai_keep_alive": "5m", "ai_batch": 8, "bot_batch_seconds": 1.0},
-    "full": {k: v for k, v in DEFAULT.items() if k != "preset"},
+    "full": {"ai_max_load": 100, "ai_threads": 0, "ai_keep_alive": "10m", "ai_batch": 16, "bot_batch_seconds": 0.3},
 }
 
 

@@ -42,16 +42,26 @@ def test_a_label_is_found_by_its_name_as_typed_or_its_start_when_only_one_fits()
     assert forum.find_tag(tags, "service") is None and forum.find_tag(tags, "public")["id"] == "2" and forum.find_tag(tags, "sport") is None and forum.find_tag(tags, "") is None
 
 
-def test_the_labels_of_a_debate_are_the_chosen_one_then_the_open_ones_named_in_the_axis_and_at_most_five():
+def test_the_labels_of_a_debate_match_the_subject_then_use_the_chosen_fallback_and_at_most_five():
     available = [{"id": "e", "name": "Économie"}, {"id": "r", "name": "Religion"}, {"id": "i", "name": "International"}, {"id": "p", "name": "Politique", "moderated": True},
                  {"id": "pc", "name": "Politique commerciale"}]
     assert forum.pick_tags(available, None, None) == [] and forum.pick_tags(available, "p", None) == ["p"]
-    assert forum.pick_tags(available, "p", "Religion et État") == ["p", "r"]                                    # the chosen one first, then what the axis names
+    assert forum.pick_tags(available, "p", "Religion et État") == ["r", "p"]                                    # the topic comes first, chosen fallback follows
     assert forum.pick_tags(available, None, "Commerce international") == ["i"]
     assert forum.pick_tags(available, None, "Politique") == []                                                   # a label that only moderators may apply is never guessed
     assert forum.pick_tags(available, "gone", "Contrôle de l'économie") == ["e"]                                # a label that no longer exists is not used
     many = [{"id": str(n), "name": f"Mot{n}"} for n in range(9)]
     assert len(forum.pick_tags(many, "0", " ".join(f"Mot{n}" for n in range(9)))) == 5
+
+
+def test_a_new_debate_uses_its_subject_and_a_required_forum_has_a_general_fallback():
+    available = [{"id": "eco", "name": "Économie"}, {"id": "edu", "name": "Éducation"},
+                 {"id": "pol", "name": "Politique"}, {"id": "rel", "name": "Religion", "moderated": True}]
+    assert forum.pick_tags(available, None, None, "Faut-il augmenter le SMIC ?", required=True) == ["eco"]
+    assert forum.pick_tags(available, None, None, "Quel avenir pour l'école ?", required=True) == ["edu"]
+    assert forum.pick_tags(available, None, None, "Un sujet inconnu", required=True) == ["pol"]
+    assert forum.pick_tags(available, None, None, "La religion à l'école", required=True) == ["edu"]
+    assert forum.general_tag(available) == "pol"
 
 
 def test_the_forum_is_kept_for_each_server_and_taken_off(conn):
@@ -125,6 +135,14 @@ def test_a_forum_that_requires_a_label_is_not_accepted_without_one(world, ingest
     assert forum.get(ingest_db, int(GUILD)).tag_id == "t_eco"
 
 
+def test_a_required_forum_with_open_general_tag_needs_no_fixed_label(world, ingest_db):  # noqa: F811
+    world.add_forum(FORUM, tags=(("t_eco", "Économie"), ("t_pol", "Politique")), flags=16)
+    world.forum(salon=str(FORUM))
+    assert forum.get(ingest_db, int(GUILD)).tag_id is None
+    world.command(ALICE_ID, topic="Faut-il augmenter le SMIC ?")
+    assert world.discord.threads[max(world.discord.threads)]["applied_tags"] == ["t_eco"]
+
+
 @pytest.mark.parametrize("what", ["a text channel", "another server", "unreachable"])
 def test_what_is_not_a_forum_of_this_server_is_refused(world, ingest_db, what):  # noqa: F811
     if what == "another server":
@@ -149,7 +167,7 @@ def test_a_debate_opened_in_a_thread_is_created_in_the_forum_as_a_post_with_its_
     with_forum.command(ALICE_ID)
     debate = only_debate(ingest_db)
     [post] = with_forum.discord.threads
-    assert with_forum.discord.threads[post]["parent"] == FORUM and with_forum.discord.threads[post]["applied_tags"] == ["t_pol"]
+    assert with_forum.discord.threads[post]["parent"] == FORUM and with_forum.discord.threads[post]["applied_tags"] == ["t_eco", "t_pol"]
     assert [c[:2] for c in with_forum.discord.calls[1:]] == [("GET", f"/channels/{FORUM}"), ("POST", f"/channels/{FORUM}/threads"), ("PUT", f"/channels/{post}/thread-members/@me")]   # (after `/dindon forum` itself)
     posted = [c for c in with_forum.discord.calls if c[0] == "POST"]
     assert [c[1] for c in posted] == [f"/channels/{FORUM}/threads"]                                              # one call: the post and its first message, nothing under #général
@@ -187,26 +205,26 @@ def test_a_debate_in_the_channel_or_asked_from_a_thread_ignores_the_forum(with_f
     assert with_forum.discord.threads == {} and only_debate(ingest_db).thread_id == int(THREAD)
 
 
-def test_the_labels_of_an_axis_debate_are_the_chosen_one_and_the_ones_named_in_the_axis(with_forum, ingest_db):
+def test_the_labels_of_an_axis_debate_follow_its_axis_and_topic(with_forum, ingest_db):
     with_forum.forum(salon=str(FORUM), etiquette="Politique")
     with_forum.command(ALICE_ID, topic="", axis="religion")
     [post] = with_forum.discord.threads
-    assert with_forum.discord.threads[post]["applied_tags"] == ["t_pol", "t_rel"]
+    assert with_forum.discord.threads[post]["applied_tags"] == ["t_rel", "t_pol"]
     ingest_db.execute("DELETE FROM debates")
     with_forum.command(BOB_ID, topic="", axis="commerce")
-    assert with_forum.discord.threads[max(with_forum.discord.threads)]["applied_tags"] == ["t_pol", "t_intl"]
+    assert with_forum.discord.threads[max(with_forum.discord.threads)]["applied_tags"] == ["t_intl", "t_eco", "t_pol"]
 
 
-def test_a_debate_on_a_subject_written_by_a_person_carries_only_the_chosen_label(with_forum, ingest_db):
+def test_a_debate_on_a_subject_written_by_a_person_carries_its_matching_label(with_forum, ingest_db):
     with_forum.forum(salon=str(FORUM), etiquette="Économie")
     with_forum.command(ALICE_ID)
     assert with_forum.discord.threads[max(with_forum.discord.threads)]["applied_tags"] == ["t_eco"]
 
 
-def test_with_no_chosen_label_a_debate_carries_none_on_a_forum_that_does_not_ask(with_forum, ingest_db):
+def test_with_no_chosen_label_a_debate_still_carries_a_matching_label(with_forum, ingest_db):
     with_forum.forum(salon=str(FORUM))
     with_forum.command(ALICE_ID)
-    assert with_forum.discord.threads[max(with_forum.discord.threads)]["applied_tags"] == []
+    assert with_forum.discord.threads[max(with_forum.discord.threads)]["applied_tags"] == ["t_eco"]
 
 
 @pytest.mark.parametrize("failure", ["deleted", "not a forum any more", "refused", "label gone"])
