@@ -31,7 +31,7 @@ from dindon.bot.privacy_commands import Reply
 from dindon.bot.rest import DiscordREST, Response
 from dindon.clock import utc_now
 from dindon.db import connect
-from dindon.debate import answers, claims, forum, rules, stats, store, texts
+from dindon.debate import answers, claims, forum, ratings, rules, stats, store, texts
 from dindon.debate.checker import notice_mode
 from dindon.debate.reading import Reading
 from dindon.debate.store import Debate, DebateRefused
@@ -77,6 +77,10 @@ TEXT = {
     "recorded": "Position enregistrée : {choice}. Vous pouvez en changer quand vous voulez.",
     "changed": "Position changée : {choice}.",
     "unchanged": "Vous aviez déjà choisi {choice}.",
+    "rated": "Note enregistrée : {score}/10 pour <@{target}>. Vous pouvez la changer jusqu'au verdict.",
+    "rated_changed": "Note changée : {score}/10 pour <@{target}>.",
+    "bad_score": "Une note est un nombre de 0 à 10, par exemple 7,5 ou 8,25.",
+    "end_asked": "Votre demande de fin est enregistrée ({got}/{needed} dans le plus petit camp pour terminer le débat).",
 }
 
 
@@ -465,18 +469,95 @@ class Debates:
         if kind == "end":
             await self._end_by_button(data, debate_id, user_id)
             return
+        if kind in ("rate", "pick"):
+            await self._rating_click(data, kind, debate_id, user_id)
+            return
         when = self.clock()
         try:
             result = await self.db(lambda c: store.set_position(c, debate_id, user_id, value, when))
             debate = await self.db(lambda c: store.get(c, debate_id))
             text = TEXT[result].format(choice=_choice(value, debate.axis if debate else None))
             self._dirty.add(debate_id)
+            if debate is not None and debate.status == "closed" and debate.thread_id is not None:       # leaving a camp can empty it, which ends the debate
+                self._threads.pop(str(debate.thread_id), None)
+                self._owing = True
         except DebateRefused as refusal:
             text = self._refusal(refusal.code)
         except Exception as error:
             log.error("a button of a debate could not be handled (%s)", type(error).__name__)
             text = TEXT["failed"]
         await say(data, text)
+
+    async def _rating_click(self, data: dict, kind: str, debate_id: int, user_id: int) -> None:
+        """« Noter les participants »: the list of whom to rate. Then, a person chosen in it: the popup where the mark is typed."""
+        say = self.interactions.say
+        try:
+            debate = await self.db(lambda c: store.get(c, debate_id))
+            now = self.clock()
+            if debate is None or debate.rating_ends_at is None or debate.status != "closed" or now >= debate.rating_ends_at or debate.results_message_id is not None:
+                await say(data, texts.REFUSALS["rating_over"])
+                return
+            if user_id not in await self.db(lambda c: ratings.voters(c, debate_id)):
+                await say(data, texts.REFUSALS["not_voter"])
+                return
+            if kind == "rate":
+                people = [p for p in await self.db(lambda c: ratings.targets(c, debate_id)) if p != user_id]
+                given = await self.db(lambda c: ratings.given(c, debate_id, user_id))
+                text, components = texts.rating_picker(debate_id, people, given)
+                await self.interactions.say_with(data, text, components)
+                return
+            chosen = ((data.get("data") or {}).get("values") or [None])[0]
+            target = int(chosen)
+            if target == user_id:
+                await say(data, texts.REFUSALS["self"])
+                return
+            if target not in await self.db(lambda c: ratings.targets(c, debate_id)):
+                await say(data, texts.REFUSALS["not_target"])
+                return
+            who = ((data.get("data") or {}).get("resolved") or {}).get("users", {}).get(str(target)) or {}
+            name = who.get("global_name") or who.get("username") or "ce participant"
+            current = (await self.db(lambda c: ratings.given(c, debate_id, user_id))).get(target)
+            await self.interactions.modal(data, texts.rating_modal(debate_id, target, name, current))
+        except (TypeError, ValueError):
+            await say(data, TEXT["failed"])
+        except Exception as error:
+            log.error("a rating could not be handled (%s)", type(error).__name__)
+            await say(data, TEXT["failed"])
+
+    async def rating_submit(self, data: dict, user_id: int) -> None:
+        """The popup of a mark was sent."""
+        say = self.interactions.say
+        parsed = texts.parse_rating_modal_id((data.get("data") or {}).get("custom_id"))
+        if parsed is None:
+            return
+        debate_id, target = parsed
+        score = ratings.parse_score(texts.modal_values((data.get("data") or {}).get("components")).get("score"))
+        if score is None:
+            await say(data, TEXT["bad_score"])
+            return
+        try:
+            result = await self.db(lambda c: ratings.rate(c, debate_id, user_id, target, score, self.clock()))
+            await say(data, TEXT["rated" if result == "recorded" else "rated_changed"].format(score=str(score).replace(".", ","), target=target))
+        except DebateRefused as refusal:
+            await say(data, self._refusal(refusal.code))
+        except Exception as error:
+            log.error("a rating could not be recorded (%s)", type(error).__name__)
+            await say(data, TEXT["failed"])
+
+    async def _verdicts(self) -> None:
+        """The windows of rating that are over: the verdict is computed (once) and posted in the place of the debate."""
+        for debate_id in await self.db(lambda c: ratings.due(c, self.clock())):
+            key = (debate_id, "verdict")
+            if not self._may_try(key):
+                continue
+            debate = await self.db(lambda c, i=debate_id: store.get(c, i))
+            found = await self.db(lambda c, i=debate_id: ratings.finalize(c, i))
+            posted = await self._rest("POST", f"/channels/{debate.thread_id}/messages", texts.verdict(debate, found))
+            if posted.ok and posted.id is not None:
+                await self.db(lambda c, i=debate_id, m=posted.id: ratings.set_results_message(c, i, m))
+                self._succeeded(key)
+            elif self._failed_post(key, posted) >= GIVE_UP_AFTER or posted.status == 404:
+                await self.db(lambda c, i=debate_id: ratings.set_results_message(c, i, 0))
 
     async def _judge(self, data: dict, answer_id: int, user_id: int, choice: str) -> None:
         """Valide or Invalide under one of Dindon's answers. Answered privately. What it leads to (a search, if there is more Invalide) is decided by the engine, from the database."""
@@ -502,23 +583,24 @@ class Debates:
             rights = 0
         return bool(rights & MODERATOR_RIGHTS)
 
-    @classmethod
-    def _may_end(cls, data: dict, debate: Debate, user_id: int) -> bool:
-        """The person who opened the debate, or a moderator."""
-        return debate.created_by == user_id or cls._moderator(data)
-
     async def _end_by_button(self, data: dict, debate_id: int, user_id: int) -> None:
+        """A moderator ends the debate at once. A participant asks for its end: it closes when most of the smallest camp has asked. A witness cannot."""
         say = self.interactions.say
         try:
             debate = await self.db(lambda c: store.get(c, debate_id))
             if debate is None or debate.status != "open":
                 await say(data, texts.REFUSALS["unknown" if debate is None else "not_open"])
                 return
-            if not self._may_end(data, debate, user_id):
-                await say(data, texts.REFUSALS["not_allowed"])
-                return
             await self._flush_messages()                               # what was written in the last seconds still counts: the debate is closed to messages once it ends
-            closed = await self.db(lambda c: store.end(c, debate_id, rules.ENDED, self.clock()))
+            if self._moderator(data):
+                closed, text = await self.db(lambda c: store.end(c, debate_id, rules.ENDED, self.clock())), TEXT["ended"]
+            else:
+                result, closed = await self.db(lambda c: store.request_end(c, debate_id, user_id, self.clock()))
+                got, needed = (0, 0) if closed else await self.db(lambda c: store.end_votes(c, debate_id))
+                text = TEXT["ended"] if closed else TEXT["end_asked"].format(got=got, needed=needed)
+        except DebateRefused as refusal:
+            await say(data, self._refusal(refusal.code))
+            return
         except Exception as error:
             log.error("a debate could not be ended (%s)", type(error).__name__)
             await say(data, TEXT["failed"])
@@ -526,7 +608,7 @@ class Debates:
         if closed is not None and closed.thread_id is not None:
             self._threads.pop(str(closed.thread_id), None)             # (the statistics are posted by the next tick: `_owed` finds the debate closed without them)
             self._owing = True
-        await say(data, TEXT["ended"])
+        await say(data, text)
 
     async def _show_stats(self, data: dict, debate_id: int, page: int) -> None:
         """A click on a page button of the statistics: the page is made again from the database (what was deleted or erased since is gone)."""
@@ -557,6 +639,7 @@ class Debates:
             if closed is not None and closed.thread_id is not None:
                 self._threads.pop(str(closed.thread_id), None)
         await self._owed()
+        await self._verdicts()
         await self._corrections()
         await self._answers()
         await self._refresh()

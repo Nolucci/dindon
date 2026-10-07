@@ -28,7 +28,7 @@ def test_a_new_database_is_healthy(conn):
     assert count(
         "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' "
         "AND table_type = 'BASE TABLE' AND table_name <> 'schema_migrations'"
-    ) == 52
+    ) == 55
     assert count(
         "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'VIEW'"
     ) == 9

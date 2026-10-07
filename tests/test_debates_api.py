@@ -51,7 +51,7 @@ def test_the_list_gives_each_debate_its_headline_figures_and_the_state_of_the_ch
     answer = api.get("/api/debates").json()
     assert answer["checks"] == {"asked": "off", "mode": "off", "why_not": None, "model": "qwen3:14b", "search_services": [], "min_precision": 0.9, "measured_precision": None}
     [row] = answer["debates"]
-    assert (row["participants"], row["messages"], row["claims"], row["status"]) == (2, 2, 2, "open") and row["final"] == {"for": 1, "unsure": 0, "against": 1, "none": 0}
+    assert (row["participants"], row["messages"], row["claims"], row["status"]) == (2, 2, 2, "open") and row["final"] == {"for": 1, "unsure": 0, "against": 1, "witness": 0, "none": 0}
 
 
 def test_the_detail_has_the_people_with_names_the_claims_with_their_sources_and_the_parity(api):

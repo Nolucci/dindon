@@ -30,9 +30,13 @@ def reads(world, since: int = 0) -> list[str]:
     return [c[1] for c in world.discord.of("GET", "")[since:]]
 
 
+def people(db, debate) -> set[int]:
+    """Whoever wrote a counted message or holds a position (a witness who wrote is not a participant, but still has messages)."""
+    return store.participants(db, debate.id) | {r[0] for r in db.execute("SELECT author_id FROM debate_messages WHERE debate_id = %s", (debate.id,)).fetchall()}
+
+
 def figures(db, debate):
-    summary = store.summary(db, debate.id)
-    return summary["participants"], summary["messages"]
+    return len(people(db, debate)), store.summary(db, debate.id)["messages"]
 
 
 # --- messages deleted or edited -------------------------------------------------------------------------------------------------
@@ -46,7 +50,7 @@ def test_a_deleted_message_stops_counting_and_so_does_a_person_whose_only_messag
         flush(world.runner)                                                                          # the map stored them before they were deleted
     deleted(world, thread, 500)
     flush(world.runner)
-    assert figures(ingest_db, debate) == (1, 1) and store.participants(ingest_db, debate.id) == {CAROL_ID}
+    assert figures(ingest_db, debate) == (1, 1) and people(ingest_db, debate) == {CAROL_ID}
     deleted(world, thread, 501, 99999)                                                               # a bulk deletion, one of them never counted
     flush(world.runner)
     assert figures(ingest_db, debate) == (0, 0)
@@ -63,7 +67,7 @@ def test_a_deleted_message_does_not_take_back_a_position(world, ingest_db):
 
 def test_a_message_deleted_after_the_debate_is_over_is_forgotten_too(world, ingest_db):
     thread, debate = started(world, ingest_db)
-    world.click(ALICE_ID, thread, debate.id, "end", "now")
+    world.click(ALICE_ID, thread, debate.id, "end", "now", permissions=8)
     assert store.get(ingest_db, debate.id).status == "closed"
     deleted(world, thread, 500)
     flush(world.runner)
@@ -94,10 +98,10 @@ def test_a_question_deleted_by_a_moderator_is_posted_again_with_the_counts_as_th
     new = store.get(ingest_db, debate.id).question_message_id
     assert new not in (None, old) and len(world.discord.of("POST", f"/channels/{thread}/messages")) == posts + 1
     labels = [b["label"] for b in world.discord.messages[(thread, new)]["components"][0]["components"]]
-    assert labels == ["Pour · 1", "Ne sait pas · 0", "Contre · 0"]                                   # not a blank question: Bob's position is shown
+    assert labels == ["Pour · 1", "Ne sait pas · 0", "Contre · 0", "Témoin · 0"]                                   # not a blank question: Bob's position is shown
     world.click(CAROL_ID, thread, debate.id, "pos", "against")                                       # and the buttons of the new message work
     world.tick(seconds=6)
-    assert [b["label"] for b in world.discord.messages[(thread, new)]["components"][0]["components"]] == ["Pour · 1", "Ne sait pas · 0", "Contre · 1"]
+    assert [b["label"] for b in world.discord.messages[(thread, new)]["components"][0]["components"]] == ["Pour · 1", "Ne sait pas · 0", "Contre · 1", "Témoin · 0"]
     world.tick(seconds=3)
     assert len(world.discord.of("POST", f"/channels/{thread}/messages")) == posts + 1                # posted once
 
@@ -193,7 +197,7 @@ def test_what_was_written_while_the_bot_was_stopped_is_counted_when_it_starts_ag
     world.discord.say(thread, BOT_USER, "Un autre bot")                                              # not a person
     world.discord.say(thread, EVE, "Fil renommé", type=4)                                            # not a message
     world.tick(seconds=5)
-    assert figures(ingest_db, debate) == (3, 4) and store.participants(ingest_db, debate.id) == {BOB_ID, CAROL_ID, DAN_ID}
+    assert figures(ingest_db, debate) == (3, 4) and people(ingest_db, debate) == {BOB_ID, CAROL_ID, DAN_ID}
     assert reads(world, mark) == [f"/channels/{thread}/messages?limit=100&after=501"]                # from the last message counted, not from the start
 
 
@@ -218,18 +222,19 @@ def test_the_messages_of_a_person_who_stopped_are_not_counted_when_they_are_read
     world.discord.say(thread, DAN)
     world.discord.say(thread, EVE)
     world.tick(seconds=5)
-    assert store.participants(ingest_db, debate.id) == {BOB_ID, CAROL_ID, EVE_ID}
+    assert people(ingest_db, debate) == {BOB_ID, CAROL_ID, EVE_ID}
 
 
 def test_a_silence_that_seems_over_after_a_stop_counts_what_was_written_meanwhile_before_it_decides(world, ingest_db):
     world.command(ALICE_ID, quiet=3_600)
     debate = only_debate(ingest_db)
+    store.set_position(ingest_db, debate.id, ALICE_ID, "for", T0)                                    # (somebody has to take part for the debate to be more than empty)
     world.restart()                                                                                  # the bot is away…
     world.discord.say(debate.thread_id, BOB, when=T0 + timedelta(minutes=50))                        # …somebody writes at 50 minutes…
     world.time.advance(minutes=61)                                                                   # …and the bot is back after 61: not an hour of silence, only 11 minutes
     run(world.debates.tick())
     over = store.get(ingest_db, debate.id)
-    assert over.status == "open" and store.participants(ingest_db, debate.id) == {BOB_ID}            # (and not « nobody took part »)
+    assert over.status == "open" and people(ingest_db, debate) == {ALICE_ID, BOB_ID}            # (and not « nobody took part »)
     world.tick(minutes=48)                                                                           # 109 minutes: an hour after the message, less one
     assert store.get(ingest_db, debate.id).status == "open"
     world.tick(minutes=1)
@@ -283,7 +288,7 @@ def test_a_thread_that_is_gone_when_the_bot_reads_it_ends_the_debate(world, inge
 
 def test_nothing_is_read_back_for_a_debate_that_is_over(world, ingest_db):
     thread, debate = started(world, ingest_db)
-    world.click(ALICE_ID, thread, debate.id, "end", "now")
+    world.click(ALICE_ID, thread, debate.id, "end", "now", permissions=8)
     world.tick(seconds=1)
     world.restart()
     mark = len(reads(world))

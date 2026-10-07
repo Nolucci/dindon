@@ -13,6 +13,7 @@ import threading
 from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import psycopg
 import pytest
 
 from dindon import privacy
@@ -255,7 +256,14 @@ class World:
         self.time.advance(seconds=2)                                  # people do not click twice in a second
         run(self.interactions.answer(button(user, place, texts.custom_id(kind, debate_id, value), **member)))
 
-    def write(self, place, author=BOB, content="Je pense que oui", **extra):
+    def write(self, place, author=BOB, content="Je pense que oui", *, witness=False, **extra):
+        """A person writes in a place. Unless `witness`, they have first taken a position (only participants are read for the debate): « pour », if they had none."""
+        if not witness and not (isinstance(author, dict) and author.get("bot")):
+            with psycopg.connect(self.url, autocommit=True) as conn:
+                conn.execute("""INSERT INTO debate_positions (debate_id, user_id, position, chosen_at)
+                                SELECT d.id, %s, 'for', now() FROM debates d WHERE d.thread_id = %s AND d.status = 'open'
+                                AND NOT EXISTS (SELECT 1 FROM debate_positions p WHERE p.debate_id = d.id AND p.user_id = %s)
+                                AND NOT EXISTS (SELECT 1 FROM privacy_subjects s WHERE s.user_id = %s)""", (aid := int(author["id"] if isinstance(author, dict) else author), int(place["id"] if isinstance(place, dict) else place), aid, aid))
         extra.setdefault("timestamp", self.time.now().isoformat())
         self.runner.handle(create(message_create(next(self._ids), content, author, channel_id=str(place), **extra)))
 
@@ -438,14 +446,14 @@ def test_with_the_thread_box_ticked_a_public_thread_is_opened_with_the_launch_me
                                                     ("POST", f"/channels/{thread}/messages")]
     [question] = world.discord.posted(thread)
     description = question["embeds"][0]["description"]
-    assert TOPIC in description and "<t:" not in description and "1 jour sans message" in description and "Terminer le débat" in description
+    assert TOPIC in description and "<t:" not in description and "1 jour sans message" in description and "Voter la fin" in description
     assert "tous les messages" not in description                                                                                   # (that warning is for a debate in the channel)
     assert question["allowed_mentions"] == {"parse": []}
     debate = the_debate(ingest_db, thread)
     positions, finish = question["components"][0]["components"], question["components"][1]["components"]
-    assert [b["custom_id"] for b in positions] == [texts.custom_id("pos", debate.id, k) for k in ("for", "unsure", "against")]
-    assert [b["emoji"]["name"] for b in positions] == ["✅", "❔", "❌"] and [b["label"] for b in positions] == ["Pour · 0", "Ne sait pas · 0", "Contre · 0"]
-    assert [(b["custom_id"], b["label"]) for b in finish] == [(texts.custom_id("end", debate.id, "now"), "Terminer le débat")]
+    assert [b["custom_id"] for b in positions] == [texts.custom_id("pos", debate.id, k) for k in ("for", "unsure", "against", "witness")]
+    assert [b["emoji"]["name"] for b in positions] == ["✅", "❔", "❌", "👀"] and [b["label"] for b in positions] == ["Pour · 0", "Ne sait pas · 0", "Contre · 0", "Témoin · 0"]
+    assert [(b["custom_id"], b["label"]) for b in finish] == [(texts.custom_id("end", debate.id, "now"), "Voter la fin du débat")]
     assert (debate.status, debate.created_by, debate.topic, debate.in_thread, debate.channel_id, debate.quiet_seconds) == ("open", ALICE_ID, TOPIC, True, int(GENERAL), 86_400)
     assert debate.question_message_id == debate.start_message_id == max(m for _, m in world.discord.messages)
     popup, deferred, told = world.sent.calls[:3]
@@ -663,7 +671,7 @@ def test_every_axis_of_dindon_makes_a_question_that_fits_on_discord(ingest_db):
         message = texts.question(debate, {"for": 12, "unsure": 3, "against": 100})
         labels = [b["label"] for b in message["components"][0]["components"]]
         assert axis.question in message["embeds"][0]["description"] and len(message["embeds"][0]["description"]) < 4000
-        assert labels == [f"{axis.negative_pole} · 12", "Ne sait pas · 3", f"{axis.positive_pole} · 100"] and all(len(label) <= 80 for label in labels)
+        assert labels == [f"{axis.negative_pole} · 12", "Ne sait pas · 3", f"{axis.positive_pole} · 100", "Témoin · 0"] and all(len(label) <= 80 for label in labels)
         assert debate.axis == axis.snapshot()
         store.fail(ingest_db, debate.id, T0)
 
@@ -676,8 +684,8 @@ def test_without_a_subject_the_axis_chosen_gives_the_question_and_its_two_poles_
     description = launch["embeds"][0]["description"]
     assert question in description and f"Question posée par Dindon · axe « {name} »" in description and "Répondez avec les boutons" in description and "Prenez position" not in description
     buttons = launch["components"][0]["components"]
-    assert [b["label"] for b in buttons] == [f"{negative} · 0", "Ne sait pas · 0", f"{positive} · 0"] and [b["emoji"]["name"] for b in buttons] == ["🔵", "❔", "🟠"]
-    assert [b["custom_id"] for b in buttons] == [texts.custom_id("pos", debate.id, k) for k in ("for", "unsure", "against")]       # (the same buttons underneath: only the words change)
+    assert [b["label"] for b in buttons] == [f"{negative} · 0", "Ne sait pas · 0", f"{positive} · 0", "Témoin · 0"] and [b["emoji"]["name"] for b in buttons] == ["🔵", "❔", "🟠", "👀"]
+    assert [b["custom_id"] for b in buttons] == [texts.custom_id("pos", debate.id, k) for k in ("for", "unsure", "against", "witness")]       # (the same buttons underneath: only the words change)
     assert "✅" not in str(launch) and "❌" not in str(launch)                                                                       # neither pole is shown as the right one
 
 
@@ -688,6 +696,7 @@ def test_the_answers_name_the_pole_that_was_chosen_and_the_counters_use_the_pole
     world.click(BOB_ID, place, debate.id, "pos", "for")
     assert f"Position enregistrée : 🔵 {negative}" in world.sent.last()
     world.click(CAROL_ID, place, debate.id, "pos", "against")
+    world.click(ALICE_ID, place, debate.id, "pos", "for")                                                                          # (a camp that empties ends the debate: Alice stays in it)
     world.click(BOB_ID, place, debate.id, "pos", "against")
     assert f"Position changée : 🟠 {positive}" in world.sent.last()
     world.click(CAROL_ID, place, debate.id, "pos", "against")
@@ -696,7 +705,7 @@ def test_the_answers_name_the_pole_that_was_chosen_and_the_counters_use_the_pole
     assert "Position changée : ❔ Ne sait pas" in world.sent.last()
     world.tick(seconds=6)
     labels = [b["label"] for b in world.discord.of("PATCH", f"/messages/{debate.question_message_id}")[-1][2]["components"][0]["components"]]
-    assert labels == [f"{negative} · 0", "Ne sait pas · 1", f"{positive} · 1"]
+    assert labels == [f"{negative} · 1", "Ne sait pas · 1", f"{positive} · 1", "Témoin · 0"]
 
 
 def test_the_statistics_say_the_poles_and_never_pour_or_contre(world, ingest_db):
@@ -708,7 +717,7 @@ def test_the_statistics_say_the_poles_and_never_pour_or_contre(world, ingest_db)
     world.click(BOB_ID, place, debate.id, "pos", "for")
     world.click(CAROL_ID, place, debate.id, "pos", "against")
     world.click(BOB_ID, place, debate.id, "pos", "against")
-    world.click(ALICE_ID, place, debate.id, "end", "now")
+    world.click(ALICE_ID, place, debate.id, "end", "now", permissions=ADMINISTRATOR)
     world.tick(seconds=1)
     [closing] = world.discord.posted(place, "Débat terminé")
     text = closing["embeds"][0]["description"]
@@ -721,7 +730,7 @@ def test_a_subject_that_was_written_always_wins_over_an_axis(world, ingest_db):
     world.command(ALICE_ID, topic=TOPIC, axis="structure")
     debate = only_debate(ingest_db)
     assert debate.topic == TOPIC and debate.axis is None
-    assert [b["label"] for b in world.discord.posted(debate.thread_id)[0]["components"][0]["components"]] == ["Pour · 0", "Ne sait pas · 0", "Contre · 0"]
+    assert [b["label"] for b in world.discord.posted(debate.thread_id)[0]["components"][0]["components"]] == ["Pour · 0", "Ne sait pas · 0", "Contre · 0", "Témoin · 0"]
 
 
 def test_the_subject_written_in_the_popup_wins_too_and_spaces_alone_are_no_subject(world, ingest_db):
@@ -754,7 +763,7 @@ def test_a_debate_keeps_the_words_it_opened_with_whatever_happens_to_the_axis_af
     assert f"🔵 {negative}" in world.sent.last()
     world.tick(seconds=6)
     labels = [b["label"] for b in world.discord.of("PATCH", f"/messages/{debate.question_message_id}")[-1][2]["components"][0]["components"]]
-    assert labels == [f"{negative} · 1", "Ne sait pas · 0", f"{positive} · 0"] and store.get(ingest_db, debate.id).axis["for"] == negative
+    assert labels == [f"{negative} · 1", "Ne sait pas · 0", f"{positive} · 0", "Témoin · 0"] and store.get(ingest_db, debate.id).axis["for"] == negative
 
 
 def test_an_axis_debate_can_take_place_in_the_channel_and_be_checked_like_any_other(checking_world, ingest_db):
@@ -775,18 +784,19 @@ def test_a_position_is_taken_changed_and_shown_on_the_launch_message_at_most_eve
     world.click(BOB_ID, place, debate.id, "pos", "for")
     assert "Position enregistrée : ✅ Pour" in world.sent.last() and world.sent.calls[-1][2]["data"]["flags"] == EPHEMERAL
     world.click(CAROL_ID, place, debate.id, "pos", "against")
+    world.click(ALICE_ID, place, debate.id, "pos", "for")                                                                          # (a camp that empties ends the debate: Alice stays in it)
     world.click(BOB_ID, place, debate.id, "pos", "against")
     assert "Position changée : ❌ Contre" in world.sent.last()
     run(world.debates.tick())
     edits = world.discord.of("PATCH", f"/messages/{debate.question_message_id}")
     assert len(edits) == 1                                                                                                         # three clicks, one edit
-    assert [b["label"] for b in edits[0][2]["components"][0]["components"]] == ["Pour · 0", "Ne sait pas · 0", "Contre · 2"]
+    assert [b["label"] for b in edits[0][2]["components"][0]["components"]] == ["Pour · 1", "Ne sait pas · 0", "Contre · 2", "Témoin · 0"]
     assert edits[0][2]["components"][1]["components"][0]["custom_id"] == texts.custom_id("end", debate.id, "now")                   # the end button stays
     world.click(CAROL_ID, place, debate.id, "pos", "unsure")
     run(world.debates.tick())
     assert len(world.discord.of("PATCH", f"/messages/{debate.question_message_id}")) == 1                                           # too soon after the last edit: it waits
     world.tick(seconds=6)
-    assert [b["label"] for b in world.discord.of("PATCH", f"/messages/{debate.question_message_id}")[-1][2]["components"][0]["components"]] == ["Pour · 0", "Ne sait pas · 1", "Contre · 1"]
+    assert [b["label"] for b in world.discord.of("PATCH", f"/messages/{debate.question_message_id}")[-1][2]["components"][0]["components"]] == ["Pour · 1", "Ne sait pas · 1", "Contre · 1", "Témoin · 0"]
 
 
 def test_a_double_click_is_not_handled_twice(world, ingest_db):
@@ -821,7 +831,7 @@ def test_the_person_who_opened_the_debate_ends_it_and_the_statistics_follow(worl
     run(world.debates.tick())                                                                                                      # (the engine has loaded the running debates, as it does in its first seconds)
     world.write(thread, BOB)                                                                                                       # written a moment ago: not yet written to the database…
     world.click(BOB_ID, thread, debate.id, "pos", "for")
-    world.click(ALICE_ID, thread, debate.id, "end", "now")                                                                         # …and still counted: ending first brings it in
+    world.click(ALICE_ID, thread, debate.id, "end", "now", permissions=ADMINISTRATOR)                                                                         # …and still counted: ending first brings it in
     assert "le débat est terminé" in world.sent.last() and world.sent.calls[-1][2]["data"]["flags"] == EPHEMERAL
     over = store.get(ingest_db, debate.id)
     assert (over.status, over.close_reason) == ("closed", "ended") and str(thread) not in world.debates._threads             # no longer read from here on
@@ -843,7 +853,7 @@ def test_a_debate_in_the_channel_ends_the_same_way_and_the_channel_is_never_arch
     world.command(ALICE_ID, thread=False)
     debate = only_debate(ingest_db)
     world.write(GENERAL, BOB)
-    world.click(ALICE_ID, GENERAL, debate.id, "end", "now")
+    world.click(ALICE_ID, GENERAL, debate.id, "end", "now", permissions=ADMINISTRATOR)
     world.tick(seconds=1)
     assert len(world.discord.posted(GENERAL, "Débat terminé")) == 1 and store.get(ingest_db, debate.id).status == "closed"
     assert [c for c in world.discord.calls if c[0] == "PATCH" and c[1] == f"/channels/{GENERAL}"] == []
@@ -854,14 +864,14 @@ def test_a_debate_in_an_existing_thread_leaves_that_thread_as_it_was(world, inge
     world.command(ALICE_ID, channel=THREAD, channel_type=11)
     debate = only_debate(ingest_db)
     world.write(THREAD, BOB)
-    world.click(ALICE_ID, THREAD, debate.id, "end", "now")
+    world.click(ALICE_ID, THREAD, debate.id, "end", "now", permissions=ADMINISTRATOR)
     world.tick(seconds=1)
     assert len(world.discord.posted(THREAD, "Débat terminé")) == 1
     assert [c for c in world.discord.calls if c[0] == "PATCH" and c[1] == f"/channels/{THREAD}"] == []                             # it was not made by Dindon: not archived
 
 
 @pytest.mark.parametrize(("user", "permissions", "allowed"), [
-    (ALICE_ID, None, True),                                                                                                       # the person who opened it
+    (ALICE_ID, None, False),                                                                                                      # the person who opened it, who took no position
     (BOB_ID, MANAGE_MESSAGES, True),                                                                                              # a moderator
     (BOB_ID, ADMINISTRATOR, True),
     (BOB_ID, MANAGE_MESSAGES | SEND_MESSAGES, True),
@@ -877,7 +887,7 @@ def test_only_the_person_who_opened_the_debate_or_a_moderator_can_end_it(world, 
     if allowed:
         assert over.status == "closed" and "le débat est terminé" in world.sent.last()
     else:
-        assert over.status == "open" and "Seuls la personne qui a lancé le débat et les modérateurs" in world.sent.last() and world.debates.is_debate_thread(debate.thread_id)
+        assert over.status == "open" and "Les témoins ne peuvent pas terminer" in world.sent.last() and world.debates.is_debate_thread(debate.thread_id)
 
 
 def test_garbled_permissions_do_not_make_somebody_a_moderator(world, ingest_db):
@@ -892,10 +902,10 @@ def test_garbled_permissions_do_not_make_somebody_a_moderator(world, ingest_db):
 def test_ending_twice_or_ending_a_debate_that_does_not_exist_is_answered_and_changes_nothing(world, ingest_db):
     world.command(ALICE_ID)
     debate = only_debate(ingest_db)
-    world.click(ALICE_ID, debate.thread_id, debate.id, "end", "now")
-    world.click(ALICE_ID, debate.thread_id, debate.id, "end", "now")
+    world.click(ALICE_ID, debate.thread_id, debate.id, "end", "now", permissions=ADMINISTRATOR)
+    world.click(ALICE_ID, debate.thread_id, debate.id, "end", "now", permissions=ADMINISTRATOR)
     assert "Ce débat est terminé" in world.sent.last()
-    world.click(ALICE_ID, debate.thread_id, debate.id + 12345, "end", "now")
+    world.click(ALICE_ID, debate.thread_id, debate.id + 12345, "end", "now", permissions=ADMINISTRATOR)
     assert "n'existe plus" in world.sent.last()
     world.click(BOB_ID, debate.thread_id, debate.id, "pos", "for")                                                                 # and a closed debate takes no more positions
     assert "Ce débat est terminé" in world.sent.last() and ingest_db.execute("SELECT count(*) FROM debate_positions").fetchone()[0] == 0
@@ -904,7 +914,7 @@ def test_ending_twice_or_ending_a_debate_that_does_not_exist_is_answered_and_cha
 def test_a_debate_where_nobody_took_part_is_closed_with_that_said(world, ingest_db):
     world.command(ALICE_ID)
     debate = only_debate(ingest_db)
-    world.click(ALICE_ID, debate.thread_id, debate.id, "end", "now")                                                               # (the one who ends it has not taken part either)
+    world.click(ALICE_ID, debate.thread_id, debate.id, "end", "now", permissions=ADMINISTRATOR)                                                               # (the one who ends it has not taken part either)
     world.tick(seconds=1)
     assert store.get(ingest_db, debate.id).close_reason == "no_participants"
     assert "Personne n'a pris part" in world.discord.posted(debate.thread_id, "Débat terminé")[0]["embeds"][0]["description"]
@@ -1008,13 +1018,14 @@ def test_what_was_written_in_the_channel_before_the_launch_message_is_not_part_o
     world.restart()                                                                                                                # a restart reads the place again, from the launch message on
     world.discord.say(GENERAL, CAROL, "Après")
     world.tick(seconds=5)
-    assert store.participants(ingest_db, debate.id) == {CAROL_ID} and store.summary(ingest_db, debate.id)["messages"] == 1
+    assert store.summary(ingest_db, debate.id)["messages"] == 1
 
 
 def test_a_message_announced_twice_counts_once_and_a_person_who_stopped_does_not_count(world, ingest_db):
     world.command(ALICE_ID)
     debate = only_debate(ingest_db)
     payload = message_create(4242, "Bonjour", BOB, channel_id=str(debate.thread_id))
+    world.click(BOB_ID, debate.thread_id, debate.id, "pos", "for")
     world.runner.handle(create(payload))
     world.runner.handle(create(payload))
     privacy.stop_recording(ingest_db, CAROL_ID)
@@ -1050,7 +1061,7 @@ def started(world, ingest_db, *, speakers=(BOB, CAROL), thread=True):
     world.command(ALICE_ID, thread=thread)
     debate = only_debate(ingest_db)
     for author in speakers:
-        world.write(debate.thread_id, author)
+        world.write(debate.thread_id, author, witness=True)                       # (they wrote without taking a position: these tests are about the messages)
     run(world.debates.tick())
     return debate.thread_id, debate
 
@@ -1090,7 +1101,7 @@ def test_the_silence_goes_on_being_counted_across_a_restart(world, ingest_db):
 def test_a_closing_that_was_owed_at_the_stop_is_posted_by_the_next_start(world, ingest_db):
     thread, debate = started(world, ingest_db)
     world.discord.fail("POST", rf"/channels/{thread}/messages", 500, times=1)
-    world.click(ALICE_ID, thread, debate.id, "end", "now")
+    world.click(ALICE_ID, thread, debate.id, "end", "now", permissions=ADMINISTRATOR)
     world.tick(seconds=1)
     assert store.get(ingest_db, debate.id).status == "closed" and world.discord.posted(thread, "Débat terminé") == []
     world.restart()
@@ -1101,7 +1112,7 @@ def test_a_closing_that_was_owed_at_the_stop_is_posted_by_the_next_start(world, 
 def test_a_failed_post_is_tried_again_with_growing_waits_and_not_twice_when_it_works(world, ingest_db):
     thread, debate = started(world, ingest_db)
     world.discord.fail("POST", rf"/channels/{thread}/messages", 500, times=2)
-    world.click(ALICE_ID, thread, debate.id, "end", "now")
+    world.click(ALICE_ID, thread, debate.id, "end", "now", permissions=ADMINISTRATOR)
     world.tick(seconds=1)                                                                                                          # fails (first wait: 2 s)
     world.tick(seconds=1)
     assert len(world.discord.of("POST", f"/channels/{thread}/messages")) == 2                                                      # the launch message, and the one failed try: nothing hammered
@@ -1117,7 +1128,7 @@ def test_a_failed_post_is_tried_again_with_growing_waits_and_not_twice_when_it_w
 def test_a_closing_that_never_works_is_given_up_after_a_few_tries(world, ingest_db):
     thread, debate = started(world, ingest_db)
     world.discord.fail("POST", rf"/channels/{thread}/messages", 500, times=99)
-    world.click(ALICE_ID, thread, debate.id, "end", "now")
+    world.click(ALICE_ID, thread, debate.id, "end", "now", permissions=ADMINISTRATOR)
     for _ in range(12):
         world.tick(seconds=61)
     assert len(world.discord.of("POST", f"/channels/{thread}/messages")) == 1 + 5                                                  # the launch message, five tries at the closing
@@ -1127,7 +1138,7 @@ def test_a_closing_that_never_works_is_given_up_after_a_few_tries(world, ingest_
 def test_a_thread_deleted_on_discord_ends_its_debate_without_retrying_for_ever(world, ingest_db):
     thread, debate = started(world, ingest_db)
     world.discord.delete_thread(thread)
-    world.click(ALICE_ID, thread, debate.id, "end", "now")                                                                         # the closing finds the thread gone
+    world.click(ALICE_ID, thread, debate.id, "end", "now", permissions=ADMINISTRATOR)                                                                         # the closing finds the thread gone
     world.tick(seconds=1)
     over = store.get(ingest_db, debate.id)
     assert over.status == "closed" and over.final_message_id == 0 and not world.debates.is_debate_thread(thread)
@@ -1304,3 +1315,49 @@ def test_an_error_is_returned_with_discords_code_and_an_unreachable_discord_is_s
     refused = rest.call("POST", "/channels/5/threads", {})
     assert (refused.status, refused.code, refused.ok, refused.id) == (403, 50013, False, None)
     assert DiscordREST("t", "http://127.0.0.1:9/api/v10", timeout=1).call("GET", "/users/@me").status == 0       # nothing listens on port 9
+
+
+# --- the verdict -------------------------------------------------------------------------------------------------------------
+
+def test_after_the_end_the_people_rate_the_participants_and_the_verdict_is_posted_when_the_window_closes(world, ingest_db):
+    world.command(ALICE_ID)
+    debate = only_debate(ingest_db)
+    place = debate.thread_id
+    world.click(ALICE_ID, place, debate.id, "pos", "for")
+    world.click(BOB_ID, place, debate.id, "pos", "against")
+    world.click(CAROL_ID, place, debate.id, "pos", "witness")
+    world.click(ALICE_ID, place, debate.id, "end", "now", permissions=ADMINISTRATOR)
+    world.tick(seconds=1)
+    [closing] = world.discord.posted(place, "Débat terminé")
+    assert closing["components"][0]["components"][-1]["label"] == "Noter les participants"
+
+    world.click(CAROL_ID, place, debate.id, "rate", "open")                                     # a witness opens the list: it holds the two participants
+    assert f"<@{ALICE_ID}>" in world.sent.last() and f"<@{BOB_ID}>" in world.sent.last()
+    world.click(ALICE_ID, place, debate.id, "rate", "open")
+    assert f"<@{ALICE_ID}>" not in world.sent.last() and f"<@{BOB_ID}>" in world.sent.last()    # never oneself
+
+    pick = button(CAROL_ID, place, texts.custom_id("pick", debate.id, "open"))
+    pick["data"] = {**pick["data"], "component_type": 5, "values": [str(ALICE_ID)], "resolved": {"users": {str(ALICE_ID): {"username": "alice", "global_name": "Alice"}}}}
+    world.time.advance(seconds=2)
+    run(world.interactions.answer(pick))
+    assert world.sent.shown[-1]["custom_id"] == f"dindon:debat:rate:{debate.id}:{ALICE_ID}"      # the popup of the mark
+
+    def submit(user, target, value):
+        return {"id": "889", "token": "tok3", "type": 5, "application_id": "42", "guild_id": GUILD, "channel_id": str(place), "member": {"user": {"id": str(user)}},
+                "data": {"custom_id": f"dindon:debat:rate:{debate.id}:{target}", "components": [{"type": 1, "components": [{"type": 4, "custom_id": "score", "value": value}]}]}}
+    run(world.interactions.answer(submit(CAROL_ID, ALICE_ID, "9,5")))
+    assert "Note enregistrée : 9,50/10" in world.sent.last()
+    run(world.interactions.answer(submit(CAROL_ID, CAROL_ID, "9")))
+    assert "pas" in world.sent.last().lower() or "soi-même" in world.sent.last()
+    run(world.interactions.answer(submit(BOB_ID, ALICE_ID, "onze")))
+    assert "nombre de 0 à 10" in world.sent.last()
+    run(world.interactions.answer(submit(BOB_ID, ALICE_ID, "3")))
+
+    world.tick(hours=1)
+    assert world.discord.posted(place, "Verdict") == []                                          # the window is still open
+    world.tick(hours=24)
+    [verdict] = world.discord.posted(place, "Verdict")
+    text = verdict["embeds"][0]["description"]
+    assert f"<@{ALICE_ID}>" in text and "6,25" not in text and "6.25" in text                    # (9,5 + 3) / 2 = 6.25 on Alice's side of the votes
+    world.tick(hours=1)
+    assert len(world.discord.posted(place, "Verdict")) == 1                                      # posted once

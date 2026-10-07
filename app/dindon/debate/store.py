@@ -54,6 +54,8 @@ class Debate:
     started_at: datetime | None
     last_activity_at: datetime | None
     closed_at: datetime | None
+    rating_ends_at: datetime | None    # the end of the window where the people rate the participants (null: there is nothing to rate)
+    results_message_id: int | None     # the verdict message (0: given up)
 
 
 _COLUMNS = ", ".join(f.name for f in fields(Debate))
@@ -126,16 +128,18 @@ def active(conn: psycopg.Connection) -> list[Debate]:
 
 
 def participants(conn: psycopg.Connection, debate_id: int) -> set[int]:
-    """Who took part: wrote in the debate or took a position. Never someone who asked not to be recorded."""
+    """Who takes part: whoever's current position is for, not sure or against. A witness, or somebody who only wrote, does not. Never someone who asked not to be recorded."""
     with conn.cursor(row_factory=tuple_row) as cur:
         return _participants(cur, debate_id)
 
 
 def _participants(cur: psycopg.Cursor, debate_id: int) -> set[int]:
-    return {r[0] for r in cur.execute(
-        """SELECT user_id FROM (SELECT author_id AS user_id FROM debate_messages WHERE debate_id = %(d)s
-                                UNION SELECT user_id FROM debate_positions WHERE debate_id = %(d)s) p
-           WHERE NOT EXISTS (SELECT 1 FROM privacy_subjects s WHERE s.user_id = p.user_id)""", {"d": debate_id}).fetchall()}
+    return {user for user, position in _positions(cur, debate_id).items() if position in rules.PARTICIPANT_POSITIONS}
+
+
+def witnesses(conn: psycopg.Connection, debate_id: int) -> set[int]:
+    """Who only watches: the current position is « témoin »."""
+    return {user for user, position in positions(conn, debate_id).items() if position == "witness"}
 
 
 def positions(conn: psycopg.Connection, debate_id: int) -> dict[int, str]:
@@ -248,14 +252,16 @@ def fail(conn: psycopg.Connection, debate_id: int, now: datetime | None = None) 
 
 
 def record_message(conn: psycopg.Connection, debate_id: int, *, message_id: int, author_id: int, sent_at: datetime, to_read: bool = False) -> bool:
-    """A message was written in the debate. True if it is new and counts; False if it is a repeat, the debate is not open, or the author asked not to be recorded.
+    """A message was written in the debate. A person who is not a participant (a witness, or who has not taken a position) is kept marked `witness` and is never read for claims. True if it is new and counts; False if it is a repeat, the debate is not open, or the author asked not to be recorded.
     `to_read`: it waits to be read for claims (debate/claims.py) if this debate checks its claims; otherwise it is marked read at once. It counts as activity: the silence starts again."""
     with conn.transaction(), conn.cursor(row_factory=tuple_row) as cur:
         added = cur.execute(
-            """INSERT INTO debate_messages (debate_id, message_id, author_id, sent_at, read_at)
-               SELECT d.id, %(m)s, %(a)s, %(t)s, CASE WHEN %(r)s AND d.verify THEN NULL ELSE %(t)s END FROM debates d
+            """INSERT INTO debate_messages (debate_id, message_id, author_id, sent_at, read_at, witness)
+               SELECT d.id, %(m)s, %(a)s, %(t)s, CASE WHEN %(r)s AND d.verify AND NOT w.witness THEN NULL ELSE %(t)s END, w.witness FROM debates d,
+                      LATERAL (SELECT COALESCE((SELECT p.position <> ALL(%(p)s) FROM debate_positions p WHERE p.debate_id = d.id AND p.user_id = %(a)s ORDER BY p.id DESC LIMIT 1), true) AS witness) w
                WHERE d.id = %(d)s AND d.status = 'open' AND NOT EXISTS (SELECT 1 FROM privacy_subjects s WHERE s.user_id = %(a)s)
-               ON CONFLICT DO NOTHING""", {"d": debate_id, "m": message_id, "a": author_id, "t": sent_at, "r": to_read}).rowcount == 1
+               ON CONFLICT DO NOTHING""",
+            {"d": debate_id, "m": message_id, "a": author_id, "t": sent_at, "r": to_read, "p": list(rules.PARTICIPANT_POSITIONS)}).rowcount == 1
         if added:
             cur.execute("UPDATE debates SET last_activity_at = GREATEST(COALESCE(last_activity_at, %s), %s) WHERE id = %s", (sent_at, sent_at, debate_id))
         return added
@@ -277,11 +283,70 @@ def set_position(conn: psycopg.Connection, debate_id: int, user_id: int, positio
         if last is not None and last[0] == position:
             return "unchanged"
         cur.execute("INSERT INTO debate_positions (debate_id, user_id, position, chosen_at) VALUES (%s, %s, %s, %s)", (debate_id, user_id, position, now))
+        cur.execute("DELETE FROM debate_end_votes WHERE debate_id = %s AND user_id = %s", (debate_id, user_id))      # a new side, a new say
         cur.execute("UPDATE debates SET last_activity_at = %s WHERE id = %s", (now, debate_id))
+        _settle(cur, debate, now)                                          # leaving a camp can empty it, or leave the rest of the smallest camp in agreement
         return "recorded" if last is None else "changed"
 
 
 # --- the end ----------------------------------------------------------------------------------------------------------
+
+
+def request_end(conn: psycopg.Connection, debate_id: int, user_id: int, now: datetime | None = None) -> tuple[str, Debate | None]:
+    """A participant asks to end the debate. Returns ('recorded' | 'unchanged', the closed debate or None if it goes on). Refused: 'unknown', 'not_open', 'blocked', 'not_participant' (a witness
+    cannot end a debate, nor somebody who took no position)."""
+    now = now or utc_now()
+    with conn.transaction(), conn.cursor(row_factory=tuple_row) as cur:
+        debate = _locked(cur, debate_id)
+        if debate.status != "open":
+            raise DebateRefused("not_open")
+        if _blocked(cur, user_id):
+            raise DebateRefused("blocked")
+        if user_id not in _participants(cur, debate_id):
+            raise DebateRefused("not_participant")
+        added = cur.execute("INSERT INTO debate_end_votes (debate_id, user_id, voted_at) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING", (debate_id, user_id, now)).rowcount == 1
+        return ("recorded" if added else "unchanged"), _settle(cur, debate, now)
+
+
+def end_votes(conn: psycopg.Connection, debate_id: int) -> tuple[int, int]:
+    """(how many of the smallest camp asked to end, how many make a majority of it): shown to the participants. (0, 0) when nobody can end it yet."""
+    with conn.cursor(row_factory=tuple_row) as cur:
+        pool, wanted = _end_pool(cur, debate_id)
+        return len(wanted), len(pool) // 2 + 1 if pool else 0
+
+
+def _end_pool(cur: psycopg.Cursor, debate_id: int) -> tuple[set[int], set[int]]:
+    """The smallest camp that is not empty (the two, if they are as big; « ne sait pas » only when there is no camp) and which of it asked to end. With two camps of the same size the one
+    that is closest to a majority decides."""
+    current = _positions(cur, debate_id)
+    asked = {r[0] for r in cur.execute("SELECT user_id FROM debate_end_votes WHERE debate_id = %s", (debate_id,)).fetchall()}
+    camps = [{u for u, p in current.items() if p == camp} for camp in rules.CAMPS]
+    camps = [c for c in camps if c] or [{u for u, p in current.items() if p == "unsure"}]
+    smallest = min(len(c) for c in camps)
+    best = max((c for c in camps if len(c) == smallest), key=lambda c: len(c & asked))
+    return best, best & asked
+
+
+def _was_contested(cur: psycopg.Cursor, debate_id: int) -> bool:
+    """True if, at some moment, both camps had somebody in them at once (one person changing sides alone is not a debate that has emptied)."""
+    now_at: dict[int, str] = {}
+    for user, position in cur.execute("SELECT user_id, position FROM debate_positions WHERE debate_id = %s ORDER BY id", (debate_id,)).fetchall():
+        now_at[user] = position
+        if all(camp in now_at.values() for camp in rules.CAMPS):
+            return True
+    return False
+
+
+def _settle(cur: psycopg.Cursor, debate: Debate, now: datetime) -> Debate | None:
+    """Closes the debate if its camps decide it: one camp has emptied after both existed (`one_sided`), or most of the smallest camp asked to end (`agreed`). The caller holds the row's lock."""
+    current = _positions(cur, debate.id)
+    sides = {camp: any(p == camp for p in current.values()) for camp in rules.CAMPS}
+    if not all(sides.values()) and _was_contested(cur, debate.id):
+        return _close(cur, debate, rules.ONE_SIDED, now)
+    pool, wanted = _end_pool(cur, debate.id)
+    if pool and len(wanted) > len(pool) // 2:
+        return _close(cur, debate, rules.AGREED, now)
+    return None
 
 
 def end(conn: psycopg.Connection, debate_id: int, reason: str = rules.ENDED, now: datetime | None = None) -> Debate | None:
@@ -307,7 +372,9 @@ def quiet(conn: psycopg.Connection, now: datetime | None = None) -> list[int]:
 
 
 def _close(cur: psycopg.Cursor, debate: Debate, reason: str, now: datetime) -> Debate:
-    return _row(cur.execute(f"UPDATE debates SET status = 'closed', close_reason = %s, closed_at = %s WHERE id = %s RETURNING {_COLUMNS}", (reason, now, debate.id)).fetchone())
+    rating = None if reason in (rules.FAILED, rules.NO_PARTICIPANTS) else now + timedelta(seconds=rules.RATING_SECONDS)
+    return _row(cur.execute(f"UPDATE debates SET status = 'closed', close_reason = %s, closed_at = %s, rating_ends_at = %s WHERE id = %s RETURNING {_COLUMNS}",
+                            (reason, now, rating, debate.id)).fetchone())
 
 
 def close_stale(conn: psycopg.Connection, now: datetime, max_age: timedelta) -> int:

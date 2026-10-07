@@ -97,6 +97,41 @@
     }
   }
 
+  // The card of /dindon card: which pages and which blocks of each page it shows (only the administrator changes this, from here).
+  let dcard = $state(null);
+  let dcardSaved = $state(null);
+  let dcardNote = $state('');
+  const dcardChanged = $derived(dcard && dcardSaved && JSON.stringify({ pages: dcard.pages, blocks: dcard.blocks }) !== JSON.stringify({ pages: dcardSaved.pages, blocks: dcardSaved.blocks }));
+  const DCARD_PAGES = { profile: 'Profil', interactions: 'Interactions', positions: 'Positions', contradictions: 'Contradictions' };
+  const DCARD_BLOCKS = {
+    headline: 'Chiffres clés (messages, jours actifs, rang)', activity: 'Activité récente', channels: 'Salons les plus utilisés', roles: 'Rôles que la personne s’est donnés', presence: 'Dates de présence',
+    close: 'Échanges les plus proches', replies: 'Réponses données et reçues', sides: 'Accords et désaccords',
+    axes: 'Barres des axes', positions: 'Positions avec preuve (citation et lien)',
+    verdicts: 'Rôles face aux propos', against: 'Rôles contredits (avec preuve)', conflicts: 'Rôles qui s’opposent entre eux', changes: 'Changements d’avis',
+  };
+  const cloneCard = (c) => ({ pages: [...c.pages], blocks: Object.fromEntries(Object.entries(c.blocks).map(([k, v]) => [k, [...v]])), available: c.available });
+
+  async function loadDcard() {
+    try {
+      dcardSaved = await api.discordCard();
+      dcard = cloneCard(dcardSaved);
+    } catch (error) {
+      if (error instanceof AuthError) onAuthLost();
+    }
+  }
+
+  async function saveDcard() {
+    dcardNote = '';
+    try {
+      dcardSaved = { ...(await api.discordCardSave({ pages: dcard.pages, blocks: dcard.blocks })), available: dcard.available };
+      dcard = cloneCard(dcardSaved);
+      dcardNote = 'Enregistré.';
+    } catch (error) {
+      if (error instanceof AuthError) onAuthLost();
+      else dcardNote = error.message;
+    }
+  }
+
   function limitDmapNames(event) {
     dmap.names = Math.min(Number(dmap.names), Number(event.currentTarget.value));
   }
@@ -206,6 +241,7 @@
     loadWorkers();
     loadAuto();
     loadDmap();
+    loadDcard();
     timer = setInterval(() => { refresh(); loadAuto(); }, 10000);
     tick = setInterval(() => (now = Date.now()), 1000);
   });
@@ -412,6 +448,28 @@
           <button type="button" class="btn btn-primary" onclick={saveDmap} disabled={!dmapChanged || (dmapSensitive && !dmap.acknowledged)}>Enregistrer</button>
           {#if dmapChanged}<button type="button" class="btn" onclick={() => { dmap = { ...dmapSaved, kinds: [...dmapSaved.kinds], sections: [...dmapSaved.sections] }; dmapNote = ''; }}>Annuler</button>{/if}
           {#if dmapNote}<span class="muted small" role="status">{dmapNote}</span>{/if}
+        </div>
+      {:else}
+        <p class="muted">Chargement…</p>
+      {/if}
+    </section>
+
+    <section class="panel card wide" aria-label="Fiche sur Discord">
+      <header><h2 class="eyebrow">Fiche sur Discord</h2></header>
+      <p class="muted small">La commande <code>/dindon card</code> poste la fiche d’une personne, <strong>visible par tout le salon</strong>. Vous choisissez ici les pages et ce que chacune montre : seul l’administrateur change ces réglages, personne ne reçoit de message à ce sujet.</p>
+      {#if dcard}
+        {#each Object.entries(DCARD_PAGES) as [page, title]}
+          <fieldset class="what">
+            <legend class="muted small"><label class="check"><input type="checkbox" value={page} bind:group={dcard.pages} /> <span><strong>Page {title}</strong></span></label></legend>
+            {#each dcard.available[page] as block}
+              <label class="check"><input type="checkbox" value={block} bind:group={dcard.blocks[page]} disabled={!dcard.pages.includes(page)} /> <span>{DCARD_BLOCKS[block]}</span></label>
+            {/each}
+          </fieldset>
+        {/each}
+        <div class="actions">
+          <button type="button" class="btn btn-primary" onclick={saveDcard} disabled={!dcardChanged || dcard.pages.length === 0}>Enregistrer</button>
+          {#if dcardChanged}<button type="button" class="btn" onclick={() => { dcard = cloneCard(dcardSaved); dcardNote = ''; }}>Annuler</button>{/if}
+          {#if dcard.pages.length === 0}<span class="muted small" role="status">Gardez au moins une page.</span>{:else if dcardNote}<span class="muted small" role="status">{dcardNote}</span>{/if}
         </div>
       {:else}
         <p class="muted">Chargement…</p>

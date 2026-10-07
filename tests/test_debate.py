@@ -42,7 +42,10 @@ def opened(conn, *, by=ALICE, guild=GUILD, channel=CHANNEL, now=T0, **options):
     return store.attach_thread(conn, debate.id, thread_id=place, question_message_id=next(_message_ids), now=now)
 
 
-def speak(conn, debate, user, when=T0):
+def speak(conn, debate, user, when=T0, *, witness=False):
+    """A person writes. Unless they are a witness they take part: they take the position « pour » first if they had none."""
+    if not witness and user not in store.positions(conn, debate.id):
+        store.set_position(conn, debate.id, user, "for", when)
     assert store.record_message(conn, debate.id, message_id=next(_message_ids), author_id=user, sent_at=when)
 
 
@@ -245,7 +248,7 @@ def test_a_person_takes_a_position_and_may_change_it_and_the_history_is_kept(con
     assert store.set_position(conn, debate.id, BOB, "against", at(minutes=3)) == "changed"
     store.set_position(conn, debate.id, CAROL, "unsure", at(minutes=3))
     assert store.positions(conn, debate.id) == {BOB: "against", CAROL: "unsure"}
-    assert store.position_counts(conn, debate.id) == {"for": 0, "unsure": 1, "against": 1}
+    assert store.position_counts(conn, debate.id) == {"for": 0, "unsure": 1, "against": 1, "witness": 0}
     assert conn.execute("SELECT position FROM debate_positions WHERE user_id = %s ORDER BY id", (BOB,)).fetchall() == [("for",), ("against",)]
     refused(lambda: store.set_position(conn, debate.id, BOB, "maybe"), "position")
     refused(lambda: store.set_position(conn, 424242, BOB, "for"), "unknown")
@@ -278,6 +281,8 @@ def test_a_message_waits_to_be_read_only_if_the_debate_checks_its_claims_and_the
     def waiting(debate_id, message):
         return conn.execute("SELECT read_at IS NULL FROM debate_messages WHERE debate_id = %s AND message_id = %s", (debate_id, message)).fetchone()[0]
 
+    for debate in (checked, unchecked):
+        store.set_position(conn, debate.id, CAROL, "for", T0)                                                    # (only a participant is read)
     store.record_message(conn, checked.id, message_id=1, author_id=CAROL, sent_at=T0, to_read=True)
     store.record_message(conn, checked.id, message_id=2, author_id=CAROL, sent_at=T0, to_read=False)
     store.record_message(conn, unchecked.id, message_id=3, author_id=CAROL, sent_at=T0, to_read=True)       # this debate was opened without verification: never queued
@@ -300,7 +305,7 @@ def test_the_summary_gives_the_people_the_messages_and_the_positions(conn):
     speak(conn, debate, BOB)
     speak(conn, debate, BOB)
     store.set_position(conn, debate.id, CAROL, "against", T0)
-    assert store.summary(conn, debate.id) == {"participants": 2, "messages": 2, "positions": {"for": 0, "unsure": 0, "against": 1}}
+    assert store.summary(conn, debate.id) == {"participants": 2, "messages": 2, "positions": {"for": 1, "unsure": 0, "against": 1, "witness": 0}}
 
 
 # --- the end: the button, the silence, and no timer -------------------------------------------------------------------------
@@ -486,7 +491,7 @@ def test_every_table_of_the_debates_that_holds_a_person_is_cleaned_by_the_erasur
     """A new migration that adds a column with a person's id to a debate table must say so in privacy.py: this fails until it does."""
     found = {(t, c) for t, c in conn.execute(
         """SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name LIKE 'debate%'
-           AND column_name IN ('user_id', 'author_id', 'created_by', 'voter_id', 'member_id')""").fetchall()}
+           AND column_name IN ('user_id', 'author_id', 'created_by', 'voter_id', 'member_id', 'rater_id', 'target_id')""").fetchall()}
     assert found == set(privacy.DEBATE_PERSON_COLUMNS) | {("debates", "created_by")}
 
 

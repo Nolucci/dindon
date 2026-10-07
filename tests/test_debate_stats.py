@@ -45,7 +45,7 @@ def message(world, thread, db, author, content):
 
 def ended(world, db, thread, debate):
     """The person who opened the debate presses « Terminer » and the engine looks at it once."""
-    world.click(ALICE_ID, thread, debate.id, "end", "now")
+    world.click(ALICE_ID, thread, debate.id, "end", "now", permissions=8)       # (a moderator ends it at once)
     world.tick(seconds=1)
     assert store.get(db, debate.id).status == "closed"
 
@@ -57,17 +57,17 @@ def test_the_figures_the_positions_and_the_changes_of_mind(world, ingest_db):
     thread, debate = opened(world, ingest_db)
     for author, text in ((BOB, "Un premier message de Bob sur le sujet."), (BOB, "Un second message de Bob."), (CAROL, "Le message unique de Carol sur le sujet.")):
         talk(world, thread, ingest_db, author, text)
+    world.click(ALICE_ID, thread, debate.id, "pos", "for")                                                  # Alice only takes a position
     world.click(BOB_ID, thread, debate.id, "pos", "for")
     world.click(BOB_ID, thread, debate.id, "pos", "against")                                                # Bob changes his mind
-    world.click(CAROL_ID, thread, debate.id, "pos", "unsure")
-    world.click(ALICE_ID, thread, debate.id, "pos", "for")                                                  # Alice only takes a position
+    world.click(CAROL_ID, thread, debate.id, "pos", "unsure")                                               # (Carol was « pour » when she wrote)
     found = stats.collect(ingest_db, debate.id)
     totals = found["totals"]
-    assert (totals["participants"], totals["messages"], totals["changed_mind"]) == (3, 3, 1)
-    assert totals["initial"] == {"for": 2, "unsure": 1, "against": 0, "none": 0} and totals["final"] == {"for": 1, "unsure": 1, "against": 1, "none": 0}
+    assert (totals["participants"], totals["messages"], totals["changed_mind"]) == (3, 3, 2)
+    assert totals["initial"] == {"for": 3, "unsure": 0, "against": 0, "witness": 0, "none": 0} and totals["final"] == {"for": 1, "unsure": 1, "against": 1, "witness": 0, "none": 0}
     bob, carol, alice = found["participants"]                                                               # most messages first
     assert (bob["user_id"], bob["position"], bob["first_position"], bob["changed"], bob["messages"], bob["share"]) == (str(BOB_ID), "against", "for", True, 2, round(2 / 3, 3))
-    assert (carol["position"], carol["changed"], carol["messages"]) == ("unsure", False, 1) and (alice["messages"], alice["share"], alice["key_message"]) == (0, 0.0, None)
+    assert (carol["position"], carol["changed"], carol["messages"]) == ("unsure", True, 1) and (alice["messages"], alice["share"], alice["key_message"]) == (0, 0.0, None)
 
 
 def test_a_person_who_asked_not_to_be_recorded_is_in_no_figure(world, ingest_db):
@@ -141,7 +141,7 @@ def fake_stats(people=14, claims_n=0, **overrides):
 def test_the_summary_says_why_it_ended_and_the_figures_and_what_was_checked():
     page = texts.stats_page(fake_stats(claims_n=5), 0)
     embed = page["embeds"][0]
-    assert embed["title"] == "🏁 Débat terminé" and "terminé à la demande de la personne qui l'a lancé ou d'un modérateur" in embed["description"] and "Le \\*nucléaire\\*" in embed["description"]
+    assert embed["title"] == "🏁 Débat terminé" and "terminé à la demande d'un modérateur" in embed["description"] and "Le \\*nucléaire\\*" in embed["description"]
     assert "**14** participant(s) · **200** message(s) · durée **1 h 30 min**" in embed["description"] and "période" not in embed["description"]
     assert "✅ Pour **4** · ❔ Ne sait pas **4** · ❌ Contre **3** · sans position **3**" in embed["description"]
     assert "3 personne(s) ont changé de position" in embed["description"] and "**5** affirmation(s) vérifiée(s)" in embed["description"]
@@ -259,7 +259,7 @@ def test_the_closing_message_is_the_first_page_with_buttons_and_a_click_shows_th
     ended(world, ingest_db, thread, debate)
     closing = stats_message(world, thread)
     assert "**2** participant(s) · **2** message(s)" in closing["embeds"][0]["description"]
-    assert [b["label"] for b in closing["components"][0]["components"]] == ["Précédent", "Suivant"]
+    assert [b["label"] for b in closing["components"][0]["components"]] == ["Précédent", "Suivant", "Noter les participants"]
     privacy.stop_recording(ingest_db, CAROL_ID)                                                             # Carol stops after the message was posted…
     world.time.advance(seconds=3)
     run(world.interactions.answer(button(BOB_ID, thread, f"dindon:debat:stats:{debate.id}:1", id="901")))
@@ -298,7 +298,7 @@ def test_with_the_checks_on_the_closing_waits_for_the_messages_that_are_left_and
     checked.tick(seconds=3)
     closing = stats_message(checked, thread)
     assert "**1** affirmation(s) vérifiée(s) : 1 contredite" in closing["embeds"][0]["description"]
-    assert [b["label"] for b in closing["components"][0]["components"]] == ["Précédent", "Suivant"]
+    assert [b["label"] for b in closing["components"][0]["components"]] == ["Précédent", "Suivant", "Noter les participants"]
     checked.time.advance(seconds=3)
     run(checked.interactions.answer(button(BOB_ID, thread, f"dindon:debat:stats:{debate.id}:2", id="905")))
     claims_page = checked.sent.calls[-1][2]["data"]["embeds"][0]

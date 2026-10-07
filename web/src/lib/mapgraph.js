@@ -93,6 +93,74 @@ function discordColor(hex) {
   return rgb;
 }
 
+// --- grouping by role and by resemblance of names (instead of by exchanges) -------------------------------------
+const NO_GROUP = 'Sans rôle';
+// A name reduced to its letters and digits (no case, accents or fancy letters), so that « Jean_Dupont » and « jean dupont 2 » look alike
+const nameKey = (label) => String(label ?? '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+const trigrams = (key) => {
+  const padded = `  ${key} `;
+  const set = new Set();
+  for (let i = 0; i + 3 <= padded.length; i++) set.add(padded.slice(i, i + 3));
+  return set;
+};
+function similar(a, b) {
+  if (a.key.length >= 4 && b.key.length >= 4 && (a.key.startsWith(b.key.slice(0, 4)) || a.key.includes(b.key) || b.key.includes(a.key))) return true;
+  let shared = 0;
+  for (const t of a.grams) if (b.grams.has(t)) shared++;
+  return shared / (a.grams.size + b.grams.size - shared || 1) >= 0.4;
+}
+
+/** The places of the points when grouped: one island per role, and inside it the names that look alike side by side (a sunflower spiral,
+ * filled one family of names after the other). Returns { positions: id -> {x, y}, islands: [{name, x, y, radius, count}] } */
+export function groupedLayout(people) {
+  const byGroup = new Map();
+  for (const person of people) {
+    const name = person.group || NO_GROUP;
+    if (!byGroup.has(name)) byGroup.set(name, []);
+    const key = nameKey(person.label);
+    byGroup.get(name).push({ id: person.id, influence: person.influence ?? 0, key, grams: trigrams(key) });
+  }
+  const positions = new Map();
+  const islands = [];
+  const SPACING = 3;
+  for (const [name, members] of byGroup) {
+    members.sort((a, b) => b.influence - a.influence || (a.key < b.key ? -1 : 1));
+    const families = [];
+    for (const member of members) {
+      const family = families.find((f) => similar(f[0], member));
+      if (family) family.push(member);
+      else families.push([member]);
+    }
+    families.sort((a, b) => b.length - a.length || (a[0].key < b[0].key ? -1 : 1));
+    const ordered = families.flat();
+    const radius = SPACING * Math.sqrt(ordered.length) + SPACING * 2;
+    const local = ordered.map((member, i) => {
+      const r = SPACING * Math.sqrt(i + 0.5);
+      const angle = i * 2.399963229728653;               // the golden angle
+      return [member.id, r * Math.cos(angle), r * Math.sin(angle)];
+    });
+    islands.push({ name, radius, count: ordered.length, local, x: 0, y: 0 });
+  }
+  // The biggest island in the middle, the others around it along a spiral, each as close as it can be without touching
+  islands.sort((a, b) => b.count - a.count || (a.name === NO_GROUP ? 1 : -1));
+  const placed = [];
+  for (const island of islands) {
+    for (let t = 0; ; t += 0.05) {
+      const distance = placed.length ? 4 * t * (islands[0].radius / 6) : 0;
+      const x = distance * Math.cos(t * 3.2);
+      const y = distance * Math.sin(t * 3.2);
+      if (placed.every((o) => Math.hypot(o.x - x, o.y - y) >= o.radius + island.radius + SPACING * 2)) {
+        island.x = x;
+        island.y = y;
+        break;
+      }
+    }
+    placed.push(island);
+    for (const [id, dx, dy] of island.local) positions.set(id, { x: island.x + dx, y: island.y + dy });
+  }
+  return { positions, islands: islands.map(({ name, x, y, radius, count }) => ({ name, x, y, radius, count })) };
+}
+
 export class MapGraph {
   // `imageProgram`: Sigma's program that draws a picture in a point (the Activity gives one: the people's photos in the color of their name)
   constructor(container, { onSelect, onHover, imageProgram }) {
@@ -115,6 +183,8 @@ export class MapGraph {
     this.edgeCount = 0;
     this.layout = null;
     this.layoutTimer = null;
+    this.grouped = false;     // placed by role and by resemblance of names, not by exchanges
+    this.islands = [];
     this.frame = null;
     this.inFocus = null;      // the person whose links are shown: selected, otherwise under the mouse
     this.neighbors = new Map(); // their links: other person -> weight
@@ -147,6 +217,7 @@ export class MapGraph {
       .then(() => this.renderer?.refresh({ skipIndexation: true }))
       .catch(() => {});
     this.renderer.on('beforeRender', () => (this.labelBoxes = []));
+    this.renderer.on('afterRender', () => this.drawIslandNames());
     this.renderer.on('clickNode', ({ node }) => this.select(node, true));
     this.renderer.on('clickStage', () => this.select(this.labelHovered, true)); // a click on a name is a click on its point
     this.renderer.on('enterNode', ({ node }) => {
@@ -294,8 +365,10 @@ export class MapGraph {
   reduceEdge(edge, data) {
     this.updateFocus();
     const result = { ...data };
+    if (this.grouped) result.hidden = true;                  // the lines would cross the islands: they show for the person in focus and for a new exchange
     if (this.inFocus) {
       if (this.graph.hasExtremity(edge, this.inFocus)) {
+        result.hidden = false;
         // The links of the person in focus: clear, and as thick as they are strong (among theirs)
         const strength = Math.pow(data.weight / this.focusMax, 0.6);
         result.color = faded(EDGE_FOCUS, 0.40 + 0.60 * strength);
@@ -308,6 +381,7 @@ export class MapGraph {
     }
     const light = this.light(this.flashes.get(edge));
     if (light > 0) {
+      result.hidden = false;
       result.color = faded(FLASH_COLOR, 0.55 + 0.45 * light);
       result.size = Math.max(result.size, data.size) + 3.5 * UI * light;
       result.zIndex = 4;
@@ -339,7 +413,7 @@ export class MapGraph {
     for (const node of data.nodes) {
       const look = this.nodeLook(node);
       const attributes = { id: node.id, label: node.label, size: look.size, color: look.color, rgb: look.rgb, influence: node.influence,
-                           messages: node.messages, last_message_at: node.last_message_at };
+                           messages: node.messages, last_message_at: node.last_message_at, group: node.group ?? null };
       if (graph.hasNode(node.id)) {
         graph.mergeNodeAttributes(node.id, attributes);
       } else {
@@ -365,7 +439,13 @@ export class MapGraph {
   // Places the points: a few seconds of ForceAtlas2 in a worker, then it stops (the points keep their places)
   settle(milliseconds) {
     this.layout?.kill();
+    this.layout = null;
     clearTimeout(this.layoutTimer);
+    if (this.grouped) {
+      this.placeGroups();
+      return;
+    }
+    this.islands = [];
     if (this.graph.order < 2) return;
     const inferred = forceAtlas2.inferSettings(this.graph);
     const settings = {
@@ -380,7 +460,83 @@ export class MapGraph {
     };
     this.layout = new FA2Layout(this.graph, { settings });
     this.layout.start();
-    this.layoutTimer = setTimeout(() => this.layout?.stop(), milliseconds);
+    this.layoutTimer = setTimeout(() => {
+      this.layout?.kill();                                          // a worker that is gone cannot write over the next step
+      this.layout = null;
+      this.spread();
+    }, milliseconds);
+  }
+
+  // ForceAtlas2 piles the people up in the middle and leaves the edges empty. Once it has placed them, each one keeps their direction from the
+  // center and their order (the most central stays central) but the distances are evened out, and the whole is stretched to the shape of the
+  // panel: the space is used, and nothing goes past its edge (the camera fits the box of the points).
+  spread() {
+    const graph = this.graph;
+    const n = graph.order;
+    if (n < 3 || this.grouped) return;
+    let cx = 0, cy = 0;
+    graph.forEachNode((id, a) => { cx += a.x; cy += a.y; });
+    cx /= n;
+    cy /= n;
+    const rows = [];
+    graph.forEachNode((id, a) => rows.push({ id, angle: Math.atan2(a.y - cy, a.x - cx), r: Math.hypot(a.x - cx, a.y - cy) }));
+    rows.sort((a, b) => a.r - b.r);
+    const rMax = Math.max(rows[Math.floor(0.97 * (n - 1))].r, 1e-9);      // a few far strays do not set the scale
+    const box = this.container.getBoundingClientRect();
+    const aspect = box.width > 0 && box.height > 0 ? Math.min(Math.max(box.width / box.height, 0.6), 2.2) : 1;
+    rows.forEach((row, rank) => {
+      const even = Math.sqrt((rank + 0.5) / n);                          // evenly filled disc
+      const kept = Math.min(row.r / rMax, 1);                             // what the layout said
+      const r = 0.6 * even + 0.4 * kept;
+      graph.mergeNodeAttributes(row.id, { x: r * Math.cos(row.angle) * aspect * 100, y: r * Math.sin(row.angle) * 100 });
+    });
+    this.renderer.refresh();
+  }
+
+
+
+  // Grouped by role and by names that look alike: the points go to their islands, with no regard for who talks to whom
+  placeGroups(resetView = false) {
+    const people = [];
+    this.graph.forEachNode((id, a) => people.push({ id, label: a.label, group: a.group, influence: a.influence }));
+    const { positions, islands } = groupedLayout(people);
+    this.islands = islands;
+    for (const [id, { x, y }] of positions) this.graph.mergeNodeAttributes(id, { x, y });
+    this.renderer.refresh();
+    if (resetView) this.renderer.getCamera().animatedReset({ duration: 400 });
+  }
+
+  setGrouped(on) {
+    if (on === this.grouped) return;
+    this.grouped = on;
+    this.focusStale = true;
+    this.settle(2500);
+    if (on) this.placeGroups(true);
+    this.renderer.refresh();
+  }
+
+  // The name of each island, above it (in grouped mode only)
+  drawIslandNames() {
+    if (!this.grouped || !this.islands.length) return;
+    const context = this.renderer.getCanvases().labels.getContext('2d');
+    const ratio = Math.max(this.renderer.getCamera().ratio, 1e-6);
+    context.save();
+    context.textAlign = 'center';
+    context.font = `700 ${13 * UI}px ${FONT}`;
+    for (const island of this.islands) {
+      const point = this.renderer.graphToViewport({ x: island.x, y: island.y - island.radius });
+      const edge = this.renderer.graphToViewport({ x: island.x, y: island.y });
+      const reach = Math.abs(point.y - edge.y);
+      if (!Number.isFinite(reach) || reach < 6 * UI && ratio > 1) continue;
+      const text = `${island.name} · ${island.count}`;
+      context.lineJoin = 'round';
+      context.lineWidth = 4 * UI;
+      context.strokeStyle = 'rgba(49, 51, 56, 0.95)';
+      context.strokeText(text, point.x, point.y - 6 * UI);
+      context.fillStyle = '#f2f3f5';
+      context.fillText(text, point.x, point.y - 6 * UI);
+    }
+    context.restore();
   }
 
   // --- live ----------------------------------------------------------------------------------------

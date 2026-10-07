@@ -35,13 +35,23 @@
   {:else if error}
     <p class="banner" role="alert">{error}</p>
   {:else if card}
-    <div class="head">
-      <span class="portrait" style:border-color={card.color ?? '#dbdee1'}>
+    <header class="hero" style:--tint={card.color ?? '#5865f2'}>
+      <span class="portrait">
         <img src={`/api/avatar/${card.id}?guild=${guild}`} alt="" onerror={(e) => e.currentTarget.remove()} />
+        <span class="initial" aria-hidden="true">{[...card.label][0]?.toUpperCase()}</span>
       </span>
-      <div class="who"><span class="eyebrow">Personne</span><h2>{card.label}</h2></div>
+    </header>
+    <div class="identity">
+      <span class="eyebrow">Personne</span>
+      <h2>{card.label}</h2>
+      {#if others.length}<p class="muted small">Vu aussi sous : {others.join(', ')}</p>{/if}
+      <div class="facts">
+        {#each card.claimed_roles.slice(0, 3) as role (role.role)}<span class="fact role" title={role.ideology}>{role.role}</span>{/each}
+        <span class="fact">{fmt.format(card.activity.messages)} messages</span>
+        <span class="fact">{fmt.format(card.top_links.length ? card.top_links.reduce((n, l) => n + l.n, 0) : 0)} échanges</span>
+        {#if card.activity.last_message_at}<span class="fact">vu le {day(card.activity.last_message_at)}</span>{/if}
+      </div>
     </div>
-    {#if others.length}<p class="muted small">Vu aussi sous : {others.join(', ')}</p>{/if}
 
     <section>
       <h3 class="eyebrow">Activité</h3>
@@ -75,7 +85,8 @@
               {#if openAxis === axis.code}
                 <ul class="contrib">
                   {#each axis.contributions as c}
-                    <li><span class="badge small" class:success={c.stance === 1} class:danger={c.stance === -1}>{stanceName[c.stance]}</span> {c.proposition}</li>
+                    <li><span class="badge small" class:success={c.stance === 1} class:danger={c.stance === -1}>{stanceName[c.stance]}</span> {c.proposition}
+                      <span class="muted small" title="Poids de la proposition sur l’axe : négatif = pôle de gauche, positif = pôle de droite">#{c.proposition_id} · lien {c.loading > 0 ? '+' : ''}{c.loading}{c.validated ? ' · validé' : ''}</span></li>
                   {/each}
                 </ul>
               {/if}
@@ -203,11 +214,15 @@
   .positions li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.375rem 0.5rem; }
   .propText { font-weight: 600; color: var(--text-primary); }
   .positions blockquote { flex-basis: 100%; margin: 0; padding: 0.25rem 0.625rem; border-left: 3px solid var(--border-subtle); color: var(--text-secondary); font-size: 0.8125rem; line-height: 1.45; }
-  .head { display: flex; align-items: center; gap: 0.875rem; margin-bottom: 0.25rem; padding-right: 1.5rem; }
-  .who { min-width: 0; }
-  .who h2 { overflow-wrap: anywhere; }
-  .portrait { flex: none; width: 3.75rem; height: 3.75rem; border: 3px solid; border-radius: 50%; overflow: hidden; box-sizing: border-box; background: var(--bg-tertiary); }
-  .portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .hero { margin: -1.25rem -1.125rem 0; height: 4.5rem; background: linear-gradient(135deg, color-mix(in srgb, var(--tint) 70%, #000), color-mix(in srgb, var(--tint) 25%, var(--bg-secondary))); }
+  .portrait { position: relative; display: block; width: 4.75rem; height: 4.75rem; margin: 2.25rem 0 0 0.25rem; border: 4px solid var(--bg-secondary); border-radius: 50%; overflow: hidden; background: var(--tint); box-shadow: 0 0 0 2px var(--tint), var(--shadow-md); }
+  .portrait img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .initial { display: grid; place-items: center; width: 100%; height: 100%; font-size: 1.75rem; font-weight: 700; color: #fff; }
+  .identity { padding-top: 0.5rem; }
+  .identity h2 { margin: 0.125rem 0 0.25rem; }
+  .facts { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-top: 0.625rem; }
+  .fact { padding: 0.1875rem 0.5rem; border-radius: 999px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); color: var(--text-secondary); font-size: 0.6875rem; font-weight: 600; }
+  .fact.role { border-color: var(--tint); color: var(--text-primary); }
   aside {
     position: absolute;
     top: 0;
@@ -217,6 +232,7 @@
     background: var(--bg-secondary);
     border-left: 1px solid var(--border-subtle);
     padding: 1.25rem 1.125rem 1.75rem;
+    padding-top: 1.25rem;
     overflow-y: auto;
     z-index: 5;
     animation: fadeIn var(--transition-normal) both;

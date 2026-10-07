@@ -119,7 +119,7 @@ def test_the_notice_stays_when_the_question_is_refreshed_or_posted_again_and_goe
     checked.tick(seconds=1)
     new = store.get(ingest_db, debate.id).question_message_id
     assert texts.notice_short("observe") in checked.discord.messages[(thread, new)]["embeds"][0]["description"]
-    checked.click(ALICE_ID, thread, debate.id, "end", "now")
+    checked.click(ALICE_ID, thread, debate.id, "end", "now", permissions=8)
     checked.tick(seconds=1)
     assert "🔎" not in checked.discord.messages[(thread, new)]["embeds"][0]["description"]
 
@@ -321,7 +321,7 @@ def test_the_messages_of_a_person_who_stopped_are_not_read_and_a_check_in_progre
 def test_nothing_is_read_in_a_debate_that_ended_long_ago(checked, ingest_db):
     thread, debate = opened(checked, ingest_db)
     said(checked, thread, ingest_db)
-    checked.click(ALICE_ID, thread, debate.id, "end", "now")
+    checked.click(ALICE_ID, thread, debate.id, "end", "now", permissions=8)
     checked.tick(seconds=1)                                                                                 # over, with one message still unread: its statistics wait for it (claims.GRACE_MINUTES)…
     assert checked.discord.posted(thread, "Débat terminé") == []
     checked.tick(minutes=claims.GRACE_MINUTES + 1)                                                          # …and after the grace they are posted as they are, and nothing is read any more
@@ -336,7 +336,7 @@ def test_a_debate_opened_without_verification_reads_nothing_and_queues_nothing(c
     said(checked, thread, ingest_db)
     assert claims.unread_count(ingest_db) == 0 and check(checked) is False and checked.checker.texts == [] and claims_in(ingest_db) == 0
     assert "🔎" not in checked.discord.posted(thread)[0]["embeds"][0]["description"]                          # and it does not announce what it does not do
-    checked.click(ALICE_ID, thread, debate.id, "end", "now")
+    checked.click(ALICE_ID, thread, debate.id, "end", "now", permissions=8)
     checked.tick(seconds=1)
     assert "vérifiée" not in checked.discord.posted(thread, "Débat terminé")[0]["embeds"][0]["description"]
 
@@ -410,6 +410,7 @@ def test_the_engine_reads_the_messages_by_itself_in_a_task_that_does_not_hold_up
         await checked.interactions.answer(debat(ALICE_ID))
         await checked.interactions.answer(submission(ALICE_ID, checked.popup(), thread=True))
         [thread] = checked.discord.threads
+        store.set_position(ingest_db, only_debate(ingest_db).id, BOB_ID, "for", T0)                           # (only a participant is read)
         events.put_nowait(event("MESSAGE_CREATE", message_create(7001, SAYS, BOB, channel_id=str(thread), timestamp=checked.time.now().isoformat())))
         for _ in range(200):
             if checked.checker.texts:

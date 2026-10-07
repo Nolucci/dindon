@@ -251,10 +251,10 @@ def person(request: Request, user_id: int, guild: int | None = None) -> dict:
             expected.setdefault(r["axis_id"], []).append({"role": r["role_name"], "min": float(r["min_score"]), "max": float(r["max_score"]), "verdict": r["verdict"]})
         contributions: dict[int, list[dict]] = {}
         for r in conn.execute(
-                """SELECT pa.axis_id, p.text, pa.loading, s.stance, s.confidence FROM current_stances s
+                """SELECT pa.axis_id, p.id AS proposition_id, p.text, pa.loading, pa.is_validated, s.stance, s.confidence FROM current_stances s
                    JOIN proposition_axis pa ON pa.proposition_id = s.proposition_id AND pa.loading <> 0 JOIN propositions p ON p.id = s.proposition_id
                    WHERE s.guild_id = %s AND s.user_id = %s AND p.status NOT IN ('rejected', 'merged') ORDER BY abs(pa.loading) DESC""", (guild_id, user_id)):
-            contributions.setdefault(r["axis_id"], []).append({"proposition": r["text"], "loading": float(r["loading"]), "stance": r["stance"],
+            contributions.setdefault(r["axis_id"], []).append({"proposition_id": r["proposition_id"], "proposition": r["text"], "loading": float(r["loading"]), "validated": r["is_validated"], "stance": r["stance"],
                                                                "confidence": round(float(r["confidence"]), 2)})
         roles = conn.execute(
             """SELECT role_name, verdict, confirmed_axes, compatible_axes, incompatible_axes, insufficient_axes FROM claimed_ideology_summary
@@ -333,11 +333,31 @@ def coherence(request: Request, guild: int | None = None) -> dict:
                 WHERE s.guild_id = %s AND NOT u.is_bot""", (guild_id,)).fetchall()
         bad: dict[tuple[int, str], list[dict]] = {}
         for r in conn.execute(
-                """SELECT c.user_id, c.role_name, ax.name AS axis, ax.negative_pole, ax.positive_pole, c.score, c.uncertainty, c.min_score, c.max_score, c.n_propositions
+                """SELECT c.user_id, c.role_name, c.axis_id, ax.name AS axis, ax.negative_pole, ax.positive_pole, c.score, c.uncertainty, c.min_score, c.max_score, c.n_propositions
                    FROM ideology_concordance c JOIN axes ax ON ax.id = c.axis_id WHERE c.guild_id = %s AND c.verdict = 'incompatible'""", (guild_id,)):
             bad.setdefault((r["user_id"], r["role_name"]), []).append(
                 {"axis": r["axis"], "negative_pole": r["negative_pole"], "positive_pole": r["positive_pole"], "score": float(r["score"]),
-                 "uncertainty": float(r["uncertainty"]), "expected": [float(r["min_score"]), float(r["max_score"])], "positions": r["n_propositions"]})
+                 "uncertainty": float(r["uncertainty"]), "expected": [float(r["min_score"]), float(r["max_score"])], "positions": r["n_propositions"],
+                 "axis_id": r["axis_id"], "contributions": []})
+        # What was said, so that a contradiction can be judged without opening the person: their positions on that axis, with their messages
+        wanted = {(user, a["axis_id"]) for (user, _), axes_ in bad.items() for a in axes_}
+        if wanted:
+            rows_ = conn.execute(
+                """SELECT s.user_id, pa.axis_id, s.claim_id, p.id AS proposition_id, p.text, pa.loading, pa.is_validated, s.stance FROM current_stances s
+                   JOIN proposition_axis pa ON pa.proposition_id = s.proposition_id AND pa.loading <> 0 JOIN propositions p ON p.id = s.proposition_id
+                   WHERE s.guild_id = %s AND s.user_id = ANY(%s) AND pa.axis_id = ANY(%s) AND p.status NOT IN ('rejected', 'merged')
+                   ORDER BY abs(pa.loading) DESC, s.stated_at DESC""",
+                (guild_id, list({u for u, _ in wanted}), list({a for _, a in wanted}))).fetchall()
+            rows_ = [r for r in rows_ if (r["user_id"], r["axis_id"]) in wanted]
+            quotes = _evidence(conn, [r["claim_id"] for r in rows_])
+            said: dict[tuple[int, int], list[dict]] = {}
+            for r in rows_:
+                said.setdefault((r["user_id"], r["axis_id"]), []).append(
+                    {"proposition_id": r["proposition_id"], "proposition": r["text"], "loading": float(r["loading"]), "validated": r["is_validated"],
+                     "stance": r["stance"], "evidence": quotes.get(r["claim_id"], [])[:3]})
+            for (user, _), axes_ in bad.items():
+                for a in axes_:
+                    a["contributions"] = said.get((user, a["axis_id"]), [])[:8]
         conflicts = {(r["user_id"]) for r in conn.execute("SELECT DISTINCT user_id FROM claimed_ideology_conflicts WHERE guild_id = %s", (guild_id,))}
     people: dict[int, dict] = {}
     for r in rows:

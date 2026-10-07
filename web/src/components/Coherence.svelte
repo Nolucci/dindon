@@ -11,6 +11,7 @@
   let q = $state('');                         // a name, or a role
   let roleFilter = $state('');
 
+  const STANCE = { 1: 'Pour', 0: 'Nuancé', '-1': 'Contre' };
   const VERDICT = { discordant: ['Contradiction', 'danger'], concordant: ['Cohérent', 'success'], not_verifiable: ['Pas assez de propos', ''] };
 
   $effect(() => {
@@ -93,7 +94,16 @@
               {#each r.against as a}
                 <div class="against">
                   <p class="small">« {a.axis} » : {a.positions} position{a.positions > 1 ? 's' : ''} lue{a.positions > 1 ? 's' : ''} vont à l’encontre de ce rôle.</p>
-                  <details><summary>Voir le calcul</summary><AxisBar axis={asAxis(a)} compact /><p class="small">Score {a.score.toFixed(2)} (± {a.uncertainty.toFixed(2)}) ; ce rôle attend entre {a.expected[0]} et {a.expected[1]}.</p></details>
+                  <details><summary>Voir le calcul</summary><AxisBar axis={asAxis(a)} compact /><p class="small">Score {a.score.toFixed(2)} (± {a.uncertainty.toFixed(2)}) ; ce rôle attend entre {a.expected[0]} et {a.expected[1]}.</p>
+                    <ul class="said">
+                      {#each a.contributions as c}
+                        <li>
+                          <span class="badge small" class:success={c.stance === 1} class:danger={c.stance === -1}>{STANCE[c.stance]}</span> {c.proposition}
+                          <span class="muted small" title="Poids sur l’axe : négatif = pôle de gauche, positif = pôle de droite">#{c.proposition_id} · lien {c.loading > 0 ? '+' : ''}{c.loading}{c.validated ? ' · validé' : ''}</span>
+                          {#each c.evidence as e}<blockquote>« {e.quote} »<span class="muted small"> {e.channel ? `#${e.channel} · ` : ''}{e.at ? e.at.slice(0, 10) : ''}</span></blockquote>{/each}
+                        </li>
+                      {/each}
+                    </ul></details>
                 </div>
               {/each}
             </div>
@@ -132,6 +142,8 @@
   .small { font-size: 0.75rem; color: var(--text-secondary); }
   details summary { cursor: pointer; font-size: 0.75rem; color: var(--text-secondary); }
   details .small { margin-top: 0.375rem; }
+  .said { list-style: none; display: flex; flex-direction: column; gap: 0.625rem; margin-top: 0.5rem; font-size: 0.8125rem; color: var(--text-primary); }
+  .said blockquote { margin: 0.25rem 0 0; padding: 0.25rem 0.625rem; border-left: 3px solid var(--border-subtle); color: var(--text-secondary); line-height: 1.45; }
   .badge.small { min-height: 1.5rem; font-size: 0.6875rem; }
   @media (max-width: 720px) { .page { padding: 1rem 1rem 2rem; } }
 </style>

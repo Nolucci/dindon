@@ -19,6 +19,7 @@ from dindon.api.debates import router as debates_router
 from dindon.api.automation import router as automation_router
 from dindon.api.background import start_background_tasks
 from dindon.api.hub import Hub
+from dindon.api.discord_card import router as discord_card_router
 from dindon.api.discord_map import router as discord_map_router
 from dindon.api.imports import router as imports_router
 from dindon.api.invite import router as invite_router
@@ -176,7 +177,7 @@ def create_app(settings: Settings | None = None, background: bool = True) -> Fas
 
     _add_security_headers(app)
     for api_router in (_health_router(settings), _session_router(auth), _live_router(hub), router, imports_router, invite_router, analysis_router, system_router,
-                       privacy_router, positions_router, performance_router, automation_router, debates_router, discord_map_router, activity_router):
+                       privacy_router, positions_router, performance_router, automation_router, debates_router, discord_map_router, discord_card_router, activity_router):
         app.include_router(api_router)
     _mount_interface(app, settings)
     return app

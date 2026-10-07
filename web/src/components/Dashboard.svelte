@@ -50,6 +50,7 @@
   let view = $state('map');       // the map is kept alive (hidden) while another page is shown
   let analysisSection = $state('themes');
   let stale = false;              // something happened to the map while it was hidden: it is brought up to date when it comes back
+  let grouped = $state(false);     // placed by role and by resemblance of names instead of by exchanges
   let showIsolated = $state(true); // also the people who wrote and have no link on the map (points on their own)
   let lastExchange = $state(null);
   let exchangeTimer;
@@ -81,6 +82,33 @@
   // A page that shows the present can be updated live; a page that shows a past period cannot
   let showsPresent = $derived(preset !== 'custom' || !until);
   let noKind = $derived(!KINDS.some((k) => kinds[k.id]));
+
+  const DEFAULTS = { preset: 'all', density: '2500', minWeight: '0' };
+  // Something differs from what the map shows when it is opened
+  let dirty = $derived(preset !== DEFAULTS.preset || since !== '' || until !== '' || !KINDS.every((k) => kinds[k.id]) || density !== DEFAULTS.density
+    || channel !== '' || theme !== '' || ideology !== '' || minWeight !== DEFAULTS.minWeight || !showIsolated || grouped || query !== '');
+
+  function resetFilters() {
+    preset = DEFAULTS.preset;
+    since = until = '';
+    kinds = { reply: true, mention: true, reaction: true };
+    density = DEFAULTS.density;
+    channel = theme = ideology = '';
+    minWeight = DEFAULTS.minWeight;
+    showIsolated = true;
+    query = '';
+    suggestions = [];
+    if (grouped) {
+      grouped = false;
+      map?.setGrouped(false);
+    }
+    filterChanged();
+    map?.resetView();
+  }
+
+  function layoutChanged() {
+    map?.setGrouped(grouped);
+  }
 
   function graphParams() {
     const params = { guild, kinds: KINDS.filter((k) => kinds[k.id]).map((k) => k.id).join(','), max_edges: density, isolated: showIsolated,
@@ -329,6 +357,10 @@
         bind:minWeight
         {mapOptions}
         bind:showIsolated
+        bind:grouped
+        {dirty}
+        onReset={resetFilters}
+        onLayout={layoutChanged}
         presets={PRESETS}
         kindList={KINDS}
         onSearch={search}
@@ -374,7 +406,7 @@
       </main>
 
       <footer>
-        <span class="live" class:on={live}><i></i>{live ? 'En direct' : 'Hors ligne'}</span>
+        <span class="live" class:on={live} title={live ? 'Les nouveaux échanges s’allument sur la carte dès qu’ils arrivent.' : 'Le flux en direct (/events) est coupé : la carte ne s’allume plus toute seule, mais elle reste juste à chaque rechargement. Elle se reconnecte seule.'}><i></i>{live ? 'En direct' : 'Hors ligne'}</span>
         {#if meta}
           <span>{fmt.format(meta.nodes_shown)} {plural(meta.nodes_shown, 'personne', 'personnes')}{#if meta.isolated_shown > 0}&nbsp;(dont {fmt.format(meta.isolated_shown)} sans lien{#if meta.isolated_hidden > 0}, + {fmt.format(meta.isolated_hidden)} masquées{/if}){/if}{#if meta.nodes_hidden > 0}&nbsp;(+ {fmt.format(meta.nodes_hidden)} moins connectées, masquées){/if}</span>
           <span>{fmt.format(meta.edges_shown)} {plural(meta.edges_shown, 'lien', 'liens')}{#if meta.edges_hidden > 0}&nbsp;(+ {fmt.format(meta.edges_hidden)} plus faibles, masqués){/if}</span>

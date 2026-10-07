@@ -15,6 +15,7 @@ from datetime import datetime
 import psycopg
 from psycopg.rows import tuple_row
 
+from dindon.clock import utc_now
 from dindon.debate import answers as answers_mod
 from dindon.debate import claims as claims_mod
 from dindon.debate import rules, store
@@ -80,7 +81,9 @@ def collect(conn: psycopg.Connection, debate_id: int, now: datetime | None = Non
     return {
         "debate": {"id": debate.id, "topic": debate.topic, "context": debate.context, "status": debate.status, "close_reason": debate.close_reason, "in_thread": debate.in_thread,
                    "verify": debate.verify, "axis": debate.axis, "quiet_seconds": debate.quiet_seconds, "started_at": debate.started_at.isoformat() if debate.started_at else None,
-                   "closed_at": debate.closed_at.isoformat() if debate.closed_at else None, "guild_id": str(debate.guild_id), "thread_id": str(debate.thread_id) if debate.thread_id else None},
+                   "closed_at": debate.closed_at.isoformat() if debate.closed_at else None, "guild_id": str(debate.guild_id), "thread_id": str(debate.thread_id) if debate.thread_id else None,
+                   "rating_ends_at": debate.rating_ends_at.isoformat() if debate.rating_ends_at else None,
+                   "rating_open": bool(debate.rating_ends_at and debate.results_message_id is None and (now or utc_now()) < debate.rating_ends_at)},
         "totals": {"participants": len(participants), "messages": total_messages, "initial": initial, "final": final, "changed_mind": sum(p["changed"] for p in participants), "verdicts": verdicts,
                    "answers": totals_answers},
         "participants": participants, "claims": checked, "parity": claims_mod.parity(conn, debate_id), "answers": given,

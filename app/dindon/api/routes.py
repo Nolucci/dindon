@@ -169,6 +169,9 @@ def graph(
                     WHERE u.id = ANY(%s)""", (guild_id, label_ids)):
                 labels[r["id"]] = r["label"]
             colors = {r["id"]: _color(r["color"]) for r in conn.execute(MEMBER_COLORS, (guild_id, label_ids))}
+        groups = {r["user_id"]: r["name"] for r in conn.execute(           # the role they gave themselves (only roles that say an ideology), for grouping the map
+            """SELECT ci.user_id, min(i.name) AS name FROM claimed_ideologies ci JOIN ideologies i ON i.id = ci.ideology_id
+               WHERE ci.guild_id = %s AND ci.user_id = ANY(%s) GROUP BY ci.user_id""", (guild_id, label_ids))} if label_ids else {}
         if node_ids:
             for r in conn.execute(
                 """SELECT m.author_id, count(*) AS messages, max(m.sent_at) AS last_at
@@ -189,10 +192,11 @@ def graph(
               "messages": stats[uid]["messages"] if uid in stats else 0,
               "last_message_at": iso(stats[uid]["last_at"]) if uid in stats else None,
               "community": None,  # filled in by the community detection (phase 5)
+              "group": groups.get(uid),
               "isolated": False, "avatar": f"/api/avatar/{uid}?guild={guild_id}" if uid in pictured else None}
              for uid in sorted(node_ids, key=lambda u: -influence[u])]
     nodes += [{"id": str(r["id"]), "label": labels.get(r["id"], str(r["id"])), "color": colors.get(r["id"]), "influence": 0, "messages": r["messages"],
-               "last_message_at": iso(r["last_at"]), "community": None, "isolated": True,
+               "last_message_at": iso(r["last_at"]), "community": None, "group": groups.get(r["id"]), "isolated": True,
                "avatar": f"/api/avatar/{r['id']}?guild={guild_id}" if r["id"] in pictured else None} for r in loners]
     nodes_total = rows[0]["nodes_total"] if rows else 0
     edges_total = rows[0]["edges_total"] if rows else 0

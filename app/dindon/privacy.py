@@ -32,7 +32,7 @@ STOPPED, ERASED = "stopped", "erased"
 
 # The tables of the debates that hold a person's id (db/migrations/0015_debates.sql): erased with the person, listed in their export
 DEBATE_PERSON_COLUMNS = (("debate_messages", "author_id"), ("debate_positions", "user_id"), ("debate_claims", "author_id"), ("debate_answers", "author_id"),
-                         ("debate_answer_votes", "user_id"))
+                         ("debate_answer_votes", "user_id"), ("debate_end_votes", "user_id"), ("debate_ratings", "rater_id"), ("debate_ratings", "target_id"), ("debate_results", "user_id"))
 
 
 def blocked_ids(conn: psycopg.Connection) -> set[int]:

@@ -176,7 +176,7 @@ def test_a_debate_opened_in_a_thread_is_created_in_the_forum_as_a_post_with_its_
     body = posted[0][2]
     assert body["name"] == texts.thread_name(TOPIC) and body["auto_archive_duration"] == 1440 and body["message"]["allowed_mentions"] == {"parse": []}
     [launch] = with_forum.discord.posted(post)
-    assert TOPIC in launch["embeds"][0]["description"] and [b["label"] for b in launch["components"][0]["components"]] == ["Pour · 0", "Ne sait pas · 0", "Contre · 0"]
+    assert TOPIC in launch["embeds"][0]["description"] and [b["label"] for b in launch["components"][0]["components"]] == ["Pour · 0", "Ne sait pas · 0", "Contre · 0", "Témoin · 0"]
     assert f"<#{post}>" in with_forum.sent.last() and "forum" not in with_forum.sent.last().lower().replace("<#", "")                       # (no apology: it worked)
     run(with_forum.debates.tick())
     assert with_forum.debates.is_debate_thread(post) and not with_forum.debates.is_debate_thread(GENERAL)
@@ -256,8 +256,8 @@ def test_the_launch_message_of_a_post_is_edited_like_any_other_and_the_post_is_a
     with_forum.write(post, BOB)
     with_forum.click(BOB_ID, post, debate.id, "pos", "for")
     with_forum.tick(seconds=6)
-    assert [b["label"] for b in with_forum.discord.messages[(post, post)]["components"][0]["components"]] == ["Pour · 1", "Ne sait pas · 0", "Contre · 0"]
-    with_forum.click(ALICE_ID, post, debate.id, "end", "now")
+    assert [b["label"] for b in with_forum.discord.messages[(post, post)]["components"][0]["components"]] == ["Pour · 1", "Ne sait pas · 0", "Contre · 0", "Témoin · 0"]
+    with_forum.click(ALICE_ID, post, debate.id, "end", "now", permissions=8)
     with_forum.tick(seconds=1)
     assert len(with_forum.discord.posted(post, "Débat terminé")) == 1 and with_forum.discord.threads[post]["archived"] is True
     assert with_forum.discord.messages[(post, post)]["components"] == []

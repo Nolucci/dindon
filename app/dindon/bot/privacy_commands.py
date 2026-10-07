@@ -167,13 +167,14 @@ class PrivacyService:
         with self._lock:
             try:
                 data = cards.person_card(self._connection(), guild_id, user_id)
+                cfg = cards.load(self._connection())
             except (psycopg.OperationalError, psycopg.InterfaceError):
                 self._conn = None
                 return Reply(text["card_failed"])
             except Exception as error:
                 log.error("a card could not be made (%s)", type(error).__name__)
                 return Reply(text["card_failed"])
-        return Reply(text["card_none"]) if data is None else Reply("", embed=cards.card_page(data, page, avatar), components=cards.card_buttons(user_id, page))
+        return Reply(text["card_none"]) if data is None else Reply("", embed=cards.card_page(data, page, avatar, cfg), components=cards.card_buttons(user_id, page, cfg))
 
     @staticmethod
     def _pictures(guild_id: int, urls: dict[int, str]) -> dict[int, bytes]:
@@ -355,6 +356,10 @@ class Interactions:
         """A private answer, at once."""
         await self._callback(data, CHANNEL_MESSAGE, text)
 
+    async def say_with(self, data: dict, text: str, components: list) -> None:
+        """A private answer with a list or buttons under it."""
+        await self._callback(data, CHANNEL_MESSAGE, text, components)
+
     async def defer(self, data: dict) -> None:
         """'Thinking…' (private), when the answer takes longer than the 3 seconds that Discord gives."""
         await self._callback(data, DEFERRED_MESSAGE)
@@ -384,8 +389,11 @@ class Interactions:
             return
         text = _text(self.service.retention_days)
         if data.get("type") == 5:                                                 # a popup that was filled and sent: the parameters of a debate
-            if self.debates is not None and str((data.get("data") or {}).get("custom_id", "")).startswith("dindon:debat:setup:"):
+            custom_id = str((data.get("data") or {}).get("custom_id", ""))
+            if self.debates is not None and custom_id.startswith("dindon:debat:setup:"):
                 await self.debates.modal_submit(data, user_id)
+            elif self.debates is not None and custom_id.startswith("dindon:debat:rate:"):
+                await self.debates.rating_submit(data, user_id)
             return
         if data.get("type") == 3:                                                 # a button: `effacer`, or a page of a card
             custom_id = str((data.get("data") or {}).get("custom_id", ""))

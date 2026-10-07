@@ -13,15 +13,19 @@
   <div class="poles"><span>{axis.negative_pole}</span><span>{axis.positive_pole}</span></div>
   <div class="track" class:empty={!has} role="img"
        aria-label={has ? `${axis.name} : entre ${axis.negative_pole} et ${axis.positive_pole}, à ${axis.score.toFixed(2)}` : `${axis.name} : pas assez de propos`}>
-    {#each axis.expected ?? [] as e}
-      <span class="band" class:bad={e.verdict === 'incompatible'} style="left: {at(e.min)}; width: calc({at(e.max)} - {at(e.min)})" title="{e.role} attend entre {e.min} et {e.max}"></span>
-    {/each}
     {#if has}<span class="dot" style="left: {at(axis.score)}"></span>{/if}
   </div>
   <!-- How sure: a thin bracket under the bar (the colours of the bar never change; a wide bracket means that little was said) -->
   <div class="sure" aria-hidden="true">
     {#if has}<span class="whisker" style="left: {at(lo)}; width: calc({at(hi)} - {at(lo)})" title="marge d’incertitude : de {lo.toFixed(2)} à {hi.toFixed(2)}"></span>{/if}
   </div>
+  <!-- What each role of the person expects: one line per role, under the bar, with its name (never a frame over the bar) -->
+  {#each axis.expected ?? [] as e}
+    <div class="role" class:bad={e.verdict === 'incompatible'} title="{e.role} attend entre {e.min} et {e.max}">
+      <span class="range" style="left: {at(e.min)}; width: calc({at(e.max)} - {at(e.min)})"></span>
+      <span class="name">{e.role}{e.verdict === 'incompatible' ? ' · incompatible' : ''}</span>
+    </div>
+  {/each}
 </div>
 
 <style>
@@ -36,7 +40,10 @@
   .whisker::before { left: 0; }
   .whisker::after { right: 0; }
   .dot { position: absolute; top: 50%; width: 0.875rem; height: 0.875rem; margin: -0.4375rem 0 0 -0.4375rem; border-radius: 50%; background: #fff; border: 2px solid var(--bg-primary, #1e1f22); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); }
-  /* what a role expects: a frame around the part of the bar where the role would put someone */
-  .band { position: absolute; top: -0.25rem; bottom: -0.25rem; border: 1.5px solid var(--text-secondary); border-radius: 0.375rem; pointer-events: auto; }
-  .band.bad { border-color: #fff; border-style: dashed; }
+  /* what a role expects: a segment under the bar where the role would put someone, then its name */
+  .role { position: relative; height: 1.125rem; font-size: 0.625rem; color: var(--text-muted); }
+  .role .range { position: absolute; top: 0.125rem; height: 0.25rem; min-width: 0.25rem; border-radius: 999px; background: var(--text-secondary); opacity: 0.7; }
+  .role .name { position: absolute; top: 0.375rem; left: 0; line-height: 1; }
+  .role.bad .range { background: #ed4245; opacity: 0.9; }
+  .role.bad .name { color: #ed4245; }
 </style>

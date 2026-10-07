@@ -5,7 +5,9 @@ somebody who may (the person who opened it, or a moderator) presses « Terminer 
 """
 from __future__ import annotations
 
-POSITIONS = ("for", "unsure", "against")        # the three buttons of the question: pour, ne sait pas, contre
+POSITIONS = ("for", "unsure", "against", "witness")     # the buttons of the question: pour, ne sait pas, contre, and témoin (only watches)
+PARTICIPANT_POSITIONS = ("for", "unsure", "against")   # a person takes part by taking one of these; a witness does not (cannot end the debate, is not read for it)
+CAMPS = ("for", "against")                             # the two sides: « ne sait pas » is a participant but belongs to neither
 
 QUIET_CHOICES = (3_600, 21_600, 86_400, 259_200, 604_800)    # the silences offered by the popup: 1 hour, 6 hours, 24 hours, 3 days, 7 days
 DEFAULT_QUIET = 86_400
@@ -16,6 +18,7 @@ CONTEXT_MAX = 1_000
 
 # Why a debate was closed (debates.close_reason)
 ENDED, SILENCE, NO_PARTICIPANTS, FAILED = "ended", "silence", "no_participants", "failed"
+AGREED, ONE_SIDED = "agreed", "one_sided"         # the smallest camp asked to stop (most of it) / one camp has emptied after both existed
 
 
 def clean_topic(raw: str) -> str | None:
@@ -37,3 +40,6 @@ def quiet_label(seconds: int) -> str:
         return f"{days} jour{'s' if days > 1 else ''}"
     hours = seconds // 3_600
     return f"{hours} heure{'s' if hours > 1 else ''}" if seconds % 3_600 == 0 else f"{seconds // 60} minutes"
+
+RATING_SECONDS = 86_400                           # after the end, the people have this long to rate the participants; then the verdict is given
+VOTE_WEIGHT = 0.5                                 # the verdict: half the average of the ratings, half Dindon's analysis

@@ -16,6 +16,10 @@
     minWeight = $bindable('0'),
     mapOptions = { channels: [], themes: [], ideologies: [] },
     showIsolated = $bindable(true),
+    grouped = $bindable(false),
+    dirty = false,
+    onReset,
+    onLayout,
     presets,
     kindList,
     onSearch,
@@ -169,6 +173,15 @@
     <span class="toggleLabel">Sans lien</span>
   </label>
 
+  <div class="segmented" role="group" aria-label="Disposition">
+    <button type="button" aria-pressed={!grouped} onclick={() => { grouped = false; onLayout(); }} title="Les personnes qui échangent se rapprochent">Échanges</button>
+    <button type="button" aria-pressed={grouped} onclick={() => { grouped = true; onLayout(); }} title="Un îlot par rôle, les pseudos qui se ressemblent côte à côte (sans tenir compte des échanges)">Rôles &amp; pseudos</button>
+  </div>
+
+  {#if dirty}
+    <button type="button" class="tool-btn reset" onclick={onReset} title="Remettre période, types, salon, thème, rôle et force par défaut">Réinitialiser</button>
+  {/if}
+
   <button type="button" class="tool-btn fit" onclick={onFit} title="Revenir à la vue d’ensemble">
     <span class="fitIcon"><Icon name="fit" /></span>
     <span class="fitText">Tout voir</span>
@@ -203,6 +216,7 @@
   }
 
   .kind,
+  .reset,
   .fit {
     white-space: nowrap;
     flex-shrink: 0;
@@ -454,6 +468,11 @@
 
   .toggle:hover .toggleLabel {
     color: var(--text-secondary);
+  }
+
+  .reset {
+    color: var(--text-primary);
+    border-color: var(--accent);
   }
 
   .fit {

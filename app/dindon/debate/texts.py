@@ -15,7 +15,7 @@ from dindon.debate.store import Debate
 
 BLURPLE, GREY = 0x5865F2, 0x99AAB5
 NO_MENTIONS = {"parse": []}
-POSITION_BUTTONS = {"for": ("✅", "Pour"), "unsure": ("❔", "Ne sait pas"), "against": ("❌", "Contre")}
+POSITION_BUTTONS = {"for": ("✅", "Pour"), "unsure": ("❔", "Ne sait pas"), "against": ("❌", "Contre"), "witness": ("👀", "Témoin")}
 CAMP_EMOJIS = ("🔵", "🟠")                     # the two poles of an axis: neutral colours, never ✅ / ❌ (they would say that one pole is the right one)
 
 
@@ -24,7 +24,8 @@ def position_buttons(axis: dict | None = None) -> dict[str, tuple[str, str]]:
     axis (-1 first), and « Ne sait pas » in the middle."""
     if not axis:
         return POSITION_BUTTONS
-    return {"for": (CAMP_EMOJIS[0], str(axis["for"])[:60]), "unsure": POSITION_BUTTONS["unsure"], "against": (CAMP_EMOJIS[1], str(axis["against"])[:60])}
+    return {"for": (CAMP_EMOJIS[0], str(axis["for"])[:60]), "unsure": POSITION_BUTTONS["unsure"], "against": (CAMP_EMOJIS[1], str(axis["against"])[:60]),
+            "witness": POSITION_BUTTONS["witness"]}
 
 
 def position_names(axis: dict | None = None) -> dict:
@@ -43,7 +44,9 @@ NOTICE = ("Pour vérifier ce qu'une personne affirme dans un débat, Dindon envo
           "de ce serveur. Pour l'instant, il note ses vérifications sans rien publier.")
 
 REASONS = {
-    rules.ENDED: "Le débat a été terminé à la demande de la personne qui l'a lancé ou d'un modérateur.",
+    rules.ENDED: "Le débat a été terminé à la demande d'un modérateur.",
+    rules.AGREED: "La majorité du plus petit camp a demandé la fin du débat.",
+    rules.ONE_SIDED: "Un des deux camps s'est vidé : le débat est terminé.",
     rules.SILENCE: "Plus personne n'a écrit depuis un moment : le débat s'est terminé de lui-même.",
     rules.NO_PARTICIPANTS: "Personne n'a pris part au débat : il est fermé.",
 }
@@ -58,7 +61,13 @@ REFUSALS = {                                    # what a person is told when a r
     "channel_busy": "Un débat est déjà ouvert dans ce salon : terminez-le, ou ouvrez celui-ci dans un fil.",
     "not_open": "Ce débat est terminé.",
     "unknown": "Ce débat n'existe plus.",
-    "not_allowed": "Seuls la personne qui a lancé le débat et les modérateurs peuvent le terminer.",
+    "not_allowed": "Seuls les participants (pour, ne sait pas, contre) et les modérateurs peuvent terminer le débat.",
+    "rating_over": "Le temps pour noter ce débat est écoulé, ou il n'y a rien à noter.",
+    "not_voter": "Seules les personnes qui ont pris position dans ce débat (participants et témoins) peuvent noter.",
+    "self": "On ne peut pas se noter soi-même.",
+    "not_target": "Cette personne n'était pas participante : seuls les participants sont notés.",
+    "not_rating": "Ce débat n'est pas ouvert aux notes.",
+    "not_participant": "Les témoins ne peuvent pas terminer le débat : prenez position (pour, ne sait pas, contre) pour y participer.",
     "searched": "Dindon a déjà cherché sur Internet : sa réponse est corrigée.",
     "answer_gone": "Cette réponse n'existe plus.",
 }
@@ -188,7 +197,7 @@ def custom_id(kind: str, debate_id: int, value: str) -> str:
 def parse_custom_id(raw: object) -> tuple[str, int, str] | None:
     """(kind, debate, value) of a button of ours; None for anything else or anything malformed. For `val`, the number is the one of the answer that is judged."""
     parts = str(raw).split(":")
-    if len(parts) != 5 or parts[:2] != ["dindon", "debat"] or parts[2] not in ("pos", "end", "stats", "val") or not parts[3].isdigit():
+    if len(parts) != 5 or parts[:2] != ["dindon", "debat"] or parts[2] not in ("pos", "end", "stats", "val", "rate", "pick") or not parts[3].isdigit():
         return None
     if parts[2] == "val":                                     # Valide / Invalide under an answer of Dindon (the number is the answer's, not the debate's)
         return ("val", int(parts[3]), parts[4]) if parts[4] in ("valid", "invalid") else None
@@ -196,6 +205,8 @@ def parse_custom_id(raw: object) -> tuple[str, int, str] | None:
         return ("stats", int(parts[3]), parts[4]) if parts[4].isdigit() and len(parts[4]) <= 3 else None
     if parts[2] == "end":
         return ("end", int(parts[3]), "now") if parts[4] == "now" else None
+    if parts[2] in ("rate", "pick"):                          # « Noter les participants », then the list where somebody to rate is chosen
+        return (parts[2], int(parts[3]), parts[4]) if parts[4] == "open" else None
     return ("pos", int(parts[3]), parts[4]) if parts[4] in rules.POSITIONS else None
 
 
@@ -222,8 +233,10 @@ def question(debate: Debate, counts: dict[str, int], *, verifying: bool = False,
     if over:
         lines.append("Ce débat est terminé.")
     else:
-        quiet = f" ou après {rules.quiet_label(debate.quiet_seconds)} sans message" if debate.quiet_seconds else ""
-        lines.append(f"{'Répondez' if debate.axis else 'Prenez position'} avec les boutons (modifiable). Fin : « Terminer le débat » (lanceur ou modérateur){quiet}.")
+        quiet = f", ou après {rules.quiet_label(debate.quiet_seconds)} sans message" if debate.quiet_seconds else ""
+        lines.append(f"{'Répondez' if debate.axis else 'Prenez position'} avec les boutons pour participer (modifiable) : seuls les participants sont lus et comptés dans le débat. "
+                     f"👀 Témoin : vous regardez seulement, sans pouvoir le terminer ; vos messages sont gardés comme témoin, sans être analysés pour le débat. "
+                     f"Fin : quand la majorité du plus petit camp demande l'arrêt (« Voter la fin »), quand un camp se vide{quiet}.")
         if verifying and debate.verify:
             lines.append(notice_short(live))
         if not debate.in_thread:
@@ -232,7 +245,7 @@ def question(debate: Debate, counts: dict[str, int], *, verifying: bool = False,
              "footer": {"text": "Dindon compte les messages de ce débat pour les statistiques de fin. /dindon stop vous en exclut."}}
     positions = [{"type": 2, "style": SECONDARY, "label": f"{label} · {counts.get(key, 0)}", "emoji": {"name": emoji}, "custom_id": custom_id("pos", debate.id, key)}
                  for key, (emoji, label) in position_buttons(debate.axis).items()]
-    finish = [{"type": 2, "style": DANGER, "label": "Terminer le débat", "emoji": {"name": "🏁"}, "custom_id": custom_id("end", debate.id, "now")}]
+    finish = [{"type": 2, "style": DANGER, "label": "Voter la fin du débat", "emoji": {"name": "🏁"}, "custom_id": custom_id("end", debate.id, "now")}]
     return {"content": "", "embeds": [embed], "components": [] if over else [*_row(positions), *_row(finish)], "allowed_mentions": NO_MENTIONS}
 
 
@@ -371,7 +384,7 @@ def stats_page(stats: dict, page: int, *, checks_on: bool = False) -> dict:
         lines = [f"**{_plain(debate['topic'])}**", REASONS.get(debate["close_reason"] or "", "Le débat est terminé."),
                  f"**{totals['participants']}** participant(s) · **{totals['messages']}** message(s) · durée **{_duration(debate)}**"]
         if totals["participants"]:
-            lines.append("Positions : " + " · ".join(f"{buttons[k][0]} {buttons[k][1]} **{final[k]}**" for k in rules.POSITIONS) + (f" · sans position **{final['none']}**" if final["none"] else ""))
+            lines.append("Positions : " + " · ".join(f"{buttons[k][0]} {buttons[k][1]} **{final[k]}**" for k in rules.POSITIONS if final.get(k) or k in rules.PARTICIPANT_POSITIONS) + (f" · sans position **{final['none']}**" if final["none"] else ""))
             if totals["changed_mind"]:
                 lines.append(f"{totals['changed_mind']} personne(s) ont changé de position pendant le débat.")
         if stats["claims"]:
@@ -410,12 +423,58 @@ def stats_page(stats: dict, page: int, *, checks_on: bool = False) -> dict:
             lines.append(f"{emoji} « {_plain(c['claim'])} » : **{label}**" + (f" ({_plain(c['period'])})" if c["period"] else "")
                          + (f" · [le message]({jump})" if jump else "") + (f" · {links}" if links else ""))
         title, color = f"🔎 Affirmations vérifiées ({page - people_pages}/{_pages(len(stats['claims']), CLAIMS_PER_PAGE)})", BLURPLE
+    rating = []
+    if page == 0 and debate.get("rating_open") and totals["participants"]:
+        until = int(datetime.fromisoformat(debate["rating_ends_at"]).timestamp())
+        lines += ["", f"⭐ **Le verdict** : notez chaque participant sur 10 (vous pouvez le faire même comme témoin, mais pas pour vous-même) jusqu'à <t:{until}:R>. "
+                      "La note finale vaut moitié vos notes, moitié l'analyse de Dindon (sources, logique, fidélité aux rôles)."]
+        rating = [{"type": 2, "style": SUCCESS, "label": "Noter les participants", "emoji": {"name": "⭐"}, "custom_id": custom_id("rate", debate["id"], "open")}]
     embed = {"title": title, "description": "\n".join(lines).strip()[:4000], "color": color, "footer": {"text": f"Page {page + 1}/{total} · {KEY_RULE}"[:2000]}}
     payload = {"content": "", "embeds": [embed], "allowed_mentions": NO_MENTIONS}
     if total > 1:
         buttons = [{"type": 2, "style": SECONDARY, "label": "Précédent", "emoji": {"name": "◀️"}, "custom_id": custom_id("stats", debate["id"], str(max(page - 1, 0))), "disabled": page == 0},
                    {"type": 2, "style": SECONDARY, "label": "Suivant", "emoji": {"name": "▶️"}, "custom_id": custom_id("stats", debate["id"], str(min(page + 1, total - 1))), "disabled": page == total - 1}]
-        payload["components"] = _row(buttons)
+        payload["components"] = _row([*buttons, *rating])
     else:
-        payload["components"] = []
+        payload["components"] = _row(rating) if rating else []
     return payload
+
+
+def rating_picker(debate_id: int, people: list[int], given: dict[int, object]) -> tuple[str, list]:
+    """What a person sees when they press « Noter » : the participants, and what they already gave; then a list of members where they choose whom to rate."""
+    lines = ["Choisissez la personne à noter dans la liste (seuls les participants peuvent l'être) :"]
+    lines += [f"• <@{u}> — " + (f"votre note : {given[u]}/10" if u in given else "pas encore noté") for u in people[:20]]
+    return "\n".join(lines), _row([{"type": 5, "custom_id": custom_id("pick", debate_id, "open"), "placeholder": "Choisir un participant", "min_values": 1, "max_values": 1}])
+
+
+def rating_modal(debate_id: int, target: int, name: str, current: object = None) -> dict:
+    return {"custom_id": f"dindon:debat:rate:{debate_id}:{target}", "title": "Noter un participant"[:45], "components": [
+        {"type": 1, "components": [{"type": 4, "custom_id": "score", "style": 1, "label": f"Note sur 10 pour {name}"[:45], "placeholder": "ex. 7,50", "required": True, "min_length": 1,
+                                    "max_length": 5, **({"value": str(current)} if current is not None else {})}]}]}
+
+
+def parse_rating_modal_id(raw: object) -> tuple[int, int] | None:
+    parts = str(raw).split(":")
+    if len(parts) != 5 or parts[:3] != ["dindon", "debat", "rate"] or not (parts[3].isdigit() and parts[4].isdigit()):
+        return None
+    return int(parts[3]), int(parts[4])
+
+
+def verdict(debate: Debate, results: list[dict]) -> dict:
+    """The message of the verdict: who won, each person's final score, and what it is made of. Mentions nobody (the names show, nobody is pinged)."""
+    if not results:
+        return {"content": "", "embeds": [{"title": "🏆 Verdict", "description": "Personne à départager.", "color": GREY}], "components": [], "allowed_mentions": NO_MENTIONS}
+    winners = [r for r in results if r["winner"]]
+    rated = any(r["votes"] for r in results)
+    lines = [f"**{_plain(debate.topic)}**", ""]
+    lines.append(("🏆 Vainqueur : " if len(winners) == 1 else "🏆 Ex æquo : ") + ", ".join(f"<@{w['user_id']}>" for w in winners) + f" — **{winners[0]['final']}/10**")
+    lines.append("" if rated else "*Personne n'a noté : seule l'analyse de Dindon compte.*")
+    for r in results:
+        d = r["detail"]
+        vote = f"votes **{r['vote']}** ({r['votes']} note(s))" if r["votes"] else "votes —"
+        lines.append(f"{'🥇 ' if r['winner'] else ''}<@{r['user_id']}> : **{r['final']}/10** · {vote} · Dindon **{r['ai']}**")
+        lines.append(f"> sources {d['sources']} ({d['figures']['sourced_claims']} affirmation(s) confirmée(s) sourcée(s)) · logique {d['logic']} ({d['figures']['settled_claims']} tranchée(s)) · "
+                     f"valeurs {d['values']} ({d['figures']['roles_discordant']}/{d['figures']['roles']} rôle(s) discordant(s))")
+    lines += ["", "Note finale = 50 % la moyenne des notes des participants et témoins + 50 % l'analyse de Dindon (règles fixes, sans jugement de modèle sur le contenu) : sources vérifiables, "
+                  "affirmations tenues, fidélité aux rôles que chacun s'est donnés."]
+    return {"content": "", "embeds": [{"title": "🏆 Verdict du débat", "description": "\n".join(lines)[:4000], "color": BLURPLE}], "components": [], "allowed_mentions": NO_MENTIONS}

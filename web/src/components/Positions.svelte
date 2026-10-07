@@ -15,9 +15,16 @@
   let info = $state(null);        // /api/analysis (ready, job)
   let opened = $state(null);      // { id, loading, people }
   let problem = $state('');
-  let perBatch = $state(40);         // conversations read in each batch ("salve")
-  let batches = $state(1);           // how many batches
-  let untilEnd = $state(false);      // keep going until nothing is left to read
+  // The choice of the batches ("salves") is kept in this browser, so that a reload does not undo it
+  const SALVO_KEY = 'dindon.salvo';
+  const saved = (() => { try { return JSON.parse(localStorage.getItem(SALVO_KEY) ?? '{}') ?? {}; } catch { return {}; } })();
+  let perBatch = $state(saved.perBatch ?? 40);         // conversations read in each batch ("salve")
+  let batches = $state(saved.batches ?? 1);            // how many batches
+  let untilEnd = $state(saved.untilEnd === true);      // keep going until nothing is left to read
+  $effect(() => {
+    const value = JSON.stringify({ perBatch, batches, untilEnd });
+    try { localStorage.setItem(SALVO_KEY, value); } catch { /* storage refused: the choice is only kept until the reload */ }
+  });
   let busy = $state(false);
   let poll = null;
 
