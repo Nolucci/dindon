@@ -29,6 +29,7 @@ from dindon.analysis.chunks import split_long
 from dindon.analysis.compact import clean
 from dindon.analysis.embeddings import vector_literal
 from dindon.analysis.ollama import Ollama, OllamaError
+from dindon.analysis.parallel import pipeline, workers_for
 
 log = logging.getLogger("dindon.analysis")
 
@@ -236,37 +237,49 @@ def extract_claims(conn: psycopg.Connection, client: Ollama, model: str, embed_m
     if limit is not None:
         todo = todo[:limit]
     left -= len(todo)                                                     # what a next batch would still have to read
-    done = kept = refused = failed = unread = in_a_row = 0
-    for n, cid in enumerate(todo, 1):
-        if cancelled():
-            break
-        with conn.cursor(row_factory=tuple_row) as cur:
-            reads = prepare_windows(cur.execute(_MESSAGES, (cid,)).fetchall())
-        if not reads:                                                     # nothing to read: recorded, not read again
-            conn.execute("INSERT INTO conversation_extractions (conversation_id, model, prompt_version, claims, refused) VALUES (%s, %s, %s, 0, 0) "
-                         "ON CONFLICT DO NOTHING", (cid, model, PROMPT_VERSION))
-            unread += 1
-            continue
+    done = kept = refused = failed = unread = in_a_row = handled = 0
+
+    def conversations():
+        """The conversations to ask the model about, read from the database here (the thread of the loop) as the computers become free."""
+        nonlocal unread
+        for cid in todo:
+            if cancelled():
+                return
+            with conn.cursor(row_factory=tuple_row) as cur:
+                reads = prepare_windows(cur.execute(_MESSAGES, (cid,)).fetchall())
+            if not reads:                                                 # nothing to read: recorded, not read again
+                conn.execute("INSERT INTO conversation_extractions (conversation_id, model, prompt_version, claims, refused) VALUES (%s, %s, %s, 0, 0) "
+                             "ON CONFLICT DO NOTHING", (cid, model, PROMPT_VERSION))
+                unread += 1
+                continue
+            yield cid, reads
+
+    def ask(item) -> tuple[list[tuple[Claim, Read]], int] | None:
+        """What the model says of one conversation, on whichever computer is free (no database here: several run at the same time)."""
         validated: list[tuple[Claim, Read]] = []
         bad = 0
-        try:
-            for read in reads:
-                if cancelled():
-                    break
-                answer = client.chat_json(model, SYSTEM, "Conversation :\n" + read.text, SCHEMA)
-                claims, refused_here = validate(answer, read)
-                validated.extend((claim, read) for claim in claims)
-                bad += refused_here
+        for read in item[1]:
             if cancelled():
-                break
-            in_a_row = 0
-        except OllamaError as error:
+                return None
+            claims, refused_here = validate(client.chat_json(model, SYSTEM, "Conversation :\n" + read.text, SCHEMA), read)
+            validated.extend((claim, read) for claim in claims)
+            bad += refused_here
+        return validated, bad
+
+    for (cid, _), result, error in pipeline(conversations(), ask, workers_for(client, model), cancelled):
+        if cancelled():
+            break
+        if error is not None:
+            if not isinstance(error, OllamaError):
+                raise error
             failed += 1
             in_a_row += 1
             log.warning("extraction: conversation skipped (%s)", str(error)[:80])
             if in_a_row >= FAILURES_IN_A_ROW:
-                raise
+                raise error
             continue
+        in_a_row = 0
+        validated, bad = result
         with conn.transaction():
             ids = _proposition_ids(conn, client, embed_model, [c.proposition for c, _ in validated if c.stance is not None], model) if validated else {}
             reviewed = conn.execute("SELECT EXISTS (SELECT 1 FROM claims WHERE conversation_id = %s AND review_status <> 'auto')", (cid,)).fetchone()[0]
@@ -296,7 +309,8 @@ def extract_claims(conn: psycopg.Connection, client: Ollama, model: str, embed_m
         done += 1
         kept += stored
         refused += bad
+        handled = done + failed
         if progress:
-            progress(n, len(todo))
+            progress(min(handled + unread, len(todo)), len(todo))
     log.info("extraction: %d conversations read, %d claims kept, %d refused, %d failed", done, kept, refused, failed)
     return {"done": done, "claims": kept, "refused": refused, "failed": failed, "waiting": len(todo), "unread": unread, "left": left}

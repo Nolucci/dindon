@@ -22,6 +22,7 @@ from functools import partial
 import psycopg
 from psycopg.rows import tuple_row
 
+from dindon.analysis.parallel import pipeline, workers_for
 from dindon.analysis.ollama import Ollama, OllamaError
 
 log = logging.getLogger("dindon.analysis")
@@ -223,42 +224,54 @@ def assign_axes(conn: psycopg.Connection, client: Ollama, model: str, guild_id: 
     schema = _schema(list(ids), sorted({name for a in axes for name in (a[3], a[4])}))
     by_id = {ids[a[0]]: a for a in axes}
     done = linked = failed = in_a_row = 0
-    for n, (pid, text) in enumerate(todo, 1):
+
+    def propositions():
+        """The propositions to ask the model about; the examples decided by a person are looked up here (the database stays in this thread)."""
+        for pid, text in todo:
+            if cancelled():
+                return
+            if PERSON_ONLY.fullmatch(text.strip()):
+                yield pid, text, None
+            else:
+                yield pid, text, _decided_examples(conn, pid, embed_model, axes) if decided >= MIN_EXAMPLES else ""
+
+    def ask(item):
+        """The weight on the axes of one proposition, on whichever computer is free (no database here: several run at the same time)."""
+        _, text, examples = item
+        if examples is None:
+            return None                                                     # a sentence about a person: nothing to link
+        readings = [validate(client.chat_json(model, system, f"Phrase : {text}", schema), ids, poles) for system in systems]
+        if examples:
+            readings.append(validate(client.chat_json(model, systems[0], examples + f"Phrase : {text}", schema), ids, poles))
+        return decide(readings, partial(_judge, client, model, by_id, anchors, text))
+
+    for (pid, _, examples), loadings, error in pipeline(propositions(), ask, workers_for(client, model), cancelled):
         if cancelled():
             break
-        if PERSON_ONLY.fullmatch(text.strip()):
-            with conn.transaction():
-                conn.execute("UPDATE propositions SET axes_read_at = now() WHERE id = %s", (pid,))
-            done += 1
-            if progress:
-                progress(n, len(todo))
-            continue
-        try:
-            readings = [validate(client.chat_json(model, system, f"Phrase : {text}", schema), ids, poles) for system in systems]
-            if decided >= MIN_EXAMPLES:
-                examples = _decided_examples(conn, pid, embed_model, axes)
-                if examples:
-                    readings.append(validate(client.chat_json(model, systems[0], examples + f"Phrase : {text}", schema), ids, poles))
-            loadings = decide(readings, partial(_judge, client, model, by_id, anchors, text))
-            in_a_row = 0
-        except OllamaError as error:
+        if error is not None:
+            if not isinstance(error, OllamaError):
+                raise error
             failed += 1
             in_a_row += 1
             log.warning("axes: proposition skipped (%s)", str(error)[:80])
             if in_a_row >= FAILURES_IN_A_ROW:
-                raise
+                raise error
             continue
+        in_a_row = 0
         with conn.transaction():
-            # a new reading replaces what an earlier reading proposed (an older version of the prompt, for instance); what a person validated stays
-            conn.execute("DELETE FROM proposition_axis WHERE proposition_id = %s AND NOT is_validated", (pid,))
-            for axis_id, loading, confidence in loadings:
-                conn.execute("""INSERT INTO proposition_axis (proposition_id, axis_id, loading, confidence, is_validated) VALUES (%s, %s, %s, %s, false)
-                                ON CONFLICT (proposition_id, axis_id) DO NOTHING""", (pid, axis_id, loading, confidence))
-            conn.execute("UPDATE propositions SET axes_read_at = now() WHERE id = %s", (pid,))
+            if examples is None:
+                conn.execute("UPDATE propositions SET axes_read_at = now() WHERE id = %s", (pid,))
+            else:
+                # a new reading replaces what an earlier reading proposed (an older version of the prompt, for instance); what a person validated stays
+                conn.execute("DELETE FROM proposition_axis WHERE proposition_id = %s AND NOT is_validated", (pid,))
+                for axis_id, loading, confidence in loadings:
+                    conn.execute("""INSERT INTO proposition_axis (proposition_id, axis_id, loading, confidence, is_validated) VALUES (%s, %s, %s, %s, false)
+                                    ON CONFLICT (proposition_id, axis_id) DO NOTHING""", (pid, axis_id, loading, confidence))
+                conn.execute("UPDATE propositions SET axes_read_at = now() WHERE id = %s", (pid,))
         done += 1
-        linked += len(loadings)
+        linked += len(loadings or ())
         if progress:
-            progress(n, len(todo))
+            progress(done + failed, len(todo))
     scores = conn.execute("SELECT refresh_person_axis_scores(%s)", (guild_id,)).fetchone()[0]
     log.info("axes: %d propositions read (%d links), %d scores", done, linked, scores)
     return {"done": done, "links": linked, "failed": failed, "scores": scores, "waiting": len(todo)}

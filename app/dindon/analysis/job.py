@@ -156,13 +156,15 @@ class AnalysisJobs:
         import time
 
         cache = {"at": 0.0, "value": performance.clean({})}
+        guard = threading.Lock()                                                           # several computers ask at once (parallel.py)
 
         def current() -> dict:
-            if time.monotonic() - cache["at"] > 5:
-                with contextlib.suppress(Exception):                                       # the last known settings stand
-                    cache["value"] = performance.load(conn)
-                cache["at"] = time.monotonic()
-            return cache["value"]
+            with guard:
+                if time.monotonic() - cache["at"] > 5:
+                    with contextlib.suppress(Exception):                                   # the last known settings stand
+                        cache["value"] = performance.load(conn)
+                    cache["at"] = time.monotonic()
+                return cache["value"]
 
         return current
 

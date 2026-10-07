@@ -15,6 +15,7 @@ from collections.abc import Callable
 import psycopg
 from psycopg.rows import tuple_row
 
+from dindon.analysis.parallel import pipeline, workers_for
 from dindon.analysis.ollama import Ollama, OllamaError
 
 log = logging.getLogger("dindon.analysis")
@@ -61,21 +62,22 @@ def verify_stances(conn: psycopg.Connection, client: Ollama, model: str, guild_i
     with conn.cursor(row_factory=tuple_row) as cur:
         todo = cur.execute(_TODO, (guild_id,)).fetchall()
     checked = changed = questions = unclear = failed = in_a_row = 0
-    for n, (claim_id, before, proposition, quotes) in enumerate(todo, 1):
+    todo_quotes = [row for row in todo if row[3]]
+    for (claim_id, before, _proposition, _quotes), relation_or_none, error in pipeline(
+            todo_quotes, lambda row: judge(client, model, row[3], row[2]), workers_for(client, model), cancelled):
         if cancelled():
             break
-        if not quotes:
-            continue
-        try:
-            relation = judge(client, model, quotes, proposition)
-            in_a_row = 0
-        except OllamaError as error:
+        if error is not None:
+            if not isinstance(error, OllamaError):
+                raise error
             failed += 1
             in_a_row += 1
             log.warning("stances: claim skipped (%s)", str(error)[:80])
             if in_a_row >= FAILURES_IN_A_ROW:
-                raise
+                raise error
             continue
+        in_a_row = 0
+        relation = relation_or_none
         if relation is None:                                        # an answer that is not in the shape asked: the first reading stays, to be read again later
             unclear += 1
             continue
@@ -90,7 +92,7 @@ def verify_stances(conn: psycopg.Connection, client: Ollama, model: str, guild_i
                 changed += after != before
         checked += 1
         if progress:
-            progress(n, len(todo))
+            progress(checked + unclear + failed, len(todo_quotes))
     scores = conn.execute("SELECT refresh_person_axis_scores(%s)", (guild_id,)).fetchone()[0] if checked else None
     log.info("stances: %d claims read, %d positions changed, %d turned into questions, %d unclear, %d failed", checked, changed, questions, unclear, failed)
     return {"checked": checked, "changed": changed, "questions": questions, "unclear": unclear, "failed": failed, "waiting": len(todo), "scores": scores}

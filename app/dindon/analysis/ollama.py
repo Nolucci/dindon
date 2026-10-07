@@ -171,6 +171,7 @@ class OllamaPool:
         self._digests: dict[str, dict[str, str]] = {}
         self._failed: set[str] = set()
         self._cursor = 0
+        self._busy: dict[str, int] = {}                  # calls in flight on each computer
         self._lock = threading.Lock()
 
     @property
@@ -265,10 +266,16 @@ class OllamaPool:
         eligible = self._eligible(model)
         if not eligible:
             raise OllamaError(f"Le modèle {model} n'est installé sur aucun ordinateur d'analyse")
-        # Chats in these stages depend on earlier results. Prefer a helper (typically
-        # the Apple Silicon computer), then the server as a fallback.
-        client = next((candidate for candidate in eligible if candidate is not self.local), eligible[0])
-        return self._call_on(client, "chat_json", model, system, user, schema, num_ctx)
+        # The computer with the fewest calls in flight; at equal load a helper (typically the Apple Silicon computer) before the server, which is the fallback.
+        # With one call at a time this is the helper; with two at a time (see parallel.py) the second one goes to the server.
+        with self._lock:
+            client = min(eligible, key=lambda candidate: (self._busy.get(candidate.base_url, 0), candidate is self.local))
+            self._busy[client.base_url] = self._busy.get(client.base_url, 0) + 1
+        try:
+            return self._call_on(client, "chat_json", model, system, user, schema, num_ctx)
+        finally:
+            with self._lock:
+                self._busy[client.base_url] -= 1
 
 
 def _unit(vector: list[float]) -> list[float]:
