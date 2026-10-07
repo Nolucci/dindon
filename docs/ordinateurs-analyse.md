@@ -35,19 +35,23 @@ sudo docker compose exec -T app printenv DINDON_EMBED_MODEL DINDON_NAMING_MODEL
 Sur le **Mac**, exécutez dans Terminal :
 
 ```sh
+tailscale up
+tailscale ip -4
 tailscale serve --bg --tcp=11434 tcp://localhost:11434
 tailscale serve status
-tailscale ip -4
 ```
+
+Si `tailscale up` indique que Tailscale est arrêté, ouvrez l'application Tailscale dans la barre de menus du Mac, connectez-vous et autorisez sa configuration VPN dans les réglages macOS. Reprenez les commandes quand `tailscale ip -4` affiche une adresse `100.x.y.z`.
 
 Sur **Windows**, exécutez dans PowerShell (Ollama et Tailscale doivent être démarrés) :
 
 ```powershell
 ollama pull qwen3.5:4b
 ollama pull leoipulsar/harrier-0.6b
+& "$env:ProgramFiles\Tailscale\tailscale.exe" up
+& "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
 & "$env:ProgramFiles\Tailscale\tailscale.exe" serve --bg --tcp=11434 tcp://localhost:11434
 & "$env:ProgramFiles\Tailscale\tailscale.exe" serve status
-& "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
 ```
 
 `tailscale serve` ne rend Ollama accessible **qu'aux appareils autorisés sur ce réseau privé**. Il continue après la fermeture du terminal grâce à `--bg`.
