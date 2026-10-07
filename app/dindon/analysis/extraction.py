@@ -56,11 +56,14 @@ SYSTEM = (
     "une réponse vague ne suffisent pas. N'invente pas une opinion générale à partir d'un récit personnel ou d'un fait médical. "
     "Un participant qui ne prend pas de position n'apparaît pas. Une position sans preuve autonome sera refusée."
 )
-SCHEMA = {"type": "object", "properties": {"claims": {"type": "array", "items": {"type": "object", "properties": {
-    "participant": {"type": "string"}, "proposition": {"type": "string"}, "stance": {"type": ["integer", "null"]},
+# The answer is bounded by the grammar itself: a small model that is not stopped keeps adding claims (or repeating a sentence) until its context is full,
+# thousands of tokens and several minutes for one conversation.
+MAX_CLAIMS_PER_ANSWER = 12
+SCHEMA = {"type": "object", "properties": {"claims": {"type": "array", "maxItems": MAX_CLAIMS_PER_ANSWER, "items": {"type": "object", "properties": {
+    "participant": {"type": "string", "maxLength": 80}, "proposition": {"type": "string", "maxLength": 300}, "stance": {"type": ["integer", "null"]},
     "kind": {"type": "string", "enum": ["opinion", "humour"]}, "confidence": {"type": "number"},
-    "evidence": {"type": "array", "items": {"type": "object", "properties": {"ref": {"type": "integer"}, "quote": {"type": "string"}},
-                                           "required": ["ref", "quote"]}}},
+    "evidence": {"type": "array", "maxItems": 3, "items": {"type": "object", "properties": {"ref": {"type": "integer"}, "quote": {"type": "string", "maxLength": 400}},
+                                                          "required": ["ref", "quote"]}}},
     "required": ["participant", "proposition", "stance", "kind", "confidence", "evidence"]}}}, "required": ["claims"]}
 
 _TODO = """

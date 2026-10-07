@@ -15,6 +15,10 @@ from collections.abc import Callable
 from urllib.parse import urlsplit
 
 
+# A safety net under the grammar of each answer: a model that loops is cut after about a minute on a laptop instead of filling its whole context
+MAX_ANSWER_TOKENS = 2500
+
+
 class OllamaError(Exception):
     """Ollama cannot answer now (not running, model missing, timeout) or answered something unusable."""
 
@@ -129,9 +133,9 @@ class Ollama:
         return [self.embed(model, group) for group in groups]
 
     def chat_json(self, model: str, system: str, user: str, schema: dict, num_ctx: int = 8192) -> dict:
-        """An answer of the model in the shape of `schema`. Deterministic (temperature 0), without a chain of thought."""
+        """An answer of the model in the shape of `schema`. Deterministic (temperature 0), without a chain of thought, and never longer than MAX_ANSWER_TOKENS."""
         settings = self._settings()
-        options = {"temperature": 0, "num_ctx": num_ctx}
+        options = {"temperature": 0, "num_ctx": num_ctx, "num_predict": MAX_ANSWER_TOKENS}
         if settings.get("ai_threads"):
             options["num_thread"] = int(settings["ai_threads"])
         started = time.monotonic()
