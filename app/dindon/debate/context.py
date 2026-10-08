@@ -83,6 +83,29 @@ def render(before: list[Said], target_author: int, reply_to: int | None = None, 
     return "\n".join(lines + extra + ["", head])
 
 
+def answered(context: str) -> str:
+    """The text of the message that the one to read answers, from a context made by `render`: the one it replies to, else the last one by somebody else (so that irony, which answers
+    something, can be told from a sincere answer). Empty when there is nothing."""
+    if not context:
+        return ""
+    *body, head = context.rstrip().split("\n")
+    match = re.search(r"écrit par (\w+)(?:, en réponse à (\w+))?", head)
+    if match is None:
+        return ""
+    author, parent = match.group(1), match.group(2)
+    rows = {}
+    for line in body:
+        parts = line.split(" | ")
+        if len(parts) >= 3:
+            rows[parts[0]] = (parts[1], parts[2])
+    if parent in rows:
+        return rows[parent][1]
+    for label in reversed(list(rows)):
+        if rows[label][0] != author and rows[label][0] != "Bot":
+            return rows[label][1]
+    return ""
+
+
 def window(conn: psycopg.Connection, message_id: int) -> tuple[list[Said], tuple[int | None, str | None, int | None]]:
     """The messages written just before this one in the same place, oldest first, and what this one replies to. Never the messages of a person who asked not to be recorded: they are not here at all."""
     with conn.cursor(row_factory=tuple_row) as cur:

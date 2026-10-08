@@ -18,6 +18,8 @@ import re
 from dataclasses import dataclass
 from typing import Protocol
 
+from dindon.analysis import irony
+from dindon.debate.context import answered
 from dindon.debate.search import has_personal_data, scrub_query
 from dindon.debate.web import normalize
 
@@ -137,4 +139,6 @@ def read_message(llm: Chat, model: str, text: str, context: str = "") -> list[Re
         seen.add(key)
         search = scrub_query(query) if len(query.split()) >= 2 else ""
         found.append(Reading(claim, said[:500], search or scrub_query(claim)))
+    if found and irony.judge(llm, model, message, answered(context)).not_sincere:
+        return []                                                                       # irony, a joke, a quotation, a question: nothing the author claims
     return found

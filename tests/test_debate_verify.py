@@ -9,6 +9,7 @@ import pytest
 
 from dindon.analysis.ollama import OllamaError
 from dindon.config import Settings
+from dindon.analysis import irony
 from dindon.debate import reading, verify
 from dindon.debate.checker import Checker, build_checker
 from dindon.debate.claims import Evidence
@@ -166,9 +167,9 @@ def test_the_model_is_blind_it_gets_the_text_of_the_message_and_nothing_else():
 
 def test_a_short_claim_is_read_too_and_only_what_is_too_short_to_hold_one_is_not():
     model = Model(lambda s, u: {"claims": [claim("La Terre est plate", "La Terre est plate")]})
-    assert [r.claim for r in read_message(model, "m", "La Terre est plate.")] == ["La Terre est plate"] and len(model.calls) == 1            # 19 characters
-    assert read_message(model, "m", "mdr trop vrai") == [] and len(model.calls) == 1                                                          # 13: not even shown to the model
-    assert read_message(model, "m", "<@100000000000000001> <@100000000000000002> https://exemple.fr/une-page") == [] and len(model.calls) == 1   # mentions and links hold no claim, whatever their length
+    assert [r.claim for r in read_message(model, "m", "La Terre est plate.")] == ["La Terre est plate"] and len(model.calls) == 2            # 19 characters (and the tone of the message)
+    assert read_message(model, "m", "mdr trop vrai") == [] and len(model.calls) == 2                                                          # 13: not even shown to the model
+    assert read_message(model, "m", "<@100000000000000001> <@100000000000000002> https://exemple.fr/une-page") == [] and len(model.calls) == 2   # mentions and links hold no claim, whatever their length
     assert reading.MIN_CHARS == 16
 
 
@@ -361,8 +362,9 @@ def test_what_the_checker_gives_the_model_is_the_message_and_then_the_claim_with
     """Blind, all the way: through the checker too, not only through the reader. Nothing about who wrote the message can reach the model, because nothing of it enters the checker."""
     model = Model(lambda system, user: {"claims": [claim()]} if system == reading.SYSTEM else {"extract_says": "x", "same_subject": True, "stance": "supports", "quote": QUOTE, "period": "2026"})
     Checker(model, "m", lambda: Lookup([Service([hit(OFFICIAL)])], Pages({OFFICIAL: PAGE}))).check(MESSAGE)
-    first, second = model.calls
+    first, tone, second = model.calls
     assert (first["system"], first["user"]) == (reading.SYSTEM, f"Message :\n«{MESSAGE}»")
+    assert tone["system"] == irony.SYSTEM and "MESSAGE À JUGER" in tone["user"] and "Contexte" not in tone["user"]                    # the tone: the message alone, nothing about who wrote it
     assert second["system"] == verify.PAGE_SYSTEM and second["user"].startswith("Affirmation : Le taux de chômage en France est de 12 % de la population active\n\nExtraits de la page")
 
 

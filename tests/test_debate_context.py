@@ -5,6 +5,7 @@ puts in front of the model and what it keeps of its answer; whether a real model
 """
 import pytest
 
+from dindon.analysis import irony
 from dindon.debate import context, reading
 from dindon.debate.context import Said, render, tidy
 from dindon.debate.reading import CONTEXT_RULES, read_message
@@ -39,11 +40,13 @@ CLAIMS = {"claims": [{"claim": "Le chômage est de 25 % en France", "said": "Oui
 
 
 class Model:
-    def __init__(self, reply):
-        self.reply, self.calls = reply, []
+    def __init__(self, reply, tone="sincere"):
+        self.reply, self.calls, self.tone = reply, [], tone
 
     def chat_json(self, model, system, user, schema, num_ctx=8192):
         self.calls.append({"system": system, "user": user, "schema": schema})
+        if schema is irony.SCHEMA:
+            return {"reasoning": "il le pense", "tone": self.tone, "certainty": 90}
         return self.reply
 
 
@@ -52,7 +55,7 @@ def test_with_a_context_the_model_is_told_it_is_data_and_the_claim_must_still_be
     ctx = render([Said(1, 10, "Le chômage est à 25 % en France.")], 11)
     [found] = read_message(model, "m", "Oui exactement, 25 %.", ctx)
     assert found.claim == "Le chômage est de 25 % en France" and found.said == "Oui exactement, 25 %"
-    [call] = model.calls
+    call = model.calls[0]
     assert call["system"].endswith(CONTEXT_RULES) and "DONNÉES" in CONTEXT_RULES and ctx in call["user"] and call["user"].endswith("«Oui exactement, 25 %.»")
     assert "author_asserts" in call["schema"]["properties"]["claims"]["items"]["properties"]
     # a claim whose words are only in the context is not noted: the context helps to understand, it does not provide claims
@@ -83,3 +86,22 @@ def test_the_unread_message_comes_with_what_was_said_before_and_nothing_of_a_per
     assert "Message à lire : écrit par U2" in unread[last].context
     for private in ("Bob", "Carol", "quelqu'un", str(BOB_ID), str(CAROL_ID), str(ALICE_ID)):
         assert private not in unread[last].context                                                       # no name, no id, nothing of a person who asked to stop
+
+
+def test_a_message_that_is_irony_gives_no_claim_whatever_the_reading_found_and_a_hesitation_changes_nothing():
+    ctx = render([Said(1, 10, "Le chômage est à 25 % en France.")], 11)
+    assert read_message(Model(CLAIMS, tone="ironic"), "m", "Oui exactement, 25 %.", ctx) == []
+    assert read_message(Model(CLAIMS, tone="joke"), "m", "Oui exactement, 25 %.") == []
+    assert len(read_message(Model(CLAIMS, tone="sincere"), "m", "Oui exactement, 25 %.", ctx)) == 1
+    hesitating = Model(CLAIMS)
+    hesitating.chat_json = lambda model, system, user, schema, num_ctx=8192: ({"reasoning": "peut-être", "tone": "ironic", "certainty": 40} if schema is irony.SCHEMA else CLAIMS)
+    assert len(read_message(hesitating, "m", "Oui exactement, 25 %.", ctx)) == 1                                # not sure it is irony: the message stays as it is
+
+
+def test_the_message_that_is_answered_is_found_in_the_context():
+    from dindon.debate.context import answered
+
+    ctx = render([Said(1, 10, "Le chômage est à 25 %."), Said(2, 12, "Autre chose."), Said(3, 11, "Tu es sûr ?", 1, "Le chômage est à 25 %.", 10)], 12, 3)
+    assert answered(ctx) == "Tu es sûr ?"                                                                  # the one it replies to
+    assert answered(render([Said(1, 10, "Le chômage est à 25 %."), Said(2, 11, "Je pense que oui.")], 11)) == "Le chômage est à 25 %."     # else the last by somebody else
+    assert answered("") == ""

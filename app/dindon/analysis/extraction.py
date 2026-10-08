@@ -25,6 +25,7 @@ from dataclasses import dataclass
 import psycopg
 from psycopg.rows import tuple_row
 
+from dindon.analysis import irony
 from dindon.analysis.chunks import split_long
 from dindon.analysis.compact import clean
 from dindon.analysis.embeddings import vector_literal
@@ -33,7 +34,7 @@ from dindon.analysis.parallel import pipeline, workers_for
 
 log = logging.getLogger("dindon.analysis")
 
-PROMPT_VERSION = "extract-5"
+PROMPT_VERSION = "extract-6"
 MAX_CHARS = 7000
 SAME_PROPOSITION = 0.80
 MAX_CLAIMS_PER_PERSON = 3
@@ -209,6 +210,28 @@ def substantial_evidence(quote: str) -> bool:
     return len(words) >= 5 and not promotion and not _VAGUE.fullmatch(quote.strip()) and not quote.strip().endswith("?")
 
 
+def _drop_irony(client: Ollama, model: str, claims: list[Claim], read: Read) -> int:
+    """An opinion whose proofs are all irony, sarcasm, a joke, a quotation or a question is not what the person thinks (analysis/irony.py): it stays with its proof, as humour, and counts for nothing.
+    Each proof is judged with the message before it by somebody else. Returns how many positions were dropped."""
+    seen: dict[int, bool] = {}
+    refs = sorted(read.messages)
+    dropped = 0
+    for claim in claims:
+        if claim.kind != "opinion" or claim.stance is None:
+            continue
+        verdicts = []
+        for ref, _quote in claim.evidence:
+            if ref not in seen:
+                author, content, _when = read.messages[ref]
+                before = next((read.messages[r][1] for r in reversed(refs) if r < ref and read.messages[r][0] != author), "")
+                seen[ref] = irony.judge(client, model, content, before).not_sincere
+            verdicts.append(seen[ref])
+        if verdicts and all(verdicts):
+            claim.kind, claim.stance = "humour", None
+            dropped += 1
+    return dropped
+
+
 def _proposition_ids(conn: psycopg.Connection, client: Ollama, embed_model: str, texts: list[str], model: str) -> dict[str, int]:
     """The proposition (existing, or new and *proposed*) that each text is about."""
     out: dict[str, int] = {}
@@ -262,6 +285,7 @@ def extract_claims(conn: psycopg.Connection, client: Ollama, model: str, embed_m
             if cancelled():
                 return None
             claims, refused_here = validate(client.chat_json(model, SYSTEM, "Conversation :\n" + read.text, SCHEMA), read)
+            _drop_irony(client, model, claims, read)
             validated.extend((claim, read) for claim in claims)
             bad += refused_here
         return validated, bad

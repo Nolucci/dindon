@@ -1,0 +1,630 @@
+{
+ "version": 1,
+ "how": "messages of a political Discord, each with the message it answers: irony (marked, mocking echo, deadpan) and sincere answers that look alike (emphatic, humorous, with the same words 'bien sûr', 'évidemment', 'mdr'). Labelled by Claude from the messages themselves.",
+ "cases": [
+  {
+   "id": "i01",
+   "context": [
+    [
+     "A",
+     "Il faut augmenter le SMIC à 2000 euros."
+    ]
+   ],
+   "author": "B",
+   "text": "Bien sûr, et pourquoi pas 10 000 tant qu'on y est, l'argent pousse sur les arbres 🙄",
+   "label": "ironique"
+  },
+  {
+   "id": "i02",
+   "context": [
+    [
+     "A",
+     "Je pense qu'il faut taxer les riches."
+    ]
+   ],
+   "author": "B",
+   "text": "Ouais ouais, taxons tout le monde sauf moi, ça va être génial /s",
+   "label": "ironique"
+  },
+  {
+   "id": "i03",
+   "context": [
+    [
+     "A",
+     "Le nucléaire c'est l'avenir."
+    ]
+   ],
+   "author": "B",
+   "text": "Évidemment, rien de plus sûr qu'une centrale. Aucun risque. Jamais.",
+   "label": "ironique"
+  },
+  {
+   "id": "i04",
+   "context": [
+    [
+     "A",
+     "Les écologistes veulent nous interdire la viande."
+    ]
+   ],
+   "author": "B",
+   "text": "Mais oui bien sûr, ils vont venir chez toi arracher ton steak de la poêle 😂",
+   "label": "ironique"
+  },
+  {
+   "id": "i05",
+   "context": [
+    [
+     "A",
+     "L'immigration coûte cher à la France."
+    ]
+   ],
+   "author": "B",
+   "text": "Ah oui l'immigration, la cause de tous nos problèmes, même du mauvais temps",
+   "label": "ironique"
+  },
+  {
+   "id": "i06",
+   "context": [
+    [
+     "A",
+     "On devrait supprimer l'impôt sur le revenu."
+    ]
+   ],
+   "author": "B",
+   "text": "Super idée, supprimons les routes, les écoles et les hôpitaux aussi, on économisera encore plus",
+   "label": "ironique"
+  },
+  {
+   "id": "i07",
+   "context": [
+    [
+     "A",
+     "Le gouvernement fait du bon travail."
+    ]
+   ],
+   "author": "B",
+   "text": "Oh oui, un travail exemplaire, regardez comme tout va bien dans le pays 👏",
+   "label": "ironique"
+  },
+  {
+   "id": "i08",
+   "context": [
+    [
+     "A",
+     "Il faut interdire les trottinettes."
+    ]
+   ],
+   "author": "B",
+   "text": "Oui et les vélos, et les piétons aussi, pendant qu'on y est. Plus personne ne bouge, plus d'accident.",
+   "label": "ironique"
+  },
+  {
+   "id": "i09",
+   "context": [
+    [
+     "A",
+     "Moi je trouve que l'école devrait être gratuite."
+    ]
+   ],
+   "author": "B",
+   "text": "« L'école devrait être gratuite » mdr les profs travaillent par amour de la patrie",
+   "label": "ironique"
+  },
+  {
+   "id": "i10",
+   "context": [
+    [
+     "A",
+     "La retraite à 60 ans c'est un droit."
+    ]
+   ],
+   "author": "B",
+   "text": "Bien sûr. Travailler c'est surfait de toute façon.",
+   "label": "ironique"
+  },
+  {
+   "id": "i11",
+   "context": [
+    [
+     "A",
+     "L'Europe nous impose trop de règles."
+    ]
+   ],
+   "author": "B",
+   "text": "Ah ouais, l'Europe, ce monstre qui nous oblige à avoir de l'eau potable et des droits",
+   "label": "ironique"
+  },
+  {
+   "id": "i12",
+   "context": [
+    [
+     "A",
+     "On devrait fermer les frontières."
+    ]
+   ],
+   "author": "B",
+   "text": "Parfait, fermons tout, vivons en autarcie avec nos trois pommes de terre",
+   "label": "ironique"
+  },
+  {
+   "id": "i13",
+   "context": [
+    [
+     "A",
+     "Le télétravail rend les gens paresseux."
+    ]
+   ],
+   "author": "B",
+   "text": "Évidemment, c'est bien connu, personne ne travaille jamais depuis chez soi 🙃",
+   "label": "ironique"
+  },
+  {
+   "id": "i14",
+   "context": [
+    [
+     "A",
+     "Il faut plus de policiers."
+    ]
+   ],
+   "author": "B",
+   "text": "Oui oui, plus de policiers, moins d'écoles, super priorités",
+   "label": "ironique"
+  },
+  {
+   "id": "i15",
+   "context": [
+    [
+     "A",
+     "Je suis pour la peine de mort."
+    ]
+   ],
+   "author": "B",
+   "text": "Excellente idée, rien de tel que de résoudre la violence par la violence, bravo le raisonnement",
+   "label": "ironique"
+  },
+  {
+   "id": "i16",
+   "context": [
+    [
+     "A",
+     "La Terre est plate."
+    ]
+   ],
+   "author": "B",
+   "text": "Ouais c'est ça, et les avions tombent du bord, tout le monde le sait",
+   "label": "ironique"
+  },
+  {
+   "id": "i17",
+   "context": [
+    [
+     "A",
+     "Il faut augmenter le SMIC à 2000 euros."
+    ]
+   ],
+   "author": "B",
+   "text": "Oui exactement, les prix ont explosé et les salaires n'ont pas suivi, il faut l'augmenter.",
+   "label": "sincère"
+  },
+  {
+   "id": "i18",
+   "context": [
+    [
+     "A",
+     "Je pense qu'il faut taxer les riches."
+    ]
+   ],
+   "author": "B",
+   "text": "Mdr oui je suis d'accord, les plus riches doivent contribuer davantage.",
+   "label": "sincère"
+  },
+  {
+   "id": "i19",
+   "context": [
+    [
+     "A",
+     "Le nucléaire c'est l'avenir."
+    ]
+   ],
+   "author": "B",
+   "text": "Évidemment que le nucléaire est nécessaire pour décarboner, on n'a pas d'autre option réaliste.",
+   "label": "sincère"
+  },
+  {
+   "id": "i20",
+   "context": [
+    [
+     "A",
+     "Les écologistes veulent nous interdire la viande."
+    ]
+   ],
+   "author": "B",
+   "text": "Non, c'est faux, ils veulent surtout réduire l'élevage industriel, pas interdire la viande.",
+   "label": "sincère"
+  },
+  {
+   "id": "i21",
+   "context": [
+    [
+     "A",
+     "L'immigration coûte cher à la France."
+    ]
+   ],
+   "author": "B",
+   "text": "Je ne suis pas d'accord : plusieurs études montrent que l'effet budgétaire est faible, voire positif.",
+   "label": "sincère"
+  },
+  {
+   "id": "i22",
+   "context": [
+    [
+     "A",
+     "On devrait supprimer l'impôt sur le revenu."
+    ]
+   ],
+   "author": "B",
+   "text": "Bien sûr que non, il finance les services publics, il faut le garder.",
+   "label": "sincère"
+  },
+  {
+   "id": "i23",
+   "context": [
+    [
+     "A",
+     "Le gouvernement fait du bon travail."
+    ]
+   ],
+   "author": "B",
+   "text": "Oui je trouve aussi, sur l'énergie notamment les choix sont cohérents.",
+   "label": "sincère"
+  },
+  {
+   "id": "i24",
+   "context": [
+    [
+     "A",
+     "Il faut interdire les trottinettes."
+    ]
+   ],
+   "author": "B",
+   "text": "Pas interdire, mais les réguler : casque obligatoire et stationnement encadré.",
+   "label": "sincère"
+  },
+  {
+   "id": "i25",
+   "context": [
+    [
+     "A",
+     "Moi je trouve que l'école devrait être gratuite."
+    ]
+   ],
+   "author": "B",
+   "text": "Elle l'est déjà dans le public, par contre les fournitures coûtent cher aux familles.",
+   "label": "sincère"
+  },
+  {
+   "id": "i26",
+   "context": [
+    [
+     "A",
+     "La retraite à 60 ans c'est un droit."
+    ]
+   ],
+   "author": "B",
+   "text": "Je suis pour, mais il faut dire comment on la finance, sinon ça ne tient pas.",
+   "label": "sincère"
+  },
+  {
+   "id": "i27",
+   "context": [
+    [
+     "A",
+     "L'Europe nous impose trop de règles."
+    ]
+   ],
+   "author": "B",
+   "text": "Ah oui là je suis d'accord, certaines normes agricoles sont absurdes pour les petits producteurs.",
+   "label": "sincère"
+  },
+  {
+   "id": "i28",
+   "context": [
+    [
+     "A",
+     "On devrait fermer les frontières."
+    ]
+   ],
+   "author": "B",
+   "text": "Je pense qu'il faut contrôler les frontières mais pas les fermer, ce serait inapplicable.",
+   "label": "sincère"
+  },
+  {
+   "id": "i29",
+   "context": [
+    [
+     "A",
+     "Le télétravail rend les gens paresseux."
+    ]
+   ],
+   "author": "B",
+   "text": "Pas du tout, la productivité est équivalente d'après les enquêtes que j'ai lues.",
+   "label": "sincère"
+  },
+  {
+   "id": "i30",
+   "context": [
+    [
+     "A",
+     "Il faut plus de policiers."
+    ]
+   ],
+   "author": "B",
+   "text": "Oui, surtout de la police de proximité, ça a bien fonctionné dans d'autres pays.",
+   "label": "sincère"
+  },
+  {
+   "id": "i31",
+   "context": [
+    [
+     "A",
+     "Je suis pour la peine de mort."
+    ]
+   ],
+   "author": "B",
+   "text": "Moi je suis contre, c'est irréversible et on a déjà condamné des innocents.",
+   "label": "sincère"
+  },
+  {
+   "id": "i32",
+   "context": [
+    [
+     "A",
+     "Qui a une opinion sur la TVA ?"
+    ]
+   ],
+   "author": "B",
+   "text": "Je pense qu'il faut baisser la TVA sur l'énergie, c'est un bien de première nécessité.",
+   "label": "sincère"
+  },
+  {
+   "id": "i33",
+   "context": [
+    [
+     "A",
+     "Faut-il privatiser les autoroutes ?"
+    ]
+   ],
+   "author": "B",
+   "text": "Franchement non, c'était une énorme erreur de les vendre, ça coûte une fortune aux usagers.",
+   "label": "sincère"
+  },
+  {
+   "id": "i34",
+   "context": [
+    [
+     "A",
+     "Vous êtes pour ou contre le vote obligatoire ?"
+    ]
+   ],
+   "author": "B",
+   "text": "Contre, voter doit rester un choix libre, même si je trouve ça dommage qu'on s'abstienne.",
+   "label": "sincère"
+  },
+  {
+   "id": "i35",
+   "context": [
+    [
+     "A",
+     "Il faut réformer la justice."
+    ]
+   ],
+   "author": "B",
+   "text": "Oui !! Les délais sont insupportables, il faut plus de magistrats, c'est urgent.",
+   "label": "sincère"
+  },
+  {
+   "id": "i36",
+   "context": [
+    [
+     "A",
+     "Le prix de l'essence est scandaleux."
+    ]
+   ],
+   "author": "B",
+   "text": "Totalement, et en plus les taxes en représentent plus de la moitié, c'est un problème.",
+   "label": "sincère"
+  },
+  {
+   "id": "i37",
+   "context": [
+    [
+     "A",
+     "Il paraît que la dette n'est pas un problème."
+    ]
+   ],
+   "author": "B",
+   "text": "Mais non, on peut s'endetter à l'infini, ça n'a jamais posé problème à personne dans l'histoire.",
+   "label": "ironique"
+  },
+  {
+   "id": "i38",
+   "context": [
+    [
+     "A",
+     "Il faut laisser les entreprises polluer librement."
+    ]
+   ],
+   "author": "B",
+   "text": "Oui laissons-les, de toute façon on respire très bien, les poumons s'habituent.",
+   "label": "ironique"
+  },
+  {
+   "id": "i39",
+   "context": [
+    [
+     "A",
+     "La démocratie directe réglerait tout."
+    ]
+   ],
+   "author": "B",
+   "text": "Oui, un référendum par jour sur tout, personne n'aura aucun autre métier.",
+   "label": "ironique"
+  },
+  {
+   "id": "i40",
+   "context": [
+    [
+     "A",
+     "Les syndicats bloquent le pays."
+    ]
+   ],
+   "author": "B",
+   "text": "Les syndicats, ces dangereux criminels qui osent demander des congés payés.",
+   "label": "ironique"
+  },
+  {
+   "id": "i41",
+   "context": [
+    [
+     "A",
+     "Le nucléaire est trop dangereux."
+    ]
+   ],
+   "author": "B",
+   "text": "Oui, remplaçons-le par des bougies, c'est connu c'est la source la plus fiable.",
+   "label": "ironique"
+  },
+  {
+   "id": "i42",
+   "context": [
+    [
+     "A",
+     "Il faut baisser les impôts des entreprises."
+    ]
+   ],
+   "author": "B",
+   "text": "Les entreprises paient trop d'impôts, les pauvres chéries, il faut leur faire un câlin fiscal",
+   "label": "ironique"
+  },
+  {
+   "id": "i43",
+   "context": [
+    [
+     "A",
+     "Il faut réduire le nombre de fonctionnaires."
+    ]
+   ],
+   "author": "B",
+   "text": "Non, c'est une mauvaise idée, les services publics manquent déjà de personnel.",
+   "label": "sincère"
+  },
+  {
+   "id": "i44",
+   "context": [
+    [
+     "A",
+     "L'âge de la retraite doit passer à 67 ans."
+    ]
+   ],
+   "author": "B",
+   "text": "Tu rêves, on ne peut pas demander ça aux gens qui font des métiers physiques.",
+   "label": "sincère"
+  },
+  {
+   "id": "i45",
+   "context": [
+    [
+     "A",
+     "Il faut taxer les transactions financières."
+    ]
+   ],
+   "author": "B",
+   "text": "Ouais, je suis pour, c'est la seule solution pour financer la transition.",
+   "label": "sincère"
+  },
+  {
+   "id": "i46",
+   "context": [
+    [
+     "A",
+     "L'Europe doit avoir sa propre armée."
+    ]
+   ],
+   "author": "B",
+   "text": "Non, c'est faux, la défense doit rester nationale.",
+   "label": "sincère"
+  },
+  {
+   "id": "i47",
+   "context": [
+    [
+     "A",
+     "Les loyers devraient être encadrés partout."
+    ]
+   ],
+   "author": "B",
+   "text": "Oui, il faut le faire, sinon les jeunes ne trouvent plus à se loger.",
+   "label": "sincère"
+  },
+  {
+   "id": "i48",
+   "context": [
+    [
+     "A",
+     "On devrait interdire les voitures thermiques en 2035."
+    ]
+   ],
+   "author": "B",
+   "text": "Pas d'accord, il faut laisser le choix aux gens et aux constructeurs.",
+   "label": "sincère"
+  },
+  {
+   "id": "i49",
+   "context": [
+    [
+     "A",
+     "Le service militaire devrait revenir."
+    ]
+   ],
+   "author": "B",
+   "text": "Bonne idée, ça recréerait du lien entre les générations.",
+   "label": "sincère"
+  },
+  {
+   "id": "i50",
+   "context": [
+    [
+     "A",
+     "Les médias sont tous vendus."
+    ]
+   ],
+   "author": "B",
+   "text": "Faux, il y en a de très divers, il suffit de recouper les sources.",
+   "label": "sincère"
+  },
+  {
+   "id": "i51",
+   "context": [
+    [
+     "A",
+     "La viande devrait être taxée."
+    ]
+   ],
+   "author": "B",
+   "text": "Non, on ne devrait pas, ça touchera surtout les familles modestes.",
+   "label": "sincère"
+  },
+  {
+   "id": "i52",
+   "context": [
+    [
+     "A",
+     "Il faut plus de nucléaire."
+    ]
+   ],
+   "author": "B",
+   "text": "Je suis d'accord avec toi, c'est notre atout principal.",
+   "label": "sincère"
+  }
+ ]
+}

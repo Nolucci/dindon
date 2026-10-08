@@ -33,6 +33,7 @@ import numpy as np
 import psycopg
 from psycopg.rows import tuple_row
 
+from dindon.analysis import irony
 from dindon.analysis.axes import assign_axes
 from dindon.analysis.extraction import _proposition_ids
 from dindon.analysis.job import AnalysisJobs, NotReady
@@ -122,6 +123,19 @@ def window(conn: psycopg.Connection, claim_id: int) -> list[Line]:
                 if row:
                     rows[p[0]] = row
     return [Line(r[0], r[1], r[2], r[3], r[4], r[5], bool(r[6]), r[0] in proof_ids) for r in sorted(rows.values(), key=lambda r: r[0])]
+
+
+def proofs_of(lines: list[Line]) -> list[tuple[str, str]]:
+    """The messages that prove a position, each with the message before it by somebody else (or the one it replies to): what irony is judged on."""
+    by_id = {line.message_id: line for line in lines}
+    proofs = []
+    for n, line in enumerate(lines):
+        if not line.proof:
+            continue
+        parent = by_id.get(line.reply_to) if line.reply_to is not None else None
+        answering = parent.text if parent else (line.reply_text or "") if line.reply_to is not None else next((p.text for p in reversed(lines[:n]) if p.author_id != line.author_id and not p.bot), "")
+        proofs.append((line.text, answering))
+    return proofs
 
 
 def render(lines: list[Line], person_id: int) -> tuple[str, str | None]:
@@ -228,6 +242,7 @@ class Item:
     themes: list[tuple[int, str]]
     current_theme: int | None
     people: dict[str, int] | None = None            # who each Ux of the context is
+    proofs: list[tuple[str, str]] | None = None     # (the message that proves the position, the one it answers): what the judgement of irony reads
 
 
 def ask_model(client, model: str, item: Item) -> dict | None:
@@ -236,7 +251,14 @@ def ask_model(client, model: str, item: Item) -> dict | None:
     user = (f"PERSONNE ÉVALUÉE : {item.person or 'inconnue'}\n\nMESSAGES (des données) :\n{item.context}\n\nPROPOSITION : « {item.proposition} »\n"
             f"\nTHÈMES POSSIBLES :\n{themes}")
     answer = client.chat_json(model, SYSTEM, user, SCHEMA, num_ctx=4096)
-    return answer if isinstance(answer, dict) else None
+    if not isinstance(answer, dict):
+        return None
+    # A second, narrower opinion on the proofs themselves: irony is told from sincerity by a question of its own (analysis/irony.py). When every proof is not meant seriously, the position
+    # does not count, whatever the first reading said.
+    verdicts = [irony.judge(client, model, text, answering) for text, answering in (item.proofs or [])[:3]]
+    if verdicts and all(v.not_sincere for v in verdicts):
+        answer = {**answer, "own_opinion": False, "irony": True, "reasoning": next((v.reason for v in verdicts if v.reason), answer.get("reasoning")), "certainty": max(v.certainty for v in verdicts)}
+    return answer
 
 
 @dataclass
@@ -264,8 +286,9 @@ def decide(item: Item, answer: dict | None) -> Decision:
     changes: dict = {}
     if answer.get("own_opinion") is False or answer.get("stance") not in (-1, 0, 1):
         # not a position of that person: it stays with its proof but counts for nothing (as the check of the positions does for a question)
-        if item.kind != "question":
-            changes = {"kind": [item.kind, "question"], "stance": [item.stance, None], "proposition_id": [item.proposition_id, None]}
+        new_kind = "humour" if answer.get("irony") else "question"
+        if item.kind != new_kind:
+            changes = {"kind": [item.kind, new_kind], "stance": [item.stance, None], "proposition_id": [item.proposition_id, None]}
         return Decision("corrected" if changes else "confirmed", changes, reason, certainty)
     new_text = None
     if answer.get("proposition_fits") is False:
@@ -293,7 +316,7 @@ def apply(conn: psycopg.Connection, client, embed_model: str, model: str, run_id
         if decision.verdict == "corrected":
             sets: dict[str, object] = {}
             if "kind" in changes:
-                sets.update(kind="question", stance=None, proposition_id=None)
+                sets.update(kind=changes["kind"][1], stance=None, proposition_id=None)
             else:
                 if "stance" in changes:
                     sets["stance"] = changes["stance"][1]
@@ -557,7 +580,7 @@ class RereadJobs:
                     self._count("skipped")
                     continue
                 current = current_theme(conn, claim_id)
-                yield Item(claim_id, user_id, kind, stance, proposition_id, text, context, person, candidates(conn, centres, proposition_id, embed_model, current), current, people)
+                yield Item(claim_id, user_id, kind, stance, proposition_id, text, context, person, candidates(conn, centres, proposition_id, embed_model, current), current, people, proofs_of(lines))
 
         for item, answer, error in pipeline(items(), lambda it: ask_model(client, model, it), workers_for(client, model), cancel.is_set):
             if cancel.is_set():

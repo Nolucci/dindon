@@ -12,6 +12,7 @@ import pytest
 
 from dindon.analysis.ollama import OllamaError
 from dindon.config import Settings
+from dindon.analysis import irony
 from dindon.debate import local
 from dindon.debate.checker import Checker, build_checker, notice_mode, resolve_mode
 from dindon.debate.claims import ClaimResult
@@ -30,12 +31,15 @@ WEB = ClaimResult(CLAIM, "Le chômage est à 12 % en France", "contradicted", No
 class Model:
     """A script for the local model: the first call reads the message, the next ones answer each claim in turn. Every call is recorded."""
 
-    def __init__(self, *replies, relation="contradicts", recalled=None):
+    def __init__(self, *replies, relation="contradicts", recalled=None, tone="sincere"):
         self.replies, self.calls = list(replies), []
+        self.irony = {"reasoning": "il le pense", "tone": tone, "certainty": 90}                     # the judgement of irony on a message that has claims (analysis/irony.py)
         self.relation, self.recalled = {"relation": relation}, recalled or {"fact": "", "certainty": 0}      # the two narrow questions that read a « false » again (local.py)
 
     def chat_json(self, model, system, user, schema, num_ctx=8192):
         self.calls.append({"model": model, "system": system, "user": user, "schema": schema})
+        if schema is irony.SCHEMA:
+            return self.irony
         if schema is local.CHECK_SCHEMA:
             return self.relation
         if schema is local.RECALL_SCHEMA:
@@ -145,7 +149,7 @@ def test_a_claim_that_dindon_is_certain_is_false_gets_an_answer_and_nothing_goes
     [answer] = found.answers
     assert (answer.claim, answer.said, answer.query, answer.verdict, answer.answer, answer.model) == (CLAIM, "Le chômage est à 12 % en France", "taux de chômage France", "false",
                                                                                                        "Le taux de chômage en France est de 7 %.", "m")
-    assert found.results == () and c.searched == [] and len(c.llm.calls) == 4                                      # the reading, the answer, and the two narrow questions that read a « false » again
+    assert found.results == () and c.searched == [] and len(c.llm.calls) == 5                                      # the reading, the tone of the message, the answer, and the two narrow questions that read a « false » again
 
 
 def test_a_claim_that_dindon_is_certain_is_true_is_noted_and_nothing_is_said_or_searched():
@@ -187,7 +191,7 @@ def test_a_model_that_fails_while_answering_leaves_the_message_unread():
 
 def test_checking_without_answering_is_what_it_was_every_claim_on_the_internet():
     c = checker(READING)
-    assert [r.claim for r in c.check(MESSAGE)] == [CLAIM] and len(c.llm.calls) == 1                               # the observation mode never asks the model what it knows
+    assert [r.claim for r in c.check(MESSAGE)] == [CLAIM] and len(c.llm.calls) == 2                               # the reading and the tone of the message; the observation mode never asks the model what it knows
 
 
 def test_the_search_asked_by_the_participants_needs_a_search_service():

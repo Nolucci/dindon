@@ -22,7 +22,7 @@ def run(case: dict, client, model: str) -> tuple[reread.Decision, dict | None]:
     ids: dict[str, int] = {}
     lines = [reread.Line(n, ids.setdefault(who, len(ids) + 1), text, None, None, None, False, n - 1 in case["evidence"]) for n, (who, text) in enumerate(case["lines"], 1)]
     context, person = reread.render(lines, ids[case["person"]])
-    item = reread.Item(1, ids[case["person"]], "opinion", case["current"], 7, case["proposition"], context, person, [], None)
+    item = reread.Item(1, ids[case["person"]], "opinion", case["current"], 7, case["proposition"], context, person, [], None, None, reread.proofs_of(lines))
     answer = reread.ask_model(client, model, item)
     return reread.decide(item, answer), answer
 
