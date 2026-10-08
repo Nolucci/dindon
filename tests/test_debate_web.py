@@ -103,6 +103,10 @@ def refused(call, code: str) -> None:
     ("https://www.service-public.gouv.fr/particuliers/vosdroits/F1", "official"),
     ("https://factuel.afp.com/doc.afp.com.34ZZ", "checker"),
     ("https://www.lemonde.fr/les-decodeurs/article/2026/10/01/x_123.html", "checker"),
+    ("https://www.bra.se/publikationer/x", "official"),
+    ("https://www.nature.com/articles/x", "official"),
+    ("https://www.politifact.com/factchecks/x", "checker"),
+    ("https://fr.wikipedia.org/wiki/Berlin", "other"),                                    # an encyclopedia is context, not a source that condemns
     ("https://www.lemonde.fr/politique/article/2026/10/01/x_123.html", "other"),           # a newspaper is not a checker as a whole
     ("https://www.liberation.fr/checknews/2026/10/01/x/", "checker"),
     ("https://www.liberation.fr/politique/x/", "other"),

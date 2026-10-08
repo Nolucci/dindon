@@ -82,7 +82,7 @@ def test_the_bot_asks_for_the_minimum_and_the_token_is_never_logged(caplog):
 
     identify = run(scenario())
     # servers (roles, channels, threads) and messages with their content: not the members, not the presences, not the reactions
-    assert identify["intents"] == GUILDS | GUILD_MESSAGES | MESSAGE_CONTENT
+    assert identify["intents"] == GUILDS | GUILD_MESSAGES | MESSAGE_CONTENT | (1 << 1) | (1 << 24)
     assert TOKEN not in caplog.text
     assert "bonjour" not in caplog.text  # nor the messages themselves, whatever the level
 

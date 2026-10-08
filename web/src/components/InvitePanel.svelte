@@ -19,6 +19,7 @@
     CREATE_PUBLIC_THREADS: 'Créer des fils publics (débats)',
     SEND_MESSAGES: 'Envoyer des messages (débats)',
     SEND_MESSAGES_IN_THREADS: 'Envoyer des messages dans les fils (débats)',
+    SEND_POLLS: 'Créer des sondages',
     EMBED_LINKS: 'Intégrer des liens (débats)'
   };
   const waiting = $derived((info?.servers ?? []).filter((s) => !s.following));

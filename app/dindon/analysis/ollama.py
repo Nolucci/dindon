@@ -64,13 +64,19 @@ class Ollama:
         connection_type = http.client.HTTPSConnection if url.scheme == "https" else http.client.HTTPConnection
         connection = connection_type(url.hostname, url.port, timeout=min(duration, 5))
         finished = threading.Event()
+        timed_out = threading.Event()
+        transport: list[socket.socket | None] = [None]
+        deadline = time.monotonic() + duration
 
         def interrupt() -> None:
             while not finished.wait(0.1):
-                if self.cancelled():
+                if self.cancelled() or time.monotonic() >= deadline:
+                    if not self.cancelled():
+                        timed_out.set()
                     with suppress(OSError):
-                        if connection.sock:
-                            connection.sock.shutdown(socket.SHUT_RDWR)
+                        active_socket = connection.sock or transport[0]
+                        if active_socket:
+                            active_socket.shutdown(socket.SHUT_RDWR)
                     connection.close()
                     return
 
@@ -82,10 +88,13 @@ class Ollama:
             data = None if body is None else json.dumps(body).encode()
             connection.request("POST" if data is not None else "GET", url.path.rstrip("/") + path, body=data,
                                headers={"Content-Type": "application/json"} if data is not None else {})
+            transport[0] = connection.sock
             if connection.sock:
                 connection.sock.settimeout(duration)
             response = connection.getresponse()
             raw = response.read()
+            if timed_out.is_set():
+                raise OllamaError(f"Ollama ne répond pas à {self.base_url} (TimeoutError)")
             if self.cancelled():
                 raise InterruptedError("analyse annulée")
             if response.status >= 400:
@@ -101,7 +110,8 @@ class Ollama:
         except (http.client.HTTPException, TimeoutError, ConnectionError, OSError) as error:
             if self.cancelled():
                 raise InterruptedError("analyse annulée") from None
-            raise OllamaError(f"Ollama ne répond pas à {self.base_url} ({type(error).__name__})") from None
+            reason = "TimeoutError" if timed_out.is_set() else type(error).__name__
+            raise OllamaError(f"Ollama ne répond pas à {self.base_url} ({reason})") from None
         finally:
             finished.set()
             connection.close()
@@ -281,7 +291,7 @@ class OllamaPool:
                       or f"{model}:latest" in self._models.get(client.base_url, set()))]
         # One vector space must not contain embeddings from different model builds.
         reference = next((self._digests.get(c.base_url, {}).get(model) or self._digests.get(c.base_url, {}).get(f"{model}:latest")
-                          for c in reversed(candidates) if self._digests.get(c.base_url, {}).get(model)
+                          for c in reversed(self.clients) if self._digests.get(c.base_url, {}).get(model)
                           or self._digests.get(c.base_url, {}).get(f"{model}:latest")), None)
         return [c for c in candidates if not reference or (self._digests.get(c.base_url, {}).get(model)
                 or self._digests.get(c.base_url, {}).get(f"{model}:latest")) == reference]

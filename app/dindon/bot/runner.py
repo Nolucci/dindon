@@ -197,6 +197,10 @@ class BotRunner:
                 if self.interactions is not None and self._application_id is not None:
                     self._spawn(self.interactions.register_guild(self._application_id, str(data["id"])))
                 log.info("server %s is ready: %d channels and threads, %d roles", data["id"], len(guild.channels), len(guild.roles))
+        elif kind == "THREAD_MEMBERS_UPDATE" and self.debates is not None:
+            self.debates.on_members(data)
+        elif kind in ("MESSAGE_POLL_VOTE_ADD", "MESSAGE_POLL_VOTE_REMOVE") and self.debates is not None:
+            self.debates.on_poll_vote(data, kind == "MESSAGE_POLL_VOTE_ADD")
         elif kind == "MESSAGE_CREATE":
             if self.debates is not None and self.debates.is_debate_thread(data.get("channel_id")):
                 self.debates.on_message(data)           # counted for the debate; it also goes on to the map like any message

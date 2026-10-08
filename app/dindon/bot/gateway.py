@@ -6,8 +6,8 @@ events, as plain dictionaries, in a queue for the runner. Nothing of discord.py 
 that the rest of Dindon does not depend on it and could use another library.
 
 Minimum asked of Discord: the servers (roles, channels, threads) and the messages of the servers' channels, with their
-content (a "privileged" intent that the owner of the bot switches on in the Developer Portal). Not the members list, not the
-presences, not the reactions, not the typing indicators.
+content (a "privileged" intent that the owner of the bot switches on in the Developer Portal). Thread membership and poll votes are also received. Member lists are not downloaded;
+presences, reactions and typing indicators are not requested.
 """
 from __future__ import annotations
 
@@ -26,6 +26,8 @@ log = logging.getLogger("dindon.bot")
 # Gateway intent bits: GUILDS (1 << 0), GUILD_MESSAGES (1 << 9), MESSAGE_CONTENT (1 << 15)
 INTENTS = discord.Intents.none()
 INTENTS.guilds = True
+INTENTS.members = True
+INTENTS.guild_polls = True
 INTENTS.guild_messages = True
 INTENTS.message_content = True
 
@@ -140,7 +142,7 @@ class GatewaySource:
                     "the token of a personal account cannot be used here.") from None
             except discord.PrivilegedIntentsRequired:
                 raise FatalGatewayError(
-                    "Discord refused the intents: switch on 'Message Content Intent' for the bot "
+                    "Discord refused the intents: switch on 'Message Content Intent' and 'Server Members Intent' for the bot "
                     "(Developer Portal > Bot > Privileged Gateway Intents), then start the bot again.") from None
             except discord.ConnectionClosed as error:
                 if error.code in (4004, 4010, 4011, 4012, 4013, 4014):  # authentication failed, invalid shard/API/intents

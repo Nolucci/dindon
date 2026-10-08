@@ -101,8 +101,8 @@ def test_a_claim_with_a_plain_figure_or_fact_is_still_put_to_the_model(claim):
 
 
 def test_a_model_that_is_not_certain_by_its_own_account_says_nothing_and_a_correction_that_keeps_the_figures_is_dropped():
-    assert local.answer_claim(Model({**FALSE, "certainty": 89}), "m", reading()) == local.Local("unsure")
-    assert local.answer_claim(Model({**FALSE, "certainty": 90}), "m", reading()).verdict == "false"
+    assert local.answer_claim(Model({**FALSE, "certainty": 79}), "m", reading()) == local.Local("unsure")
+    assert local.answer_claim(Model({**FALSE, "certainty": 80}), "m", reading()).verdict == "false"
     assert local.answer_claim(Model({"verdict": "true", "answer": "", "certainty": 40}), "m", reading()) == local.Local("unsure")
     for certainty in ("beaucoup", None, -5, [90]):
         assert local.answer_claim(Model({**FALSE, "certainty": certainty}), "m", reading()) == local.Local("unsure")

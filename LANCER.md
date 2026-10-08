@@ -14,7 +14,7 @@ sudo bash /tmp/install-debian.sh
 
 Le script installe Git et, si nécessaire, Docker depuis son dépôt officiel, clone le projet dans `/opt/dindon`, crée `.env`, démarre PostgreSQL, Ollama, l'application et le bot, puis exécute le contrôle final. Il génère les deux mots de passe locaux, configure l'adresse d'Ollama et utilise les ports du projet. À partir du jeton, il récupère auprès de Discord l'identifiant de l'application et les identifiants des serveurs où le bot est déjà invité. S'il n'est encore dans aucun serveur, il suivra les serveurs où il sera invité. Le mode `DINDON_COLLECTOR=catchup` évite une seconde collecte permanente. Le téléchargement des modèles peut être long. Un `.env` existant est conservé ; le script ne supprime pas les données existantes.
 
-**Seul le jeton du bot Discord doit être fourni à la première installation.** Le script le demande dans le terminal sans l'afficher ni l'écrire dans l'historique du shell. Créer et inviter le bot depuis le [portail des développeurs Discord](https://discord.com/developers/applications), copier son jeton et activer **Message Content Intent** avant de lancer l'installateur. Ce jeton ne peut pas être déduit de la machine ni du serveur Discord. Si vous voulez installer d'abord l'application sans le bot, utiliser `sudo bash /tmp/install-debian.sh --no-bot` ; une exécution ultérieure avec `--with-bot` demandera le jeton.
+**Seul le jeton du bot Discord doit être fourni à la première installation.** Le script le demande dans le terminal sans l'afficher ni l'écrire dans l'historique du shell. Créer et inviter le bot depuis le [portail des développeurs Discord](https://discord.com/developers/applications), copier son jeton et activer **Message Content Intent* et *Server Members Intent** et **Server Members Intent** avant de lancer l'installateur. Ce jeton ne peut pas être déduit de la machine ni du serveur Discord. Si vous voulez installer d'abord l'application sans le bot, utiliser `sudo bash /tmp/install-debian.sh --no-bot` ; une exécution ultérieure avec `--with-bot` demandera le jeton.
 
 Le script récupère `DISCORD_CLIENT_ID` automatiquement. Seul `DISCORD_CLIENT_SECRET` reste à copier depuis le portail Discord si vous voulez l'Activity dans un salon vocal. Pour l'activer après l'installation :
 
@@ -134,7 +134,7 @@ docker compose up -d --build
 
 ## Bot Discord en direct (facultatif)
 
-Renseigner `DISCORD_TOKEN` dans `.env`, activer **Message Content Intent** pour le bot dans le portail Discord, puis lancer :
+Renseigner `DISCORD_TOKEN` dans `.env`, activer **Message Content Intent* et *Server Members Intent** et **Server Members Intent** pour le bot dans le portail Discord, puis lancer :
 
 ```sh
 docker compose --profile bot up -d --build

@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from dindon.debate.reading import Chat, Reading
 
-PROMPT_VERSION = "local-3"
+PROMPT_VERSION = "local-4"
 TRUE, FALSE, UNSURE = "true", "false", "unsure"
 SYSTEM = (
     "Tu es un vérificateur de faits très prudent. On te donne UNE affirmation de fait, seule : tu ne sais ni qui l'a dite, ni dans quel débat, et tu n'as aucun avis. "
@@ -24,14 +24,14 @@ SYSTEM = (
     "pour tout ce qui dépend d'une définition ou d'un périmètre, et dès que tu hésites : mieux vaut se taire que se tromper. "
     "Si tu réponds `false`, écris dans `answer` UNE phrase qui dit ce que tu sais d'exact (le bon chiffre, la bonne date, le bon fait), sans adresse Internet, sans « selon », sans adjectif, "
     "sans parler de la personne qui a affirmé. Si tu réponds `true` ou `unsure`, `answer` est vide. Donne aussi `certainty`, ton degré de certitude de 0 à 100 : "
-    "sous 90, réponds `unsure`. Une correction doit dire quelque chose de DIFFÉRENT de l'affirmation (un autre chiffre, une autre date, un autre fait) : si tu retrouves les mêmes chiffres, c'est que tu n'as pas de correction.\n"
+    "sous 80, réponds `unsure`. Une correction doit dire quelque chose de DIFFÉRENT de l'affirmation (un autre chiffre, une autre date, un autre fait) : si tu retrouves les mêmes chiffres, c'est que tu n'as pas de correction.\n"
     "Exemples. « La Terre tourne autour du Soleil. » → true. « Paris est la capitale de l'Allemagne. » → false, answer « La capitale de l'Allemagne est Berlin. » "
     "« Le taux de chômage en France est de 7,3 %. » → unsure (un chiffre qui change)."
 )
 SCHEMA = {"type": "object", "properties": {"verdict": {"type": "string", "enum": [TRUE, FALSE, UNSURE]}, "answer": {"type": "string"}, "certainty": {"type": "integer"}},
           "required": ["verdict", "answer", "certainty"]}
 MIN_ANSWER, MAX_ANSWER = 15, 400
-MIN_CERTAINTY = 90                                                              # what the model says of its own certainty: not a proof, but a model that hesitates must not speak
+MIN_CERTAINTY = 80                                                              # what the model says of its own certainty: not a proof, but a model that hesitates must not speak
 _NOT_CLEAN = re.compile(r"https?://|www\.|\[|\]|<|>|@", re.I)
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 # A claim that compares a figure with a threshold (« plus de 50 % », « inférieur à 1 000 euros ») needs the exact figure AND the arithmetic: a language model that answers from memory gets the comparison

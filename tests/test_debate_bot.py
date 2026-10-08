@@ -95,6 +95,21 @@ class FakeDiscord:
                     failure[3] -= 1
                     return Response(failure[2], {"code": failure[4], "message": "refused"} if failure[4] else None)
             path, _, query = path.partition("?")
+            poll_path = re.fullmatch(r"/channels/(\d+)/polls/(\d+)/(expire|answers/(\d+))", path)
+            if poll_path:
+                channel, message = int(poll_path[1]), int(poll_path[2])
+                stored = self.messages.get((channel, message))
+                if stored is None:
+                    return Response(404, {"code": 10008})
+                if method == 'POST' and poll_path[3] == 'expire':
+                    stored['poll']['expiry'] = T0.isoformat()
+                    return Response(200, {'id': str(message), **stored})
+                if method == 'GET' and poll_path[4]:
+                    voters = getattr(self, 'voters', {}).get((message, int(poll_path[4])), [])
+                    params = dict(item.split('=') for item in query.split('&') if item)
+                    voters = [u for u in voters if int(u['id']) > int(params.get('after', 0))]
+                    return Response(200, {'users': voters[:int(params.get('limit', 25))]})
+
             match = re.fullmatch(r"/channels/(\d+)(?:/(threads|messages|thread-members/@me)(?:/(\d+))?)?", path)
             if match is None:
                 return Response(404)
@@ -120,7 +135,7 @@ class FakeDiscord:
                 return Response(201, {"id": str(thread_id)})
             if method == "PUT" and part == "thread-members/@me":
                 return Response(204)
-            if method == "GET" and part == "messages":                               # a page: the oldest messages after a cursor, newest first (as Discord does)
+            if method == "GET" and part == "messages" and message is None:                               # a page: the oldest messages after a cursor, newest first (as Discord does)
                 options = dict(item.split("=") for item in query.split("&") if item)
                 after, limit = int(options.get("after", 0)), int(options.get("limit", 50))
                 page = sorted((m for m in self.history.get(channel, []) if int(m["id"]) > after), key=lambda m: int(m["id"]))[:limit]
@@ -128,16 +143,26 @@ class FakeDiscord:
             if method == "POST" and part == "messages":
                 message_id = next(self._message_ids)
                 self.messages[(channel, message_id)] = dict(body)
+                if 'poll' in body:
+                    native = dict(body['poll'])
+                    native['answers'] = [{'answer_id': 10 + i, **answer} for i, answer in enumerate(native['answers'])]
+                    native['expiry'] = (T0 + timedelta(hours=native.pop('duration'))).isoformat()
+                    self.messages[(channel, message_id)]['poll'] = native
                 self.history.setdefault(channel, []).append({"id": str(message_id), "channel_id": str(channel), "author": {"id": "42", "bot": True}, "type": 0,
                                                              "content": body.get("content", ""), "timestamp": T0.isoformat()})
-                return Response(200, {"id": str(message_id)})
+                return Response(200, {"id": str(message_id), **self.messages[(channel, message_id)]})
             if method == "DELETE" and part == "messages":
                 gone = self.messages.pop((channel, int(message)), None)
                 self.history[channel] = [m for m in self.history.get(channel, []) if m["id"] != message]
                 return Response(204) if gone is not None else Response(404, {"code": 10008})
+            if method == 'GET' and part == 'messages' and message:
+                stored = self.messages.get((channel, int(message)))
+                return Response(200, {'id': message, **stored}) if stored else Response(404, {'code': 10008})
             if method == "PATCH" and part == "messages":
                 if (channel, int(message)) not in self.messages:
                     return Response(404, {"code": 10008})
+                if 'poll' in self.messages[(channel, int(message))]:
+                    return Response(400, {'code': 50035})
                 self.messages[(channel, int(message))].update(body)
                 return Response(200, {"id": message})
             if method == "PATCH" and part is None and channel in self.threads:
@@ -1111,11 +1136,12 @@ def test_a_closing_that_was_owed_at_the_stop_is_posted_by_the_next_start(world, 
 
 def test_a_failed_post_is_tried_again_with_growing_waits_and_not_twice_when_it_works(world, ingest_db):
     thread, debate = started(world, ingest_db)
+    published = len(world.discord.of("POST", f"/channels/{thread}/messages"))
     world.discord.fail("POST", rf"/channels/{thread}/messages", 500, times=2)
     world.click(ALICE_ID, thread, debate.id, "end", "now", permissions=ADMINISTRATOR)
     world.tick(seconds=1)                                                                                                          # fails (first wait: 2 s)
     world.tick(seconds=1)
-    assert len(world.discord.of("POST", f"/channels/{thread}/messages")) == 2                                                      # the launch message, and the one failed try: nothing hammered
+    assert len(world.discord.of("POST", f"/channels/{thread}/messages")) == published + 1                                                      # the launch message, and the one failed try: nothing hammered
     world.tick(seconds=2)                                                                                                          # fails again (second wait: 5 s)
     world.tick(seconds=4)
     assert world.discord.posted(thread, "Débat terminé") == []
@@ -1127,11 +1153,12 @@ def test_a_failed_post_is_tried_again_with_growing_waits_and_not_twice_when_it_w
 
 def test_a_closing_that_never_works_is_given_up_after_a_few_tries(world, ingest_db):
     thread, debate = started(world, ingest_db)
+    published = len(world.discord.of("POST", f"/channels/{thread}/messages"))
     world.discord.fail("POST", rf"/channels/{thread}/messages", 500, times=99)
     world.click(ALICE_ID, thread, debate.id, "end", "now", permissions=ADMINISTRATOR)
     for _ in range(12):
         world.tick(seconds=61)
-    assert len(world.discord.of("POST", f"/channels/{thread}/messages")) == 1 + 5                                                  # the launch message, five tries at the closing
+    assert len(world.discord.of("POST", f"/channels/{thread}/messages")) == published + 5                                                  # the launch message, five tries at the closing
     assert store.get(ingest_db, debate.id).final_message_id == 0 and store.unannounced(ingest_db) == []
 
 

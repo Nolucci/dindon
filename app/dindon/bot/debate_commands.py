@@ -111,7 +111,12 @@ class Debates:
         self._deleted: list[tuple[int, list[int]]] = []           # (debate, ids) messages deleted in a debate thread, to see whether any was the bot's own
         self._poll_deletions: list[tuple[int, list[int]]] = []
         self._poll_pending = False
+        self._poll_events: list[tuple[dict, bool]] = []
+        self._joins: dict[tuple[int, int], dict] = {}
+        self._poll_gap = True
+        self._poll_gap_retry_at = 0.0
         self._poll_lock = asyncio.Lock()
+        self._poll_vote_lock = asyncio.Lock()
         self._gone_threads: set[int] = set()                      # threads (and channels) deleted on Discord, whose debates must be closed
         self._gone_channels: set[int] = set()
         self._gap = True                                          # messages may have been missed: the threads must be read again (true at the start)
@@ -158,7 +163,7 @@ class Debates:
     def has_work(self) -> bool:
         """Whether the engine should wake up often: a debate runs, or something is owed. Until the first tick, yes (the debates have not been loaded)."""
         return (not self._loaded or bool(self._threads) or bool(self._inbox) or bool(self._dirty) or self._owing or self._gap
-                or self._poll_pending or bool(self._poll_deletions) or bool(self._deleted) or bool(self._gone_threads) or bool(self._gone_channels) or self._retracting)
+                or self._poll_pending or bool(self._poll_events) or bool(self._joins) or self._poll_gap or bool(self._poll_deletions) or bool(self._deleted) or bool(self._gone_threads) or bool(self._gone_channels) or self._retracting)
 
     @property
     def verifying(self) -> bool:
@@ -199,6 +204,24 @@ class Debates:
         if len(self._inbox) >= MAX_INBOX:
             del self._inbox[: len(self._inbox) - MAX_INBOX + 1]
         self._inbox.append((debate_id, *counted))
+        if len(self._joins) < MAX_INBOX:
+            self._joins.setdefault((debate_id, counted[1]), {"user": data.get("author")})
+
+    def on_members(self, data: dict) -> None:
+        debate_id = self._threads.get(str(data.get("id")))
+        if debate_id is None:
+            return
+        for joined in data.get("added_members", []):
+            member = joined.get("member") or {}
+            user_id = joined.get("user_id") or (member.get("user") or {}).get("id")
+            if str(user_id).isdigit() and not (member.get("user") or {}).get("bot") and len(self._joins) < MAX_INBOX:
+                self._joins.setdefault((debate_id, int(user_id)), member)
+
+    def on_poll_vote(self, data: dict, added: bool) -> None:
+        if len(self._poll_events) < MAX_INBOX:
+            self._poll_events.append((dict(data), added))
+        else:
+            self._poll_gap = True
 
     def _counted(self, data: dict) -> tuple[int, int, datetime] | None:
         """(message, author, when) of a message that counts for a debate; None for a bot's, or a system message (a thread renamed…). One rule for the messages
@@ -215,6 +238,7 @@ class Debates:
     def note_gap(self) -> None:
         """The Gateway started a new session: what was written since the last event never came. The places of the debates will be read again before their silence is looked at."""
         self._gap = True
+        self._poll_gap = True
 
     def on_delete(self, data: dict, ids: list) -> None:
         """Messages were deleted in a channel. Only those of a debate thread matter here, and only if one of them is the bot's own."""
@@ -656,6 +680,7 @@ class Debates:
             if debate is None or debate.status != "open":
                 await say(data, texts.REFUSALS["unknown" if debate is None else "not_open"])
                 return
+            await self._flush_poll_votes()
             await self._flush_messages()                               # what was written in the last seconds still counts: the debate is closed to messages once it ends
             if self._moderator(data):
                 closed, text = await self.db(lambda c: store.end(c, debate_id, rules.ENDED, self.clock())), TEXT["ended"]
@@ -696,7 +721,9 @@ class Debates:
         await self._close_gone()
         if self._gap and self._mono() >= self._gap_retry_at:
             await self._catch_up()
+        await self._flush_poll_votes()
         await self._flush_messages()
+        await self._welcome()
         await self._bot_messages_deleted()
         now = self.clock()
         for debate_id in await self.db(lambda c: store.quiet(c, now)):          # nobody wrote for as long as the person allowed: the debate ends by itself
@@ -990,19 +1017,151 @@ class Debates:
             debate = await self.db(lambda c, i=debate_id: store.get(c, i))
             if debate is None or debate.thread_id is None:
                 continue
-            counts = await self.db(lambda c, i=debate_id: store.position_counts(c, i))
-            body = polls.message(debate, row, counts)
-            method, path = ("PATCH", f"/channels/{channel_id}/messages/{message_id}") if message_id else ("POST", f"/channels/{channel_id}/messages")
-            result = await self._rest(method, path, body)
-            if result.ok and (message_id or result.id):
-                await self.db(lambda c, i=debate_id, m=message_id or result.id, v=revision: c.execute(
-                    "UPDATE debate_polls SET message_id = %s, dirty = revision <> %s WHERE debate_id = %s", (m, v, i)))
+            mapping = await self.db(lambda c, i=debate_id: c.execute("SELECT answer_ids FROM debate_polls WHERE debate_id = %s", (i,)).fetchone()[0])
+            if debate.status == 'closed' and mapping is None:
+                await self.db(lambda c, i=debate_id: c.execute('UPDATE debate_polls SET dirty = false WHERE debate_id = %s', (i,)))
+                continue
+            if message_id and mapping is None:
+                # Discord does not allow turning a button message into a poll.
+                removed = await self._rest("DELETE", f"/channels/{channel_id}/messages/{message_id}")
+                if not removed.ok and removed.status != 404:
+                    self._failed_post(key, removed)
+                    continue
+                await self.db(lambda c, i=debate_id: c.execute("UPDATE debate_polls SET message_id = NULL WHERE debate_id = %s", (i,)))
+                message_id = None
+            if message_id:
+                if debate.status == "closed":
+                    current = await self._rest("GET", f"/channels/{channel_id}/messages/{message_id}")
+                    expiry = ((current.data or {}).get("poll") or {}).get("expiry") if current.ok else None
+                    expired = expiry and datetime.fromisoformat(expiry.replace('Z', '+00:00')) <= self.clock()
+                    result = current if expired else await self._rest("POST", f"/channels/{channel_id}/polls/{message_id}/expire")
+                else:
+                    # Native vote counts are maintained by Discord; poll messages cannot be edited.
+                    result = None
+            elif debate.status == "closed":
+                result = None
+            else:
+                result = await self._rest("POST", f"/channels/{channel_id}/messages", polls.message(debate, row, {}))
+                if result.ok and result.id:
+                    mapping = polls.answer_map(result.data)
+                    if len(mapping) != 3:
+                        found = await self._rest("GET", f"/channels/{channel_id}/messages/{result.id}")
+                        mapping = polls.answer_map(found.data or {}) if found.ok else {}
+                    from psycopg.types.json import Jsonb
+                    await self.db(lambda c, i=debate_id, m=result.id, a=mapping: c.execute(
+                        "UPDATE debate_polls SET message_id = %s, answer_ids = %s WHERE debate_id = %s", (m, Jsonb(a), i)))
+                    message_id = result.id
+            if result is None or result.ok:
+                await self.db(lambda c, i=debate_id, v=revision: c.execute(
+                    "UPDATE debate_polls SET dirty = revision <> %s WHERE debate_id = %s", (v, i)))
                 self._succeeded(key)
             elif result.status == 404 and result.code == 10008 and message_id:
-                await self.db(lambda c, i=debate_id: c.execute("UPDATE debate_polls SET message_id = NULL WHERE debate_id = %s", (i,)))
+                await self.db(lambda c, i=debate_id: c.execute("UPDATE debate_polls SET message_id = NULL, answer_ids = NULL WHERE debate_id = %s", (i,)))
             else:
                 self._failed_post(key, result)
         self._poll_pending = await self.db(lambda c: c.execute("SELECT EXISTS (SELECT 1 FROM debate_polls WHERE dirty AND channel_id IS NOT NULL)").fetchone()[0])
+
+    async def _welcome(self) -> None:
+        for (debate_id, user_id), _member in list(self._joins.items()):
+            key = (debate_id, f"welcome:{user_id}")
+            if not self._may_try(key):
+                continue
+            debate = await self.db(lambda c, i=debate_id: store.get(c, i))
+            skip = await self.db(lambda c, i=debate_id, u=user_id: c.execute(
+                """SELECT EXISTS (SELECT 1 FROM debate_welcomes WHERE debate_id = %s AND user_id = %s)
+                       OR EXISTS (SELECT 1 FROM privacy_subjects WHERE user_id = %s)
+                       OR COALESCE((SELECT position FROM debate_positions WHERE debate_id = %s AND user_id = %s ORDER BY id DESC LIMIT 1) IN ('for', 'against', 'unsure'), false)""", (i, u, u, i, u)).fetchone()[0])
+            if debate is None or debate.status != "open" or skip:
+                self._joins.pop((debate_id, user_id), None)
+                continue
+            buttons = [{"type": 2, "style": texts.SECONDARY, "label": _choice(value, debate.axis)[:80],
+                        "custom_id": texts.custom_id("pos", debate_id, value)} for value in rules.PARTICIPANT_POSITIONS]
+            result = await self._rest("POST", f"/channels/{debate.thread_id}/messages", {
+                "content": f"<@{user_id}>, quel est ton avis ? Choisis ton camp pour participer au débat.",
+                "components": texts._row(buttons), "allowed_mentions": {"parse": [], "users": [str(user_id)]}})
+            if result.ok:
+                await self.db(lambda c, i=debate_id, u=user_id: c.execute("INSERT INTO debate_welcomes VALUES (%s, %s) ON CONFLICT DO NOTHING", (i, u)))
+                self._joins.pop((debate_id, user_id), None)
+                self._succeeded(key)
+            else:
+                self._failed_post(key, result)
+
+    async def _apply_poll_vote(self, data: dict, added: bool, member=None) -> None:
+        if not all(str(data.get(k, '')).isdigit() for k in ('channel_id', 'message_id', 'user_id', 'answer_id', 'guild_id')):
+            return
+        row = await self.db(lambda c: c.execute("""SELECT q.debate_id, q.answer_ids FROM debate_polls q JOIN debates d ON d.id = q.debate_id
+            WHERE q.channel_id = %s AND q.message_id = %s AND d.guild_id = %s AND d.status = 'open'""",
+            (int(data['channel_id']), int(data['message_id']), int(data['guild_id']))).fetchone())
+        if not row or not row[1] or str(data['answer_id']) not in row[1]:
+            return
+        if not added:
+            # A camp change may arrive as REMOVE then ADD, across different ticks.
+            # Confirm the current Discord choice before withdrawing a participant.
+            for answer_id in row[1]:
+                found = await self._rest('GET', f"/channels/{data['channel_id']}/polls/{data['message_id']}/answers/{answer_id}?after={int(data['user_id']) - 1}&limit=1")
+                if not found.ok:
+                    if found.status == 404:
+                        return
+                    raise RuntimeError('poll voters unavailable')
+                user = next((u for u in (found.data or {}).get('users', []) if str(u.get('id')) == str(data['user_id'])), None)
+                if user:
+                    if str(answer_id) != str(data['answer_id']):
+                        await self._apply_poll_vote({**data, 'answer_id': answer_id}, True, {'user': user})
+                    return
+        if added and member is None:
+            known = await self.db(lambda c: c.execute('SELECT 1 FROM users WHERE id = %s', (int(data['user_id']),)).fetchone())
+            if not known:
+                found = await self._rest('GET', f"/guilds/{data['guild_id']}/members/{data['user_id']}")
+                member = found.data if found.ok else {'user': {'id': str(data['user_id'])}}
+        try:
+            await self.db(lambda c: polls.vote(c, row[0], int(data['user_id']), int(data['answer_id']), row[1][str(data['answer_id'])], added, self.clock(), member))
+            self._dirty.add(row[0])
+        except DebateRefused:
+            pass
+
+    async def _flush_poll_votes(self) -> None:
+        async with self._poll_vote_lock:
+            await self._flush_poll_votes_locked()
+
+    async def _flush_poll_votes_locked(self) -> None:
+        # Replay missed events from the paginated voter lists after a Gateway gap/restart.
+        if self._poll_gap and self._mono() >= self._poll_gap_retry_at:
+            complete = True
+            rows = await self.db(lambda c: c.execute("""SELECT q.debate_id, q.channel_id, q.message_id, q.answer_ids, d.guild_id
+                FROM debate_polls q JOIN debates d ON d.id = q.debate_id WHERE q.answer_ids IS NOT NULL AND d.status = 'open'""").fetchall())
+            for debate_id, channel, message, mapping, guild in rows:
+                seen = {}
+                for answer_id in mapping:
+                    after = 0
+                    while True:
+                        result = await self._rest('GET', f'/channels/{channel}/polls/{message}/answers/{answer_id}?limit=100&after={after}')
+                        if not result.ok:
+                            complete = False
+                            break
+                        users = (result.data or {}).get('users', [])
+                        for user in users:
+                            if not user.get('bot'):
+                                seen[int(user['id'])] = (int(answer_id), user)
+                        if len(users) < 100:
+                            break
+                        after = max(int(user['id']) for user in users)
+                    if not complete:
+                        break
+                if not complete:
+                    break
+                previous = await self.db(lambda c, i=debate_id: c.execute('SELECT user_id, answer_id FROM debate_poll_votes WHERE debate_id = %s', (i,)).fetchall())
+                for user_id, (answer_id, user) in seen.items():
+                    await self._apply_poll_vote(dict(channel_id=channel, message_id=message, guild_id=guild, user_id=user_id, answer_id=answer_id), True, {'user': user})
+                for user_id, answer_id in previous:
+                    if user_id not in seen:
+                        await self._apply_poll_vote(dict(channel_id=channel, message_id=message, guild_id=guild, user_id=user_id, answer_id=answer_id), False)
+            self._poll_gap = not complete
+            self._poll_gap_retry_at = self._mono() + 30
+        self._poll_events.sort(key=lambda event: not event[1])
+        while self._poll_events:
+            data, added = self._poll_events[0]
+            await self._apply_poll_vote(data, added)
+            self._poll_events.pop(0)
 
     async def _post_question(self, debate: Debate) -> None:
         """The question was deleted on Discord: it is posted again, with the counts as they are now."""

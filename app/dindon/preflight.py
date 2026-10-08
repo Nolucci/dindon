@@ -163,6 +163,8 @@ def _permission_checks(label: str, server: dict) -> list[Check]:
             found.append(_warn(area, f"{label} : le bot peut aussi {', '.join(extra)}. Il n'en a pas besoin : retirez ces droits."))
         if bits & VIEW_CHANNEL and bits & READ_MESSAGE_HISTORY and not extra:
             found.append(_ok(area, f"{label} : droits justes (voir les salons, lire l'historique, rien d'autre de sensible)."))
+        if not bits & (1 << 49):
+            found.append(_info(area, f"{label} : autorisez « Envoyer des sondages » pour publier les sondages des débats."))
         cannot = [name for bit, name in DEBATE_PERMISSIONS.items() if not bits & bit]
         if cannot:
             found.append(_info(area, f"{label} : `/dindon debat` ne marchera pas, le bot ne peut pas {', ni '.join(cannot)}. Pour les débats, invitez-le de nouveau avec le lien de l'interface."))

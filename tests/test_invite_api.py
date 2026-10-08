@@ -49,8 +49,8 @@ def test_the_link_asks_for_the_bot_scope_and_only_what_the_bot_needs(me):
     url = urlparse(answer["url"])
     query = {k: v[0] for k, v in parse_qs(url.query).items()}
     assert (url.scheme, url.netloc, url.path) == ("https", "discord.com", "/oauth2/authorize")
-    assert query == {"client_id": "424242424242424242", "scope": "bot applications.commands", "permissions": str((1 << 10) | (1 << 11) | (1 << 14) | (1 << 16) | (1 << 35) | (1 << 38))}
-    assert answer["permissions"] == ["VIEW_CHANNEL", "SEND_MESSAGES", "EMBED_LINKS", "READ_MESSAGE_HISTORY", "CREATE_PUBLIC_THREADS", "SEND_MESSAGES_IN_THREADS"]
+    assert query == {"client_id": "424242424242424242", "scope": "bot applications.commands", "permissions": str((1 << 10) | (1 << 11) | (1 << 14) | (1 << 16) | (1 << 35) | (1 << 38) | (1 << 49))}
+    assert answer["permissions"] == ["VIEW_CHANNEL", "SEND_MESSAGES", "EMBED_LINKS", "READ_MESSAGE_HISTORY", "CREATE_PUBLIC_THREADS", "SEND_MESSAGES_IN_THREADS", "SEND_POLLS"]
     assert not int(query["permissions"]) & ((1 << 3) | (1 << 13) | (1 << 29))                    # never administrator, never manage messages / webhooks
 
 

@@ -14,15 +14,36 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit
 
 OFFICIAL_DEFAULT = (
+    # France: statistics, administrations (gouv.fr covers the ministries, DREES, DARES, France Stratégie, Légifrance, data.gouv.fr...), parliament, courts, auditors, public research.
     "insee.fr", "gouv.fr", "assemblee-nationale.fr", "senat.fr", "conseil-constitutionnel.fr", "conseil-etat.fr", "ccomptes.fr", "banque-france.fr",
-    "ademe.fr", "santepubliquefrance.fr", "cnil.fr", "europa.eu", "who.int", "oecd.org", "un.org", "worldbank.org", "imf.org", "iea.org", "ipcc.ch",
-    "nasa.gov", "noaa.gov", "cdc.gov", "nih.gov",
+    "ademe.fr", "santepubliquefrance.fr", "cnil.fr", "vie-publique.fr", "ined.fr", "cepii.fr", "cae-eco.fr", "ipp.eu", "ofce.sciences-po.fr", "ires.fr", "cnesco.fr",
+    "cnrs.fr", "inserm.fr", "inrae.fr", "inrap.fr", "meteofrance.fr", "afa.gouv.fr", "anlci.gouv.fr", "academie-francaise.fr", "acpr.banque-france.fr", "cour-de-cassation.fr",
+    "has-sante.fr", "ansm.sante.fr", "anses.fr", "rte-france.com", "cre.fr", "ofpra.gouv.fr",
+    # Europe and international organisations (europa.eu covers Eurostat, the ECB, the Commission, the Court of Justice, EUR-Lex).
+    "europa.eu", "coe.int", "echr.coe.int", "who.int", "oecd.org", "oecd-ilibrary.org", "un.org", "worldbank.org", "imf.org", "iea.org", "ipcc.ch", "bis.org", "wto.org", "ilo.org",
+    "unesco.org", "unhcr.org", "unicef.org", "fao.org", "iaea.org", "irena.org", "oecd-nea.org", "wmo.int", "ifrc.org", "icrc.org", "interpol.int", "iom.int", "undp.org",
+    "unfccc.int", "unodc.org", "ohchr.org", "eea.europa.eu", "ecb.europa.eu", "eurofound.europa.eu", "ourworldindata.org",
+    # Other countries: statistics offices, governments, parliaments, central banks, courts.
+    "nasa.gov", "noaa.gov", "cdc.gov", "nih.gov", "bls.gov", "census.gov", "bea.gov", "cbo.gov", "congress.gov", "federalreserve.gov", "treasury.gov", "justice.gov", "fbi.gov",
+    "supremecourt.gov", "whitehouse.gov", "usda.gov", "epa.gov", "energy.gov", "eia.gov", "ed.gov", "gao.gov", "sec.gov",
+    "gov.uk", "ons.gov.uk", "parliament.uk", "nhs.uk", "bankofengland.co.uk", "legislation.gov.uk", "nao.org.uk", "ifs.org.uk", "supremecourt.uk",
+    "canada.ca", "statcan.gc.ca", "gc.ca", "abs.gov.au", "mdba.gov.au", "gov.au", "stats.govt.nz", "govt.nz",
+    "admin.ch", "bfs.admin.ch", "bag.admin.ch", "snb.ch", "bundesregierung.de", "destatis.de", "bundesbank.de", "bundestag.de", "bundesverfassungsgericht.de",
+    "government.se", "regeringen.se", "scb.se", "bra.se", "riksbank.se", "riksdagen.se", "dst.dk", "ssb.no", "stat.fi", "vm.fi", "istat.it", "ine.es", "bde.es", "cbs.nl",
+    "statbel.fgov.be", "belgium.be", "bancaditalia.it", "indec.gob.ar", "bcra.gob.ar", "argentina.gob.ar", "ibge.gov.br", "stats.gov.cn", "e-stat.go.jp", "kostat.go.kr",
+    # Research bodies and the scientific literature (peer-reviewed publishers and public repositories).
+    "nber.org", "aeaweb.org", "nature.com", "science.org", "thelancet.com", "nejm.org", "bmj.com", "pnas.org", "cairn.info", "persee.fr", "jstor.org", "arxiv.org", "ssrn.com", "sciencedirect.com", "springer.com", "wiley.com", "tandfonline.com", "oup.com", 
+    "cambridge.org", "sagepub.com", "plos.org", "frontiersin.org", "mdpi.com", "apa.org", "psychiatry.org", "aap.org", "cochranelibrary.com",
+    "nobelprize.org", "plato.stanford.edu", 
+    "sciencespo.fr", "ens.fr", "ens-lyon.fr", "college-de-france.fr", 
     # The company itself is a primary source for the identity and products of its own shops.
     "marieblachere.com",
 )
 CHECKERS_DEFAULT = (
-    "factuel.afp.com", "lemonde.fr/les-decodeurs", "liberation.fr/checknews", "francetvinfo.fr/vrai-ou-faux", "factcheck.org", "fullfact.org", "snopes.com",
-    "reuters.com/fact-check", "apnews.com/hub/ap-fact-check",
+    "factuel.afp.com", "factcheck.afp.com", "lemonde.fr/les-decodeurs", "liberation.fr/checknews", "francetvinfo.fr/vrai-ou-faux", "factcheck.org", "fullfact.org", "snopes.com",
+    "reuters.com/fact-check", "apnews.com/hub/ap-fact-check", "politifact.com", "africacheck.org", "leadstories.com", "science.feedback.org", "climatefeedback.org", "healthfeedback.org",
+    "bbc.com/news/reality_check", "bbc.co.uk/news/reality_check", "usatoday.com/news/factcheck", "washingtonpost.com/politics/fact-checker",
+    "correctiv.org/faktencheck", "faktencheck.dpa.com", "maldita.es", "newtral.es", "pagellapolitica.it", "facta.news", "factcheck.eu", "factcheckeu.info", "edmo.eu", "euvsdisinfo.eu",
 )
 OFFICIAL, CHECKER, OTHER = "official", "checker", "other"
 

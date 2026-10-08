@@ -313,3 +313,71 @@ def test_analysis_publishes_statistics_after_each_complete_round(ingest_url, tmp
     assert sum(c["calls"] for c in final["last_round"]["computers"]) == 2
     assert sum(c["calls"] for c in final["computers"]) == 4
     assert sum(c["share"] for c in final["last_round"]["computers"]) == 100
+
+
+def test_failed_computer_reassigns_all_inflight_work_even_with_zero_backup_share(monkeypatch):
+    from dindon.analysis.ollama import OllamaError
+    pool = _measured_pool()
+    helper = pool.clients[0]
+    pool.set_shares({helper.base_url: 100, pool.local.base_url: 0})
+    monkeypatch.setattr(helper, 'embed', lambda *_args: (_ for _ in ()).throw(OllamaError('computer disconnected')))
+    monkeypatch.setattr(pool.local, 'embed', lambda _model, texts: texts)
+    groups = [[str(i)] for i in range(12)]
+    assert pool.embed_batches('vectors', groups) == groups
+    assert helper.base_url in pool._failed
+    assert pool.activity()[-1]['calls'] == len(groups)
+
+
+def test_failover_does_not_change_model_build_when_reference_computer_fails(monkeypatch):
+    from dindon.analysis.ollama import OllamaError
+    pool = _measured_pool()
+    helper = pool.clients[0]
+    pool._digests = {pool.local.base_url: {'vectors': 'original'}, helper.base_url: {'vectors': 'different'}}
+    monkeypatch.setattr(pool.local, 'embed', lambda *_args: (_ for _ in ()).throw(OllamaError('offline')))
+    monkeypatch.setattr(helper, 'embed', lambda *_args: pytest.fail('must not mix incompatible vectors'))
+    with pytest.raises(OllamaError):
+        pool.embed('vectors', ['a'])
+
+
+def test_chat_reassigned_after_worker_timeout(monkeypatch):
+    from dindon.analysis.ollama import OllamaError
+    pool = _measured_pool()
+    monkeypatch.setattr(pool.clients[0], 'chat_json', lambda *_args: (_ for _ in ()).throw(OllamaError('TimeoutError')))
+    monkeypatch.setattr(pool.local, 'chat_json', lambda *_args: {'recovered': True})
+    assert pool.chat_json('chat', 'system', 'text', {}) == {'recovered': True}
+
+
+def test_entire_request_has_a_deadline_even_if_response_keeps_trickling():
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from dindon.analysis.ollama import OllamaError
+
+    class Trickle(BaseHTTPRequestHandler):
+        # HTTP/1.0 detaches the response socket from the HTTPConnection.
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header('Content-Length', '1000')
+            self.end_headers()
+            try:
+                for _ in range(50):
+                    self.wfile.write(b' ')
+                    self.wfile.flush()
+                    time.sleep(0.03)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+        def log_message(self, *_args):
+            pass
+
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Trickle)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        client = Ollama(f'http://127.0.0.1:{server.server_port}', timeout=0.2)
+        started = time.monotonic()
+        with pytest.raises(OllamaError, match='TimeoutError'):
+            client._call('/api/tags')
+        assert time.monotonic() - started < 1
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(1)

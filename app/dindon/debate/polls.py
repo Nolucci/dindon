@@ -73,11 +73,36 @@ def message(debate, row, counts) -> dict:
 
     _, _, _, question, description, _ = row
     link = f"https://discord.com/channels/{debate.guild_id}/{debate.thread_id}"
-    body = (texts._plain(description) + "\n\n" if description else "") + f"[Rejoindre le débat]({link})"
-    buttons = [{"type": 2, "style": texts.SECONDARY, "label": f"{label} · {counts.get(key, 0)}", "emoji": {"name": emoji},
-                "custom_id": texts.custom_id("pos", debate.id, key)}
-               for key, (emoji, label) in texts.POSITION_BUTTONS.items() if key in rules.PARTICIPANT_POSITIONS]
-    over = debate.status == "closed"
-    return {"content": "", "embeds": [{"title": texts._plain(question), "description": body, "color": texts.GREY if over else texts.BLURPLE,
-                                         **({"footer": {"text": "Sondage terminé"}} if over else {})}],
-            "components": [] if over else texts._row(buttons), "allowed_mentions": texts.NO_MENTIONS}
+    invitation = f"[Rejoindre le débat]({link})"
+    body = (texts._plain(description)[:2000 - len(invitation) - 2] + "\n\n" if description else "") + invitation
+    return {"content": body, "allowed_mentions": texts.NO_MENTIONS,
+            "poll": {"question": {"text": texts._plain(question)}, "duration": 768, "allow_multiselect": False, "layout_type": 1,
+                     "answers": [{"poll_media": {"text": texts.POSITION_BUTTONS[key][1]}} for key in rules.PARTICIPANT_POSITIONS]}}
+
+
+def answer_map(message: dict) -> dict[str, str]:
+    """Use the IDs returned by Discord, never assume sequential answer IDs."""
+    from dindon.debate import texts
+    labels = {texts.POSITION_BUTTONS[key][1]: key for key in rules.PARTICIPANT_POSITIONS}
+    return {str(answer['answer_id']): labels[answer['poll_media']['text']]
+            for answer in (message.get('poll') or {}).get('answers', []) if answer.get('poll_media', {}).get('text') in labels}
+
+
+def vote(conn, debate_id, user_id, answer_id, position, added, now, member=None):
+    from dindon.debate import store
+    with conn.transaction():
+        # Serialize with debate buttons and closure. A stale removal must not undo a later choice.
+        conn.execute("SELECT id FROM debates WHERE id = %s FOR UPDATE", (debate_id,))
+        previous = conn.execute("SELECT answer_id, position_id FROM debate_poll_votes WHERE debate_id = %s AND user_id = %s", (debate_id, user_id)).fetchone()
+        if added:
+            if previous and previous[0] == answer_id:
+                return
+            store.set_position(conn, debate_id, user_id, position, now, member=member)
+            latest = conn.execute("SELECT id FROM debate_positions WHERE debate_id = %s AND user_id = %s ORDER BY id DESC LIMIT 1", (debate_id, user_id)).fetchone()[0]
+            conn.execute("""INSERT INTO debate_poll_votes (debate_id, user_id, answer_id, position_id) VALUES (%s, %s, %s, %s)
+                            ON CONFLICT (debate_id, user_id) DO UPDATE SET answer_id = excluded.answer_id, position_id = excluded.position_id""", (debate_id, user_id, answer_id, latest))
+        elif previous and previous[0] == answer_id:
+            latest = conn.execute("SELECT id FROM debate_positions WHERE debate_id = %s AND user_id = %s ORDER BY id DESC LIMIT 1", (debate_id, user_id)).fetchone()
+            if latest and latest[0] == previous[1]:
+                store.set_position(conn, debate_id, user_id, 'witness', now)
+            conn.execute("DELETE FROM debate_poll_votes WHERE debate_id = %s AND user_id = %s", (debate_id, user_id))
