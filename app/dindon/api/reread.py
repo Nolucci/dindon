@@ -17,6 +17,14 @@ from dindon.api.common import resolve_guild
 router = APIRouter(prefix="/api/reread", dependencies=[Depends(require_session)])
 
 
+class UndoRequest(BaseModel):
+    claims: list[int] = Field(min_length=1, max_length=500, description="the positions to put back as they were")
+
+
+def _like(text: str) -> str:
+    return "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+
+
 class StartRequest(BaseModel):
     guild: str | None = Field(default=None, pattern=r"^[0-9]{1,20}$")
     user: str | None = Field(default=None, pattern=r"^[0-9]{1,20}$", description="only the positions of this person")
@@ -62,18 +70,28 @@ def cancel(request: Request) -> dict:
 
 @router.get("/changes")
 def changes(request: Request, guild: int | None = None, run: int | None = None, verdict: Literal["corrected", "uncertain", "confirmed"] = "corrected",
-            limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0)) -> dict:
-    """What a reread decided, newest first (by default what it corrected, with what it was before). `run`: one reread; else all of them."""
+            q: str = Query("", max_length=100), change: Literal["", "stance", "kind", "proposition_id", "theme"] = "", user: str | None = Query(None, pattern=r"^[0-9]{1,20}$"),
+            state: Literal["all", "kept", "undone"] = "all", limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0)) -> dict:
+    """What a reread decided, newest first (by default what it corrected, with what it was before). `run`: one reread; else all of them. To find the positions to keep as they were:
+    `q` searches the words of the position, its proposition, the quotes and the name; `change` keeps one kind of change; `user` one person; `state` the ones put back or not."""
+    like = _like(q.strip()) if q.strip() else None
+    where = """rr.guild_id = %(guild)s AND r.verdict = %(verdict)s AND (%(run)s::bigint IS NULL OR r.run_id = %(run)s)
+               AND NOT EXISTS (SELECT 1 FROM privacy_subjects s WHERE s.user_id = cl.user_id)
+               AND (%(change)s = '' OR r.changes ? %(change)s) AND (%(user)s::bigint IS NULL OR cl.user_id = %(user)s)
+               AND (%(state)s = 'all' OR (%(state)s = 'undone') = (r.undone_at IS NOT NULL))
+               AND (%(like)s::text IS NULL OR cl.text ILIKE %(like)s OR p.text ILIKE %(like)s OR u.name ILIKE %(like)s OR u.global_name ILIKE %(like)s
+                    OR EXISTS (SELECT 1 FROM claim_evidence e WHERE e.claim_id = cl.id AND e.quote ILIKE %(like)s))"""
+    joins = """FROM claim_rereads r JOIN reread_runs rr ON rr.id = r.run_id JOIN claims cl ON cl.id = r.claim_id LEFT JOIN propositions p ON p.id = cl.proposition_id
+               JOIN users u ON u.id = cl.user_id"""
     with request.app.state.pool.connection() as conn:
         guild_id = resolve_guild(conn, guild)
+        params = {"guild": guild_id, "verdict": verdict, "run": run, "change": change, "user": user, "state": state, "like": like, "limit": limit, "offset": offset}
+        total = conn.execute(f"SELECT count(*) AS n {joins} WHERE {where}", params).fetchone()["n"]
         rows = conn.execute(
-            """SELECT r.run_id, r.claim_id, r.verdict, r.changes, r.reason, r.certainty, r.undone_at, r.created_at, r.context, r.people, cl.user_id, cl.text AS claim, cl.stance, cl.kind,
-                      p.text AS proposition, COALESCE(u.global_name, u.name) AS person
-               FROM claim_rereads r JOIN reread_runs rr ON rr.id = r.run_id JOIN claims cl ON cl.id = r.claim_id LEFT JOIN propositions p ON p.id = cl.proposition_id
-               JOIN users u ON u.id = cl.user_id
-               WHERE rr.guild_id = %s AND r.verdict = %s AND (%s::bigint IS NULL OR r.run_id = %s)
-                 AND NOT EXISTS (SELECT 1 FROM privacy_subjects s WHERE s.user_id = cl.user_id)
-               ORDER BY r.created_at DESC, r.claim_id LIMIT %s OFFSET %s""", (guild_id, verdict, run, run, limit, offset)).fetchall()
+            f"""SELECT r.run_id, r.claim_id, r.verdict, r.changes, r.reason, r.certainty, r.undone_at, r.created_at, r.context, r.people, cl.user_id, cl.text AS claim, cl.stance, cl.kind,
+                       p.text AS proposition, COALESCE(u.global_name, u.name) AS person
+                {joins} WHERE {where}
+               ORDER BY r.created_at DESC, r.claim_id LIMIT %(limit)s OFFSET %(offset)s""", params).fetchall()
         quotes: dict[int, list[str]] = {}
         for q in conn.execute("SELECT claim_id, quote FROM claim_evidence WHERE claim_id = ANY(%s) AND quote IS NOT NULL ORDER BY message_id", ([r["claim_id"] for r in rows],)):
             quotes.setdefault(q["claim_id"], []).append(q["quote"])
@@ -100,7 +118,7 @@ def changes(request: Request, guild: int | None = None, run: int | None = None, 
                     "verdict": r["verdict"], "changes": shown, "reason": r["reason"], "certainty": r["certainty"], "context": r["context"], "people": {ref: names.get(user) for ref, user in (r["people"] or {}).items()},
                     "person_ref": next((ref for ref, user in (r["people"] or {}).items() if user == str(r["user_id"])), None),
                     "undone": r["undone_at"] is not None, "at": r["created_at"].isoformat()})
-    return {"changes": out, "next": offset + len(out) if len(out) == limit else None}
+    return {"changes": out, "total": total, "next": offset + len(out) if len(out) == limit and offset + len(out) < total else None}
 
 
 @router.post("/undo/{claim_id}")
@@ -114,3 +132,28 @@ def undo(request: Request, claim_id: int) -> dict:
             raise HTTPException(status_code=409, detail="Rien à annuler pour cette position.")
         conn.execute("SELECT refresh_person_axis_scores(%s)", (found["guild_id"],))
     return {"claim": claim_id, "undone": True}
+
+
+@router.post("/undo")
+def undo_many(request: Request, body: UndoRequest) -> dict:
+    """Puts several corrected positions back as they were (the ones the person finally wants to keep). Those that cannot be (nothing to undo, or changed again since) are counted apart."""
+    with request.app.state.pool.connection() as conn:
+        guilds = {r["guild_id"] for r in conn.execute("SELECT DISTINCT guild_id FROM claims WHERE id = ANY(%s)", (body.claims,))}
+        done, skipped = reread.undo_many(conn, body.claims)
+        for guild_id in guilds:
+            conn.execute("SELECT refresh_person_axis_scores(%s)", (guild_id,))
+    return {"undone": len(done), "skipped": len(skipped), "claims": done}
+
+
+@router.post("/undo-run/{run_id}")
+def undo_run(request: Request, run_id: int) -> dict:
+    """Rolls a whole reread back: every correction that it made and that was not put back since, except the positions that a later reread corrected again."""
+    with request.app.state.pool.connection() as conn:
+        found = conn.execute("SELECT guild_id FROM reread_runs WHERE id = %s", (run_id,)).fetchone()
+        if found is None:
+            raise HTTPException(status_code=404, detail="Cette relecture n'existe pas.")
+        if request.app.state.reread.running():
+            raise HTTPException(status_code=409, detail="Une relecture est en cours : attendez qu'elle finisse, ou arrêtez-la.")
+        done, skipped = reread.undo_many(conn, reread.run_corrections(conn, run_id), run_id)
+        conn.execute("SELECT refresh_person_axis_scores(%s)", (found["guild_id"],))
+    return {"run": run_id, "undone": len(done), "skipped": len(skipped)}

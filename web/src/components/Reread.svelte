@@ -14,6 +14,14 @@
   let changes = $state([]);
   let more = $state(null);
   let shown = $state('corrected');
+  let q = $state('');
+  let kindFilter = $state('');
+  let runFilter = $state('');
+  let stateFilter = $state('all');
+  let total = $state(0);
+  let selected = $state([]);
+  let notice = $state('');
+  let searchTimer;
   let problem = $state('');
   let busy = $state(false);
   let theme = $state('');
@@ -62,10 +70,14 @@
     const current = ++changesRequest;
     const server = guild;
     try {
-      const answer = await api.rereadChanges(server, { verdict: shown, offset: append ? changes.length : 0 });
+      const answer = await api.rereadChanges(server, {
+        verdict: shown, offset: append ? changes.length : 0, q: q.trim() || undefined, change: kindFilter || undefined, run: runFilter || undefined, state: stateFilter === 'all' ? undefined : stateFilter,
+      });
       if (current !== changesRequest || server !== guild) return;
       changes = append ? [...changes, ...answer.changes] : answer.changes;
+      total = answer.total;
       more = answer.next;
+      if (!append) selected = selected.filter((id) => changes.some((c) => c.claim === id && !c.undone));
     } catch (error) {
       fail(error);
     }
@@ -93,14 +105,56 @@
   async function undo(change) {
     try {
       await api.rereadUndo(change.claim);
+      notice = 'Position remise comme avant. Une relecture ne la touchera plus.';
       await Promise.all([loadChanges(), load()]);
     } catch (error) {
       fail(error);
     }
   }
 
+  const choosable = $derived(changes.filter((c) => c.verdict === 'corrected' && !c.undone));
+  const allChosen = $derived(choosable.length > 0 && choosable.every((c) => selected.includes(c.claim)));
+  const choose = (claim, on) => { selected = on ? [...selected, claim] : selected.filter((id) => id !== claim); };
+
+  async function undoSelected() {
+    if (!selected.length || busy) return;
+    busy = true;
+    try {
+      const answer = await api.rereadUndoMany(selected);
+      notice = `${fmt.format(answer.undone)} position${answer.undone > 1 ? 's remises' : ' remise'} comme avant${answer.skipped ? ` · ${fmt.format(answer.skipped)} impossible${answer.skipped > 1 ? 's' : ''} (déjà remises, ou modifiées depuis par une autre relecture)` : ''}.`;
+      selected = [];
+      await Promise.all([loadChanges(), load()]);
+    } catch (error) {
+      fail(error);
+    }
+    busy = false;
+  }
+
+  async function undoRun() {
+    const run = Number(runFilter);
+    if (!run || busy) return;
+    const label = info?.runs?.find((r) => r.id === run);
+    if (!window.confirm(`Revenir à l’état d’avant la relecture du ${when(label?.at)} ? Toutes ses corrections seront remises comme avant (celles qu’une relecture plus récente a modifiées de nouveau restent).`)) return;
+    busy = true;
+    try {
+      const answer = await api.rereadUndoRun(run);
+      notice = `Relecture annulée : ${fmt.format(answer.undone)} position${answer.undone > 1 ? 's remises' : ' remise'} comme avant${answer.skipped ? `, ${fmt.format(answer.skipped)} laissée${answer.skipped > 1 ? 's' : ''} (modifiée${answer.skipped > 1 ? 's' : ''} depuis)` : ''}.`;
+      selected = [];
+      await Promise.all([loadChanges(), load()]);
+    } catch (error) {
+      fail(error);
+    }
+    busy = false;
+  }
+
+  function refilter() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => loadChanges(), 300);
+  }
+
   function show(value) {
     shown = value;
+    selected = [];
     loadChanges();
   }
 
@@ -114,7 +168,7 @@
     }
   });
   onMount(() => { timer = setInterval(() => { if (guild && !document.hidden && (running || !info)) load(); }, 2000); });
-  onDestroy(() => clearInterval(timer));
+  onDestroy(() => { clearInterval(timer); clearTimeout(searchTimer); });
 
   const value = (kind, text) => kind === 'stance' ? ({ accord: 'Pour', désaccord: 'Contre', nuance: 'Nuancé', aucune: 'Sans position' }[text] ?? text ?? '—') : kind === 'kind' ? ({ opinion: 'Opinion', fact: 'Fait', fait: 'Fait', question: 'Question', humour: 'Humour', other: 'Autre' }[text] ?? text ?? '—') : text ?? '—';
   const lines = (change) => Object.entries(change.changes).map(([kind, [before, after]]) => ({
@@ -188,13 +242,38 @@
       <button type="button" class="btn" class:active={shown === 'uncertain'} aria-pressed={shown === 'uncertain'} onclick={() => show('uncertain')}>Incertaines</button>
       <button type="button" class="btn" class:active={shown === 'confirmed'} aria-pressed={shown === 'confirmed'} onclick={() => show('confirmed')}>Confirmées</button>
     </div>
+    {#if notice}<p class="notice" role="status">{notice}</p>{/if}
+    <div class="finder" role="search" aria-label="Retrouver des positions">
+      <input class="field-input" type="search" placeholder="Chercher une personne, une phrase, une proposition…" aria-label="Chercher une position" bind:value={q} oninput={refilter} />
+      <select class="field-input" aria-label="Type de changement" bind:value={kindFilter} onchange={() => loadChanges()}>
+        <option value="">Tous les changements</option><option value="stance">Sens de la position</option><option value="kind">N’était pas une opinion</option><option value="proposition_id">Proposition</option><option value="theme">Thème</option>
+      </select>
+      <select class="field-input" aria-label="Quelle relecture" bind:value={runFilter} onchange={() => loadChanges()}>
+        <option value="">Toutes les relectures</option>
+        {#each info?.runs ?? [] as r (r.id)}<option value={r.id}>{when(r.at)} · {r.counts?.corrected ?? 0} corrigées</option>{/each}
+      </select>
+      <select class="field-input" aria-label="Positions gardées ou remises comme avant" bind:value={stateFilter} onchange={() => loadChanges()}>
+        <option value="all">Toutes</option><option value="kept">Corrections gardées</option><option value="undone">Remises comme avant</option>
+      </select>
+    </div>
+    {#if shown === 'corrected' && (choosable.length || runFilter)}
+      <div class="bulk" aria-live="polite">
+        {#if choosable.length}
+          <label class="check"><input type="checkbox" checked={allChosen} onchange={(e) => (selected = e.currentTarget.checked ? choosable.map((c) => c.claim) : [])} /> <span>Tout sélectionner ({fmt.format(choosable.length)})</span></label>
+          <button type="button" class="btn btn-primary" onclick={undoSelected} disabled={!selected.length || busy}>Garder l’ancienne position{selected.length ? ` (${selected.length})` : ''}</button>
+        {/if}
+        {#if runFilter}<button type="button" class="btn btn-danger" onclick={undoRun} disabled={busy}>Annuler toute cette relecture</button>{/if}
+      </div>
+    {/if}
+    {#if changes.length}<p class="muted small">{fmt.format(total)} résultat{total > 1 ? 's' : ''}{changes.length < total ? ` · ${fmt.format(changes.length)} affichés` : ''}</p>{/if}
     {#if !changes.length}
-      <p class="muted">Rien à montrer pour l’instant.</p>
+      <p class="muted">{q || kindFilter || runFilter || stateFilter !== 'all' ? 'Aucune position ne correspond à cette recherche.' : 'Rien à montrer pour l’instant.'}</p>
     {:else}
       <ul class="changes">
         {#each changes as change (`${change.run}-${change.claim}`)}
           <li class:undone={change.undone}>
             <header class="who">
+              {#if change.verdict === 'corrected' && !change.undone}<label class="pick"><input type="checkbox" checked={selected.includes(change.claim)} onchange={(e) => choose(change.claim, e.currentTarget.checked)} aria-label={`Sélectionner la position de ${change.person}`} /></label>{/if}
               {#if onPerson}<button type="button" class="link" onclick={() => onPerson(change.user)}>{change.person}</button>{:else}<strong>{change.person}</strong>{/if}
               <span class="muted small">{when(change.at)}</span>
             </header>
@@ -218,7 +297,7 @@
               </details>
             {/if}
             {#if change.verdict === 'corrected'}
-              {#if change.undone}<span class="badge small">annulée</span>{:else}<button type="button" class="btn small" onclick={() => undo(change)}>Annuler cette correction</button>{/if}
+              {#if change.undone}<span class="badge small">remise comme avant</span>{:else}<button type="button" class="btn small" onclick={() => undo(change)}>Garder l’ancienne position</button>{/if}
             {/if}
           </li>
         {/each}
@@ -262,6 +341,14 @@
   .diff s { color: var(--text-secondary); }
   .link { padding: 0; color: var(--text-link); font: inherit; font-weight: 600; text-align: left; overflow-wrap: anywhere; }
   .small { font-size: .8125rem; }
+  .finder { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); gap: .5rem; }
+  .bulk { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; padding: .625rem .75rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-control); }
+  .notice { padding: .5rem .75rem; border-radius: var(--radius-md); background: var(--bg-secondary); font-size: .875rem; }
+  .pick { display: inline-flex; align-items: center; margin-right: .5rem; }
+  .who { justify-content: flex-start; }
+  .who .small { margin-left: auto; }
+  @media (max-width: 900px) { .finder { grid-template-columns: 1fr 1fr; } .finder input { grid-column: 1 / -1; } }
+  @media (max-width: 480px) { .finder { grid-template-columns: 1fr; } }
   .legend { list-style: none; display: flex; flex-wrap: wrap; gap: .25rem 1rem; margin: .25rem 0 .5rem; padding: 0; font-size: .8125rem; }
   .context .lines { max-height: 18rem; }
   @media (max-width: 720px) { .metrics dt { font-size: .75rem; } }

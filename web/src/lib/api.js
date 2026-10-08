@@ -81,6 +81,8 @@ export const api = {
   rereadCancel: () => request('/api/reread/cancel', { method: 'POST' }),
   rereadChanges: (guild, params = {}) => request(`/api/reread/changes${query({ guild, ...params })}`),
   rereadUndo: (claim) => request(`/api/reread/undo/${claim}`, { method: 'POST' }),
+  rereadUndoMany: (claims) => request('/api/reread/undo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ claims }) }),
+  rereadUndoRun: (run) => request(`/api/reread/undo-run/${run}`, { method: 'POST' }),
   topics: (guild, rejected) => request(`/api/topics${query({ guild, rejected: rejected ? 'true' : undefined })}`),
   topicsValidate: (guild, ids) => request('/api/topics/validate-batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guild, ids }) }),
   topicChange: (id, body) => request(`/api/topics/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),

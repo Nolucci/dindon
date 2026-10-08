@@ -339,11 +339,13 @@ def apply(conn: psycopg.Connection, client, embed_model: str, model: str, run_id
     return created
 
 
-def undo(conn: psycopg.Connection, claim_id: int) -> bool:
-    """Puts a claim back as it was before its last correction, and marks it confirmed by a person (a reread never touches it again). False if there is nothing to undo."""
+def undo(conn: psycopg.Connection, claim_id: int, run_id: int | None = None) -> bool:
+    """Puts a claim back as it was before its last correction, and marks it confirmed by a person (a reread never touches it again). False if there is nothing to undo.
+    `run_id`: the correction of that reread (rolling a reread back); it is only undone when no later reread corrected the claim again, since it would no longer be the last change. Undone one after the
+    other, successive corrections come back one step at a time, the latest first."""
     with conn.transaction(), conn.cursor(row_factory=tuple_row) as cur:
         row = cur.execute("""SELECT run_id, changes FROM claim_rereads WHERE claim_id = %s AND verdict = 'corrected' AND undone_at IS NULL ORDER BY run_id DESC LIMIT 1""", (claim_id,)).fetchone()
-        if row is None:
+        if row is None or (run_id is not None and row[0] != run_id):
             return False
         run_id, changes = row
         sets: dict[str, object] = {}
@@ -364,6 +366,20 @@ def undo(conn: psycopg.Connection, claim_id: int) -> bool:
                 cur.execute("INSERT INTO claim_topics (claim_id, topic_id, run_id) VALUES (%s, %s, %s) ON CONFLICT (claim_id) DO UPDATE SET topic_id = excluded.topic_id", (claim_id, changes["theme"][0], run_id))
         cur.execute("UPDATE claim_rereads SET undone_at = now() WHERE claim_id = %s AND run_id = %s", (claim_id, run_id))
     return True
+
+
+def undo_many(conn: psycopg.Connection, claim_ids: list[int], run_id: int | None = None) -> tuple[list[int], list[int]]:
+    """Puts several claims back as they were (see `undo`). Returns the ones that were put back and the ones that could not be (nothing to undo, or changed again since by a later reread)."""
+    done, skipped = [], []
+    for claim_id in dict.fromkeys(claim_ids):
+        (done if undo(conn, claim_id, run_id) else skipped).append(claim_id)
+    return done, skipped
+
+
+def run_corrections(conn: psycopg.Connection, run_id: int) -> list[int]:
+    """The claims that a reread corrected and that were not put back since, oldest first."""
+    with conn.cursor(row_factory=tuple_row) as cur:
+        return [r[0] for r in cur.execute("SELECT claim_id FROM claim_rereads WHERE run_id = %s AND verdict = 'corrected' AND undone_at IS NULL ORDER BY claim_id", (run_id,))]
 
 
 # --- the scores, checked ---------------------------------------------------------------------------------------------------------------

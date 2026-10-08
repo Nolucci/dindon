@@ -76,8 +76,8 @@ def test_the_page_shows_what_there_is_to_reread_the_last_reread_and_its_correcti
         item.get_by_text("Voir tout le contexte lu", exact=True).click()
         assert "EVIDENCE" in item.locator("pre").inner_text() and "Il faut augmenter le SMIC." in item.locator("pre").inner_text()
         assert "(la personne évaluée)" in item.inner_text()
-        item.get_by_role("button", name="Annuler cette correction").click()
-        item.get_by_text("annulée", exact=True).wait_for()
+        item.get_by_role("button", name="Garder l’ancienne position").click()
+        item.get_by_text("remise comme avant", exact=True).wait_for()
         browser.close()
     assert errors == []
 
@@ -133,5 +133,41 @@ def test_the_live_page_is_a_page_of_its_own_in_the_analysis(base):
         machines = page.locator("section[aria-label='Répartition entre les ordinateurs']")
         machines.get_by_text("Un seul ordinateur travaille").wait_for()
         assert page.url.endswith("/live")
+        browser.close()
+    assert errors == []
+
+
+def test_the_corrections_are_searched_selected_and_put_back_together_or_by_whole_reread(base):
+    errors = []
+    with sync_api.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 1440, "height": 1000})
+        page.on("pageerror", lambda e: errors.append(str(e)[:200]))
+        page.goto(base)
+        page.fill("#password", PASSWORD)
+        page.click("button[type=submit]")
+        page.wait_for_selector("nav", timeout=20000)
+        page.get_by_role("button", name="Analyse", exact=True).click()
+        page.get_by_role("button", name="Relecture", exact=True).click()
+        page.locator(".changes li").first.wait_for()
+        search = page.get_by_label("Chercher une position")
+        search.fill("une phrase qui n'existe nulle part")
+        page.get_by_text("Aucune position ne correspond à cette recherche.").wait_for()
+        search.fill("")
+        page.locator(".changes li").first.wait_for()
+        assert "1 résultat" in page.locator("section[aria-label='Ce que la relecture a décidé']").inner_text()
+        keep = page.get_by_role("button", name="Garder l’ancienne position", exact=True).first
+        assert page.locator(".bulk button.btn-primary").is_disabled()                                  # nothing is selected yet
+        page.get_by_label("Tout sélectionner", exact=False).check()
+        bulk = page.locator(".bulk button.btn-primary")
+        assert "(1)" in bulk.inner_text() and not bulk.is_disabled()
+        bulk.click()
+        page.get_by_text("1 position remise comme avant").wait_for()
+        page.locator(".changes li.undone").wait_for()
+        assert page.locator(".changes li.undone").count() == 1
+        page.get_by_label("Positions gardées ou remises comme avant").select_option("kept")
+        page.get_by_text("Aucune position ne correspond à cette recherche.").wait_for()
+        page.get_by_label("Quelle relecture").select_option(index=1)
+        page.get_by_role("button", name="Annuler toute cette relecture").wait_for()
         browser.close()
     assert errors == []

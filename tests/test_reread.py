@@ -268,3 +268,62 @@ def test_a_reread_does_not_start_during_an_analysis_nor_an_analysis_during_a_rer
     release.set()
     me.app.state.reread.wait(60)
     assert me.get("/api/reread").json()["job"]["state"] in ("cancelled", "done")
+
+
+# --- going back: finding the positions to keep as they were ---------------------------------------------------------------------------------
+
+
+def corrected_run(me, ingest_db, client, ollama):
+    two_positions(ingest_db, client, ollama)
+    ollama.chat_handler = lambda body: say(stance=0, reasoning="il hésite")
+    assert me.post("/api/reread", json={}).status_code == 200
+    me.app.state.reread.wait(60)
+    return me.get("/api/reread").json()["runs"][0]["id"]
+
+
+def test_the_corrections_can_be_searched_by_words_person_and_kind_of_change(me, ingest_db, client, ollama):
+    corrected_run(me, ingest_db, client, ollama)
+    found = lambda **p: me.get("/api/reread/changes", params=p).json()  # noqa: E731
+    assert found()["total"] == 2
+    assert [c["person"] for c in found(q="bobby")["changes"]] == ["Bobby"]                                    # the name
+    assert found(q="salaire minimum")["total"] == 2 and found(q="détruit des emplois")["total"] == 1       # the proposition, the quote
+    assert found(q="rien de tout ça")["total"] == 0 and found(q="50%_")["total"] == 0                       # % and _ are not wildcards
+    assert found(change="stance")["total"] == 2 and found(change="theme")["total"] == 0 and found(change="kind")["total"] == 0
+    assert found(user=str(BOB_ID))["total"] == 1 and found(state="undone")["total"] == 0 and found(state="kept")["total"] == 2
+    assert me.get("/api/reread/changes", params={"change": "rien"}).status_code == 422
+
+
+def test_several_corrections_are_put_back_at_once_and_the_scores_follow(me, ingest_db, client, ollama):
+    corrected_run(me, ingest_db, client, ollama)
+    changes = me.get("/api/reread/changes").json()["changes"]
+    ids = [c["claim"] for c in changes]
+    answer = me.post("/api/reread/undo", json={"claims": [*ids, 999999]}).json()
+    assert (answer["undone"], answer["skipped"]) == (2, 1)
+    rows = claims_of(ingest_db)
+    assert rows[ALICE_ID][1] == 1 and rows[BOB_ID][1] == -1 and rows[ALICE_ID][4] == rows[BOB_ID][4] == "confirmed"      # as they were, and now protected
+    assert me.get("/api/reread/changes", params={"state": "undone"}).json()["total"] == 2
+    assert me.post("/api/reread/undo", json={"claims": ids}).json()["undone"] == 0                            # nothing is undone twice
+    assert me.post("/api/reread/undo", json={"claims": []}).status_code == 422
+
+
+def test_a_whole_reread_is_rolled_back_except_what_a_later_reread_changed_again(me, ingest_db, client, ollama):
+    run = corrected_run(me, ingest_db, client, ollama)
+    ollama.chat_handler = lambda body: say(stance=-1)
+    assert me.post("/api/reread", json={"force": True, "user": str(BOB_ID)}).status_code == 200
+    me.app.state.reread.wait(60)
+    assert claims_of(ingest_db)[BOB_ID][1] == -1                                                             # Bob's was corrected back by a second reread
+    done = me.post(f"/api/reread/undo-run/{run}").json()
+    assert (done["undone"], done["skipped"]) == (1, 1)                                                        # Alice's goes back; Bob's first correction is not the last change any more
+    assert claims_of(ingest_db)[ALICE_ID][1] == 1
+    assert me.post("/api/reread/undo-run/999999").status_code == 404
+
+
+def test_a_reread_cannot_be_rolled_back_while_one_is_running(me, ingest_db, client, ollama):
+    run = corrected_run(me, ingest_db, client, ollama)
+    release = __import__("threading").Event()
+    ollama.chat_handler = lambda body: (release.wait(30), say())[1]
+    assert me.post("/api/reread", json={"force": True}).status_code == 200
+    assert me.post(f"/api/reread/undo-run/{run}").status_code == 409
+    me.post("/api/reread/cancel")
+    release.set()
+    me.app.state.reread.wait(60)
