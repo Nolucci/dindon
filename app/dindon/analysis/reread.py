@@ -314,6 +314,8 @@ def apply(conn: psycopg.Connection, client, embed_model: str, model: str, run_id
     with conn.transaction():
         changes = {k: list(v) for k, v in decision.changes.items()}
         if decision.verdict == "corrected":
+            # What it takes to put everything back exactly as it was: the earlier value of `stance_before`, and whether this reread made the new proposition
+            changes["previous_stance_before"] = conn.execute("SELECT stance_before FROM claims WHERE id = %s", (item.claim_id,)).fetchone()[0]
             sets: dict[str, object] = {}
             if "kind" in changes:
                 sets.update(kind=changes["kind"][1], stance=None, proposition_id=None)
@@ -325,6 +327,8 @@ def apply(conn: psycopg.Connection, client, embed_model: str, model: str, run_id
                     created = bool(conn.execute("SELECT axes_read_at IS NULL FROM propositions WHERE id = %s", (new_id,)).fetchone()[0])      # still to be linked to the axes
                     sets["proposition_id"] = new_id
                     changes["proposition_id"] = [item.proposition_id, new_id]
+                    if created and not conn.execute("SELECT 1 FROM claims WHERE proposition_id = %s", (new_id,)).fetchone():
+                        changes["proposition_created"] = new_id                              # made by this reread: it goes with it if the correction is put back
             if sets:
                 names = ", ".join(f"{k} = %s" for k in sets)
                 conn.execute(f"UPDATE claims SET {names}, stance_before = COALESCE(stance_before, %s) WHERE id = %s AND review_status = 'auto'", [*sets.values(), item.stance, item.claim_id])
@@ -355,10 +359,19 @@ def undo(conn: psycopg.Connection, claim_id: int, run_id: int | None = None) -> 
             sets["stance"] = changes["stance"][0]
         if "proposition_id" in changes:
             sets["proposition_id"] = changes["proposition_id"][0]
+        if "previous_stance_before" in changes:
+            sets["stance_before"] = changes["previous_stance_before"]                         # the record of the position that the reread replaced goes too: no trace of the new one is left on the claim
         if sets:
             cur.execute(f"UPDATE claims SET {', '.join(f'{k} = %s' for k in sets)}, review_status = 'confirmed' WHERE id = %s", [*sets.values(), claim_id])
         else:
             cur.execute("UPDATE claims SET review_status = 'confirmed' WHERE id = %s", (claim_id,))
+        made = changes.get("proposition_created")
+        if isinstance(made, int):
+            # The proposition that the reread made for this position goes with it, unless something else rests on it (another claim, a debate poll, a proposition merged into it, or a person validated it)
+            cur.execute("""DELETE FROM propositions p WHERE p.id = %s AND p.status = 'proposed'
+                             AND NOT EXISTS (SELECT 1 FROM claims c WHERE c.proposition_id = p.id)
+                             AND NOT EXISTS (SELECT 1 FROM debate_polls q WHERE q.proposition_id = p.id)
+                             AND NOT EXISTS (SELECT 1 FROM propositions m WHERE m.merged_into = p.id)""", (made,))
         if "theme" in changes:
             if changes["theme"][0] is None:
                 cur.execute("DELETE FROM claim_topics WHERE claim_id = %s", (claim_id,))

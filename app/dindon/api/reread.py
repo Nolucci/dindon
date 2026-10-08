@@ -72,9 +72,9 @@ def cancel(request: Request) -> dict:
 @router.get("/changes")
 def changes(request: Request, guild: int | None = None, run: int | None = None, verdict: Literal["corrected", "uncertain", "confirmed"] = "corrected",
             q: str = Query("", max_length=100), change: Literal["", "stance", "kind", "proposition_id", "theme"] = "", user: str | None = Query(None, pattern=r"^[0-9]{1,20}$"),
-            state: Literal["all", "kept", "undone"] = "all", limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0)) -> dict:
+            state: Literal["all", "kept", "undone"] = "kept", limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0)) -> dict:
     """What a reread decided, newest first (by default what it corrected, with what it was before). `run`: one reread; else all of them. To find the positions to keep as they were:
-    `q` searches the words of the position, its proposition, the quotes and the name; `change` keeps one kind of change; `user` one person; `state` the ones put back or not."""
+    `q` searches the words of the position, its proposition, the quotes and the name; `change` keeps one kind of change; `user` one person; `state` the ones put back or not: by default only the corrections that stand, so that a position put back is no longer shown as the new one (`undone` to look at them, `all` for both)."""
     like = _like(q.strip()) if q.strip() else None
     where = """rr.guild_id = %(guild)s AND r.verdict = %(verdict)s AND (%(run)s::bigint IS NULL OR r.run_id = %(run)s)
                AND NOT EXISTS (SELECT 1 FROM privacy_subjects s WHERE s.user_id = cl.user_id)

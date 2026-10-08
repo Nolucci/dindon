@@ -78,7 +78,9 @@ def test_the_page_shows_what_there_is_to_reread_the_last_reread_and_its_correcti
         assert "EVIDENCE" in item.locator("pre").inner_text() and "Il faut augmenter le SMIC." in item.locator("pre").inner_text()
         assert "(la personne évaluée)" in item.inner_text()
         item.get_by_role("button", name="Garder l’ancienne position").click()
-        item.get_by_text("remise comme avant", exact=True).wait_for()
+        page.get_by_text("Aucune correction en cours").wait_for()                                       # put back: it is no longer shown as the new position
+        page.get_by_label("Positions gardées ou remises comme avant").select_option("undone")
+        page.locator("ul.changes > li").first.get_by_text("remise comme avant", exact=True).wait_for()
         browser.close()
     assert errors == []
 
@@ -164,10 +166,11 @@ def test_the_corrections_are_searched_selected_and_put_back_together_or_by_whole
         assert "(1)" in bulk.inner_text() and not bulk.is_disabled()
         bulk.click()
         page.get_by_text("1 position remise comme avant").wait_for()
-        page.locator(".changes li.undone").wait_for()
-        assert page.locator(".changes li.undone").count() == 1
-        page.get_by_label("Positions gardées ou remises comme avant").select_option("kept")
-        page.get_by_text("Aucune position ne correspond à cette recherche.").wait_for()
+        page.get_by_text("Aucune correction en cours").wait_for()                                       # the position that was put back is no longer listed as the new one
+        assert page.locator("ul.changes > li").count() == 0
+        page.get_by_label("Positions gardées ou remises comme avant").select_option("undone")
+        page.locator("ul.changes > li.undone").wait_for()
+        assert page.locator("ul.changes > li.undone").count() == 1
         page.get_by_label("Quelle relecture").select_option(index=1)
         page.get_by_role("button", name="Annuler toute cette relecture").wait_for()
         browser.close()

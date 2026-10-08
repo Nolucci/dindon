@@ -17,14 +17,14 @@
   let q = $state('');
   let kindFilter = $state('');
   let runFilter = $state('');
-  let stateFilter = $state('all');
+  let stateFilter = $state('kept');
   let total = $state(0);
   let selected = $state([]);
   let notice = $state('');
   let searchTimer;
   let grouped = $state(true);
   let openGroups = $state([]);
-  const searching = $derived(q.trim() !== '' || kindFilter !== '' || runFilter !== '' || stateFilter !== 'all');
+  const searching = $derived(q.trim() !== '' || kindFilter !== '' || runFilter !== '' || stateFilter === 'undone');
   let groupsTouched = $state(false);        // until the person opens or folds a theme, the first one (the busiest) is open: something is always in sight
   const isOpen = (key) => searching || openGroups.includes(key) || (!groupsTouched && groups[0]?.key === key);
   const setGroup = (key, on) => { if (!groupsTouched) { groupsTouched = true; openGroups = groups[0] && groups[0].key !== key && !on ? [groups[0].key] : openGroups; } openGroups = on ? [...new Set([...openGroups, key])] : openGroups.filter((k) => k !== key); };
@@ -271,7 +271,7 @@
         {#each info?.runs ?? [] as r (r.id)}<option value={r.id}>{when(r.at)} · {r.counts?.corrected ?? 0} corrigées</option>{/each}
       </select>
       <select class="field-input" aria-label="Positions gardées ou remises comme avant" bind:value={stateFilter} onchange={() => loadChanges()}>
-        <option value="all">Toutes</option><option value="kept">Corrections gardées</option><option value="undone">Remises comme avant</option>
+        <option value="kept">Corrections gardées</option><option value="undone">Remises comme avant</option><option value="all">Toutes</option>
       </select>
     </div>
     {#if shown === 'corrected' && (choosable.length || runFilter)}
@@ -285,7 +285,7 @@
     {/if}
     {#if changes.length}<p class="muted small">{fmt.format(total)} résultat{total > 1 ? 's' : ''}{changes.length < total ? ` · ${fmt.format(changes.length)} affichés` : ''}</p>{/if}
     {#if !changes.length}
-      <p class="muted">{q || kindFilter || runFilter || stateFilter !== 'all' ? 'Aucune position ne correspond à cette recherche.' : 'Rien à montrer pour l’instant.'}</p>
+      <p class="muted">{q || kindFilter || runFilter || stateFilter === 'undone' ? 'Aucune position ne correspond à cette recherche.' : shown === 'corrected' ? 'Aucune correction en cours : rien n’a été corrigé, ou tout a été remis comme avant.' : 'Rien à montrer pour l’instant.'}</p>
     {:else}
       <div class="viewbar">
         <label class="check"><input type="checkbox" bind:checked={grouped} /> <span>Regrouper par thème</span></label>

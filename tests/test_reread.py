@@ -144,7 +144,7 @@ def test_a_reread_corrects_what_is_wrong_keeps_what_it_was_and_recomputes_the_sc
     rows = claims_of(ingest_db)
     assert rows[ALICE_ID][1] == 1 and rows[ALICE_ID][5] == -1 and rows[ALICE_ID][6] == reread.VERSION          # corrected, and what it was is kept
     assert rows[BOB_ID][1] == -1 and rows[BOB_ID][6] == reread.VERSION
-    assert ingest_db.execute("SELECT verdict, changes FROM claim_rereads WHERE claim_id = %s", (ids[ALICE_ID],)).fetchone() == ("corrected", {"stance": [-1, 1]})
+    assert ingest_db.execute("SELECT verdict, changes FROM claim_rereads WHERE claim_id = %s", (ids[ALICE_ID],)).fetchone() == ("corrected", {"stance": [-1, 1], "previous_stance_before": None})
     assert all("Alice" not in p and "Bobby" not in p for p in seen)                                          # the model never gets a name
     context, people = ingest_db.execute("SELECT context, people FROM claim_rereads WHERE claim_id = %s", (ids[ALICE_ID],)).fetchone()
     assert "EVIDENCE" in context and "Alice" not in context and people == {"U1": str(ALICE_ID)}   # what was read is kept, as the model got it, with who is who
@@ -254,7 +254,8 @@ def test_the_page_starts_a_reread_follows_it_lists_the_changes_and_undoes_one(me
     assert me.post(f"/api/reread/undo/{claim_id}").status_code == 200
     assert me.post(f"/api/reread/undo/{claim_id}").status_code == 409
     assert me.post("/api/reread/undo/999999").status_code == 404
-    assert [c["undone"] for c in me.get("/api/reread/changes").json()["changes"]].count(True) == 1
+    assert [c["undone"] for c in me.get("/api/reread/changes").json()["changes"]] == [False]                  # the one put back is no longer listed as the new position…
+    assert [c["undone"] for c in me.get("/api/reread/changes", params={"state": "undone"}).json()["changes"]] == [True]     # …but it can be looked at
 
 
 def test_a_reread_does_not_start_during_an_analysis_nor_an_analysis_during_a_reread(me, ingest_db, client, ollama):
@@ -289,7 +290,7 @@ def test_the_corrections_can_be_searched_by_words_person_and_kind_of_change(me, 
     assert found(q="salaire minimum")["total"] == 2 and found(q="détruit des emplois")["total"] == 1       # the proposition, the quote
     assert found(q="rien de tout ça")["total"] == 0 and found(q="50%_")["total"] == 0                       # % and _ are not wildcards
     assert found(change="stance")["total"] == 2 and found(change="theme")["total"] == 0 and found(change="kind")["total"] == 0
-    assert found(user=str(BOB_ID))["total"] == 1 and found(state="undone")["total"] == 0 and found(state="kept")["total"] == 2
+    assert found(user=str(BOB_ID))["total"] == 1 and found(state="undone")["total"] == 0 and found(state="kept")["total"] == 2 and found(state="all")["total"] == 2
     assert me.get("/api/reread/changes", params={"change": "rien"}).status_code == 422
 
 
@@ -302,6 +303,8 @@ def test_several_corrections_are_put_back_at_once_and_the_scores_follow(me, inge
     rows = claims_of(ingest_db)
     assert rows[ALICE_ID][1] == 1 and rows[BOB_ID][1] == -1 and rows[ALICE_ID][4] == rows[BOB_ID][4] == "confirmed"      # as they were, and now protected
     assert me.get("/api/reread/changes", params={"state": "undone"}).json()["total"] == 2
+    assert me.get("/api/reread/changes").json()["total"] == 0                                                 # a position put back is no longer shown as the new one
+    assert me.get("/api/reread/changes", params={"state": "all"}).json()["total"] == 2
     assert me.post("/api/reread/undo", json={"claims": ids}).json()["undone"] == 0                            # nothing is undone twice
     assert me.post("/api/reread/undo", json={"claims": []}).status_code == 422
 
@@ -338,3 +341,28 @@ def test_the_corrections_carry_their_theme_the_new_one_when_the_reread_moved_the
     ingest_db.execute("INSERT INTO claim_topics (claim_id, topic_id, run_id) VALUES (%s, %s, %s)", (claim, topic, run))
     moved = {c["claim"]: (c["theme"], c["theme_id"]) for c in me.get("/api/reread/changes").json()["changes"]}
     assert moved[claim] == ("Économie", topic) and moved[first[1]["claim"]] == (None, None)
+
+
+def test_putting_a_correction_back_leaves_no_trace_of_the_new_position(ingest_db, client, ollama, jobs):
+    ids = two_positions(ingest_db, client, ollama)
+    old = claims_of(ingest_db)[ALICE_ID]
+    ingest_db.execute("UPDATE claims SET stance_before = 0 WHERE user_id = %s", (ALICE_ID,))              # the check of the positions had left its own record
+    ollama.chat_handler = lambda body: say(stance=-1, proposition_fits=False, better_proposition="Les entreprises doivent pouvoir embaucher sans plancher de salaire")
+    reread_now(jobs, user_id=ALICE_ID)
+    made = ingest_db.execute("SELECT proposition_id FROM claims WHERE id = %s", (ids[ALICE_ID],)).fetchone()[0]
+    assert made != old[3] and ingest_db.execute("SELECT 1 FROM propositions WHERE id = %s", (made,)).fetchone()          # the reread made a new proposition for it
+    assert reread.undo(ingest_db, ids[ALICE_ID]) is True
+    back = claims_of(ingest_db)[ALICE_ID]
+    assert (back[1], back[3], back[5]) == (old[1], old[3], 0)                                               # the old position, the old proposition, and the record that was there before
+    assert ingest_db.execute("SELECT 1 FROM propositions WHERE id = %s", (made,)).fetchone() is None         # the proposition that only the reread wanted is gone, with its links to the axes
+    assert ingest_db.execute("SELECT 1 FROM proposition_embeddings WHERE proposition_id = %s", (made,)).fetchone() is None
+
+
+def test_a_proposition_that_something_else_rests_on_stays_when_a_correction_is_put_back(ingest_db, client, ollama, jobs):
+    ids = two_positions(ingest_db, client, ollama)
+    ollama.chat_handler = lambda body: say(stance=-1, proposition_fits=False, better_proposition="Les entreprises doivent pouvoir embaucher sans plancher de salaire")
+    reread_now(jobs, user_id=ALICE_ID)
+    made = ingest_db.execute("SELECT proposition_id FROM claims WHERE id = %s", (ids[ALICE_ID],)).fetchone()[0]
+    ingest_db.execute("UPDATE claims SET proposition_id = %s WHERE user_id = %s", (made, BOB_ID))             # somebody else now stands on it
+    assert reread.undo(ingest_db, ids[ALICE_ID]) is True
+    assert ingest_db.execute("SELECT 1 FROM propositions WHERE id = %s", (made,)).fetchone() is not None
