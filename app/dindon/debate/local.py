@@ -42,6 +42,13 @@ CHECK_SYSTEM = (
     "`unrelated` si elle parle d'autre chose. En cas de doute : `same`."
 )
 CHECK_SCHEMA = {"type": "object", "properties": {"relation": {"type": "string", "enum": ["contradicts", "same", "unrelated"]}}, "required": ["relation"]}
+RECALL_SYSTEM = (
+    "Réponds à la QUESTION par le fait précis que tu connais, en une phrase (le nom, la date, le chiffre ou l'ordre de grandeur), sans rien supposer de ce que la question laisse entendre. "
+    "Donne aussi `certainty`, de 0 à 100 : sous 70 si tu ne le connais pas vraiment."
+)
+RECALL_SCHEMA = {"type": "object", "properties": {"fact": {"type": "string"}, "certainty": {"type": "integer"}}, "required": ["fact", "certainty"]}
+MIN_RECALL_CERTAINTY = 60
+_HEDGE = re.compile(r"\b(?:g[ée]n[ée]ralement|souvent|parfois|environ|peut|peuvent|varie\w*|estim\w+|probabl\w+|semble\w*|selon|pas de preuve|aucune preuve|difficile|incertain\w*|d[ée]pend\w*|certains?|certaines?)\b", re.I)
 MIN_ANSWER, MAX_ANSWER = 15, 400
 MIN_CERTAINTY = 80                                                              # what the model says of its own certainty: not a proof, but a model that hesitates must not speak
 MIN_CERTAINTY_COMPARING = 90                                                    # a claim that compares a figure with a threshold: the model must be surer (it gets the arithmetic wrong more often)
@@ -77,11 +84,23 @@ def answer_claim(llm: Chat, model: str, reading: Reading) -> Local:
     if verdict == TRUE:
         return Local(TRUE)
     sentence = " ".join(str(said.get("answer") or "").split())
-    if not MIN_ANSWER <= len(sentence) <= MAX_ANSWER or _NOT_CLEAN.search(sentence):
+    if not MIN_ANSWER <= len(sentence) <= MAX_ANSWER or _NOT_CLEAN.search(sentence) or _HEDGE.search(sentence):
         return Local(UNSURE)                                                    # nothing to say, or something that must not be said: Dindon does not answer
     if _figures(reading.claim) and _figures(reading.claim) <= _figures(sentence):
         return Local(UNSURE)                                                    # a « correction » that keeps every figure of the claim corrects nothing: the model contradicts itself
     relation = llm.chat_json(model, CHECK_SYSTEM, f"AFFIRMATION : {reading.claim}\nCORRECTION : {sentence}", CHECK_SCHEMA, num_ctx=2048)
     if not isinstance(relation, dict) or relation.get("relation") != "contradicts":
         return Local(UNSURE)                                                    # the « correction » says what the claim says: not a correction
+    # A second opinion that does not see the claim: the question alone (what a model recalls when nothing suggests the answer). It only stops the answer when it recalls, with some certainty,
+    # something that is consistent with the claim: a model that does not recall anything does not change what the first reading found.
+    recalled = llm.chat_json(model, RECALL_SYSTEM, f"Question : {reading.query}", RECALL_SCHEMA, num_ctx=2048)
+    fact = " ".join(str(recalled.get("fact") or "").split()) if isinstance(recalled, dict) else ""
+    try:
+        sure = int(recalled.get("certainty")) if isinstance(recalled, dict) else 0
+    except (TypeError, ValueError):
+        sure = 0
+    if fact and sure >= MIN_RECALL_CERTAINTY:
+        again = llm.chat_json(model, CHECK_SYSTEM, f"AFFIRMATION : {reading.claim}\nCORRECTION : {fact}", CHECK_SCHEMA, num_ctx=2048)
+        if isinstance(again, dict) and again.get("relation") == "same":
+            return Local(UNSURE)                                                # asked without the claim, the model recalls what the claim says: the first reading was wrong
     return Local(FALSE, sentence)

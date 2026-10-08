@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 
 OFFICIAL_DEFAULT = (
     # France: statistics, administrations (gouv.fr covers the ministries, DREES, DARES, France Stratégie, Légifrance, data.gouv.fr...), parliament, courts, auditors, public research.
-    "insee.fr", "gouv.fr", "assemblee-nationale.fr", "senat.fr", "conseil-constitutionnel.fr", "conseil-etat.fr", "ccomptes.fr", "banque-france.fr",
+    "insee.fr", "gouv.fr", "elysee.fr", "gouvernement.fr", "service-public.fr", "royal.uk", "assemblee-nationale.fr", "senat.fr", "conseil-constitutionnel.fr", "conseil-etat.fr", "ccomptes.fr", "banque-france.fr",
     "ademe.fr", "santepubliquefrance.fr", "cnil.fr", "vie-publique.fr", "ined.fr", "cepii.fr", "cae-eco.fr", "ipp.eu", "ofce.sciences-po.fr", "ires.fr", "cnesco.fr",
     "cnrs.fr", "inserm.fr", "inrae.fr", "inrap.fr", "meteofrance.fr", "afa.gouv.fr", "anlci.gouv.fr", "academie-francaise.fr", "acpr.banque-france.fr", "cour-de-cassation.fr",
     "has-sante.fr", "ansm.sante.fr", "anses.fr", "rte-france.com", "cre.fr", "ofpra.gouv.fr",

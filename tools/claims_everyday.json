@@ -665,16 +665,6 @@
    "note": ""
   },
   {
-   "id": "e67",
-   "claim": "La Terre compte sept continents selon la convention la plus répandue.",
-   "query": "nombre de continents",
-   "expected": "confirmed",
-   "confidence": "high",
-   "pair": null,
-   "side": null,
-   "note": ""
-  },
-  {
    "id": "e68",
    "claim": "Les humains ont mis le pied sur la Lune.",
    "query": "humains sur la Lune",
