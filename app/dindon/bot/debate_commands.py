@@ -751,7 +751,7 @@ class Debates:
             return
         self._computers_at = self._mono()
         try:
-            rows = computers()
+            rows = await asyncio.to_thread(computers)                       # it asks the computers which models they have: not on the thread of the bot
             self._computers_busy = any(row["active"] for row in rows)
             data = json.dumps({"model": self.checker.model, "computers": rows})
             await self.db(lambda c: c.execute("INSERT INTO service_status (name, updated_at, data) VALUES ('debate_computers', now(), %s::jsonb) "

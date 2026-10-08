@@ -54,6 +54,7 @@ class Checker:
                  local_url: str | None = None, load_helpers: Callable[[], tuple[str, ...]] | None = None, helpers: tuple[str, ...] = ()):
         self.llm, self.model, self._make_lookup, self._trust, self.mode = llm, model, make_lookup, trust or Trust(), mode
         self._local_url, self._load_helpers, self._helpers, self._ready_at = local_url, load_helpers, tuple(helpers), time.monotonic()
+        self._listed_at = float("-inf")
 
     def _ready(self) -> None:
         """Before a check, at most every half minute: the helper computers that the owner set in the interface are read again (a new list builds a new pool) and the ones that failed are tried
@@ -75,6 +76,9 @@ class Checker:
         """What each computer that checks the debates is doing, for the page Débats (counts and durations, never a text): the server and its helpers, with whether it answered and has the model."""
         if not isinstance(self.llm, OllamaPool):
             return []
+        if time.monotonic() - self._listed_at >= HELPERS_REFRESH_SECONDS:     # the lists of models only exist once a computer was asked: without this, every one shows « hors ligne » until the first check
+            self._listed_at = time.monotonic()
+            self.llm.retry_failed()
         listed = self.llm.known_models()
         rows = self.llm.activity()
         for row in rows:
