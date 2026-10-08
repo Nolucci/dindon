@@ -4,7 +4,7 @@
 `runtime_settings` like the performance limits, which it also obeys (the AI works only the share of the time that was allowed).
 
 * `vectors`: the new messages become conversations, and the conversations get their vector (the first stages; they do not look at people).
-* `themes`: the topics are searched again once enough conversations are not in any (a search replaces the proposals that nobody touched).
+* `themes`: the topics are searched again once enough conversations are not in any (the new topics are added next to the existing ones: an automatic reading never replaces or removes anything already there).
 * `positions`: what each person claims is read in the conversations not read yet (the most important first), then linked to the axes. **This looks at
   what people think**: it cannot be switched on without saying that the people are informed (`positions_acknowledged`, docs/regles-du-bot.md), and it never
   reads the messages of a person who asked to stop being recorded.
@@ -153,10 +153,13 @@ def pending(conn: psycopg.Connection, guild_id: int, embed_model: str) -> dict:
                     OR EXISTS (SELECT 1 FROM debate_polls q JOIN debates d ON d.id = q.debate_id
                                WHERE q.proposition_id = p.id AND d.guild_id = %(guild)s))""", {"guild": guild_id}).fetchone()[0]
         run = cur.execute("SELECT max(id) FROM topic_runs WHERE guild_id = %s", (guild_id,)).fetchone()[0]
+        read_up_to = cur.execute("SELECT coalesce(max((parameters->>'read_up_to')::bigint), 0) FROM topic_runs WHERE guild_id = %s", (guild_id,)).fetchone()[0]
         unplaced = cur.execute(
             """SELECT count(*) FROM conversations c JOIN channels ch ON ch.id = c.channel_id WHERE ch.guild_id = %s AND c.kept
                AND EXISTS (SELECT 1 FROM conversation_embeddings e WHERE e.conversation_id = c.id AND e.model = %s)
-               AND NOT EXISTS (SELECT 1 FROM topic_assignments a WHERE a.conversation_id = c.id AND a.run_id = %s)""", (guild_id, embed_model, run)).fetchone()[0]
+               AND c.id > %s
+               AND NOT EXISTS (SELECT 1 FROM topic_assignments a JOIN topic_runs r ON r.id = a.run_id WHERE a.conversation_id = c.id AND r.guild_id = %s)""",
+            (guild_id, embed_model, read_up_to, guild_id)).fetchone()[0]
     return {"new_messages": new_messages, "without_vector": without_vector, "unread": unread, "unlinked": unlinked, "unplaced": unplaced, "topic_run": run is not None}
 
 

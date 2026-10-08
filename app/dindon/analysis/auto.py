@@ -36,7 +36,7 @@ async def cycle(jobs: AnalysisJobs, settings: Settings) -> dict:
                 continue
             entry = {"guild": str(guild), "stages": list(stages)}
             try:
-                await asyncio.to_thread(jobs.start, guild, stages, limit=cfg["batch"])
+                await asyncio.to_thread(jobs.start, guild, stages, limit=cfg["batch"], keep=True)
             except NotReady as problem:
                 done.append({**entry, "state": "failed", "error": str(problem)})
                 break                                               # the models are not there: no point in trying the other servers

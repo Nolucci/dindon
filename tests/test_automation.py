@@ -151,7 +151,7 @@ def test_cancelling_an_automatic_cycle_does_not_start_the_next_server(setup, mon
     class CancelledJobs:
         embed_model = "bge-m3"
 
-        def start(self, guild, stages, limit=None):
+        def start(self, guild, stages, limit=None, keep=False):
             started.append(guild)
 
         def wait(self):

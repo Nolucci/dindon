@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import threading
 import time
@@ -98,6 +99,7 @@ class Debates:
         self.checker = checker                                    # reads the messages for claims and checks them (debate/checker.py), or None: nothing is read, nothing leaves
         self._check_retry_at = 0.0
         self._check_failing = False
+        self._computers_at, self._computers_busy = -1e9, False       # when the state of the computers was last written (page Débats), and whether one was working then
         self._retracting = False                                  # corrections wait to be taken back from Discord
         self._refresh_seconds, self._click_seconds = refresh_seconds, click_seconds
         self.interactions = None                                  # the answerer of commands (privacy_commands.Interactions), set by whoever builds both
@@ -736,9 +738,26 @@ class Debates:
         await self._answers()
         await self._refresh()
         await self._publish_polls()
+        await self._publish_computers()
         if self._mono() - self._swept > 60:
             self._swept = self._mono()
             await self.db(lambda c: store.close_stale(c, self.clock(), STALE_PREPARING))
+
+    async def _publish_computers(self) -> None:
+        """Says in service_status what each computer that checks the debates is doing, for the page Débats: every few seconds while one of them works (and once more when it stops), else
+        every half minute. Counts and durations only, never a text. A failure is no reason to stop looking after the debates."""
+        computers = getattr(self.checker, "computers", None)
+        if computers is None or self._mono() - self._computers_at < (3 if self._computers_busy else 30):
+            return
+        self._computers_at = self._mono()
+        try:
+            rows = computers()
+            self._computers_busy = any(row["active"] for row in rows)
+            data = json.dumps({"model": self.checker.model, "computers": rows})
+            await self.db(lambda c: c.execute("INSERT INTO service_status (name, updated_at, data) VALUES ('debate_computers', now(), %s::jsonb) "
+                                              "ON CONFLICT (name) DO UPDATE SET updated_at = now(), data = excluded.data", (data,)))
+        except Exception as error:
+            log.debug("the state of the computers could not be written (%s)", type(error).__name__)
 
     async def _flush_messages(self) -> None:
         batch, self._inbox = self._inbox, []

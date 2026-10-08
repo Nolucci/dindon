@@ -112,6 +112,12 @@
     selected = checked ? [...selected, id] : selected.filter((other) => other !== id);
   }
 
+  const allSelected = $derived(proposed.length > 0 && proposed.every((t) => selected.includes(t.id)));
+
+  function selectAll(checked) {
+    selected = checked ? proposed.map((t) => t.id) : [];
+  }
+
   async function validateSelected() {
     if (!selected.length || busy) return;
     busy = true;
@@ -292,6 +298,9 @@
 
   <section>
     <h2 class="eyebrow">À examiner <span class="count">{proposed.length}</span></h2>
+    {#if proposed.length > 1}
+      <label class="check selectAll"><input type="checkbox" checked={allSelected} onchange={(e) => selectAll(e.currentTarget.checked)} /> Tout sélectionner ({proposed.length})</label>
+    {/if}
     {#if selected.length}
       <div class="bulkActions" aria-live="polite"><span>{selected.length} thème{selected.length > 1 ? 's' : ''} sélectionné{selected.length > 1 ? 's' : ''}</span><button type="button" class="btn btn-primary" onclick={validateSelected} disabled={busy}>Valider la sélection</button><button type="button" class="btn" onclick={() => (selected = [])}>Effacer</button></div>
     {/if}
@@ -619,6 +628,7 @@
     cursor: pointer;
   }
   .selectTopic { margin: 0 0.25rem 0 0; }
+  .selectAll { display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; font-size: 0.8125rem; }
   .bulkActions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; font-size: 0.8125rem; }
   .advanced { display: flex; flex-direction: column; gap: 0.5rem; }
   .advanced[open] .inline { margin-top: 0.75rem; }

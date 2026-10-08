@@ -91,7 +91,7 @@ class AnalysisJobs:
             self.client.set_shares({(local if url == "local" else url.rstrip("/")): pct for url, pct in shares.items()} if shares else None)
 
     def start(self, guild_id: int, stages: tuple[str, ...] = STAGES, *, topics: int | None = None, rebuild: bool = False, limit: int | None = None,
-              rounds: int | None = 1) -> None:
+              rounds: int | None = 1, keep: bool = False) -> None:
         """Checks that the models are there, then starts. The positions are read in batches ("salves"): `limit` conversations each (None: all), `rounds` batches
         (None: until nothing is left to read), the positions being checked and linked to the axes after each batch so that results come as it goes. Raises NotReady or AnalysisBusy, before anything is started."""
         ready = self.readiness()
@@ -111,7 +111,7 @@ class AnalysisJobs:
             self._lines.clear()
             planned = (["compacteur : conversations"] if "conversations" in stages else []) + (["partitionneur : vecteurs"] if "embeddings" in stages else []) + (["partitionneur : thèmes"] if "themes" in stages else []) + (["classeur : positions"] if "claims" in stages else []) + (["classeur : vérification des positions", "juge : liens aux axes"] if "claims" in stages or "axes" in stages else [])
             self._state = {**self._idle(), "state": "running", "guild": str(guild_id), "started_at": utc_iso(), "stages": planned}
-            self._thread = threading.Thread(target=self._run, args=(guild_id, stages, topics, rebuild, self._cancel, limit, rounds), daemon=True, name="analysis")
+            self._thread = threading.Thread(target=self._run, args=(guild_id, stages, topics, rebuild, self._cancel, limit, rounds, keep), daemon=True, name="analysis")
             self._thread.start()
 
     def cancel(self) -> bool:
@@ -177,7 +177,7 @@ class AnalysisJobs:
         return current
 
     def _run(self, guild_id: int, stages: tuple[str, ...], topics: int | None, rebuild: bool, cancel: threading.Event, limit: int | None = None,
-             rounds: int | None = 1) -> None:
+             rounds: int | None = 1, keep: bool = False) -> None:
         error = None
         try:
             with connect(self._settings.database_url, wait=5) as conn:
@@ -202,7 +202,7 @@ class AnalysisJobs:
                 if "themes" in stages and not cancel.is_set():
                     self._stage("partitionneur : thèmes")
                     r = discover_themes(conn, self.client, guild_id, embed_model=self.embed_model, name_model=self.name_model, topics=topics,
-                                        progress=self._line, step_progress=self._progress, cancelled=cancel.is_set)
+                                        progress=self._line, step_progress=self._progress, cancelled=cancel.is_set, keep=keep)
                     self._line(f"{r['topics']} thèmes proposés pour {r['assigned']} conversations (k={r['k']}, {r['named_by_model']} nommés par le modèle)")
                 def check_and_link() -> None:
                     self._stage("classeur : vérification des positions")

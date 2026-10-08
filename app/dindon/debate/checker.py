@@ -14,9 +14,10 @@ found is not available to the next and the budget (2 queries, 3 pages) is per cl
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 
-from dindon.analysis.ollama import Ollama
+from dindon.analysis.ollama import OllamaPool
 from dindon.config import Settings
 from dindon.debate.claims import AnswerFound, ClaimResult, Considered
 from dindon.debate.local import FALSE, TRUE, answer_claim
@@ -45,9 +46,42 @@ def resolve_mode(settings: Settings) -> tuple[str, str | None]:
     return "live", None
 
 
+HELPERS_REFRESH_SECONDS = 30                                      # how often the list of helper computers is read again and the ones that failed are tried again
+
+
 class Checker:
-    def __init__(self, llm: Chat, model: str, make_lookup: Callable[[], Lookup] | None, trust: Trust | None = None, mode: str = "observe"):
+    def __init__(self, llm: Chat, model: str, make_lookup: Callable[[], Lookup] | None, trust: Trust | None = None, mode: str = "observe",
+                 local_url: str | None = None, load_helpers: Callable[[], tuple[str, ...]] | None = None, helpers: tuple[str, ...] = ()):
         self.llm, self.model, self._make_lookup, self._trust, self.mode = llm, model, make_lookup, trust or Trust(), mode
+        self._local_url, self._load_helpers, self._helpers, self._ready_at = local_url, load_helpers, tuple(helpers), time.monotonic()
+
+    def _ready(self) -> None:
+        """Before a check, at most every half minute: the helper computers that the owner set in the interface are read again (a new list builds a new pool) and the ones that failed are tried
+        again. Without a pool of computers (tests, or a plain client) nothing is done. Never raises: the last list stands."""
+        if not isinstance(self.llm, OllamaPool) or time.monotonic() - self._ready_at < HELPERS_REFRESH_SECONDS:
+            return
+        self._ready_at = time.monotonic()
+        if self._load_helpers is not None and self._local_url:
+            try:
+                urls = tuple(self._load_helpers())
+            except Exception:
+                urls = self._helpers
+            if urls != self._helpers:
+                self._helpers, self.llm = urls, OllamaPool(self._local_url, urls, timeout=300)
+                log.info("the debates are now checked on %d computer(s)", len(urls) + 1)
+        self.llm.retry_failed()
+
+    def computers(self) -> list[dict]:
+        """What each computer that checks the debates is doing, for the page Débats (counts and durations, never a text): the server and its helpers, with whether it answered and has the model."""
+        if not isinstance(self.llm, OllamaPool):
+            return []
+        listed = self.llm.known_models()
+        rows = self.llm.activity()
+        for row in rows:
+            names = listed.get(row["url"])
+            row["online"] = names is not None and not row["failed"]
+            row["has_model"] = bool(names) and (self.model in names or f"{self.model}:latest" in names)
+        return rows
 
     @property
     def can_search(self) -> bool:
@@ -56,17 +90,20 @@ class Checker:
 
     def search(self, reading: Reading) -> ClaimResult:
         """The claim checked on the Internet, with a budget of its own (2 searches, 3 pages): the sources and the verdict. Needs a search service."""
+        self._ready()
         return verify_claim(self._make_lookup(), self.llm, self.model, self._trust, reading)
 
     def check(self, text: str) -> list[ClaimResult]:
         """The results for the claims in one message (an empty list when it holds none), every one checked on the Internet. Raises what the local model raises when it cannot answer: the
         message stays unread and is tried later."""
+        self._ready()
         return [self.search(reading) for reading in read_message(self.llm, self.model, text)]
 
     def consider(self, text: str) -> Considered:
         """What Dindon does with a message when it answers first: for each claim, the local model says whether it is **certain** that it is true or false, with no Internet. True: noted, nothing
         is said. False: Dindon's answer, which the participants will judge. Not certain: the claim is checked on the Internet, if there is a search service, and noted. Raises what the model
         raises: the message stays unread and is tried later."""
+        self._ready()
         answers: list[AnswerFound] = []
         results: list[ClaimResult] = []
         for reading in read_message(self.llm, self.model, text):
@@ -84,7 +121,7 @@ def notice_mode(checker: object | None) -> str:
     return "local" if mode == "answer" and not getattr(checker, "can_search", True) else mode
 
 
-def build_checker(settings: Settings) -> Checker | None:
+def build_checker(settings: Settings, load_helpers: Callable[[], tuple[str, ...]] | None = None) -> Checker | None:
     if settings.debate_checks not in MODES:
         return None
     mode, downgraded = resolve_mode(settings)
@@ -104,4 +141,12 @@ def build_checker(settings: Settings) -> Checker | None:
         log.warning("the corrections that sources make by themselves are NOT on (%s). Dindon answers and the participants judge, or the claims are noted", downgraded)
     log.info("the claims of the debates are checked in %s mode (%d search service(s))%s", mode, len(searchers), "; nothing is published" if mode == "observe" else "")
     make_lookup = (lambda: Lookup(searchers, fetcher)) if searchers else None
-    return Checker(Ollama(settings.ollama_url, timeout=300), settings.debate_model, make_lookup, mode=mode)
+    helpers: tuple[str, ...] = tuple(settings.analysis_workers or ())
+    if load_helpers is not None:
+        try:
+            helpers = tuple(load_helpers())
+        except Exception:                                         # the database is away at the start: the list is read again in half a minute
+            pass
+    # The checks go through a pool of computers even when there is only the server: the page Débats shows what each one is doing. The helpers are the owner's own computers (analysis/helpers.py).
+    return Checker(OllamaPool(settings.ollama_url, helpers, timeout=300), settings.debate_model, make_lookup, mode=mode,
+                   local_url=settings.ollama_url, load_helpers=load_helpers, helpers=helpers)

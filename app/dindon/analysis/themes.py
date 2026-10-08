@@ -236,10 +236,17 @@ def load_vectors(conn: psycopg.Connection, guild_id: int, model: str) -> tuple[l
 
 def discover_themes(conn: psycopg.Connection, client: Ollama, guild_id: int, *, embed_model: str, name_model: str, topics: int | None = None,
                     seed: int = 0, progress: Callable[[str], None] | None = None,
-                    step_progress: Callable[[int, int], None] | None = None, cancelled: Callable[[], bool] = lambda: False) -> dict:
-    """Finds the topics of the conversations that have a vector, and records them as proposals. Returns what was found."""
+                    step_progress: Callable[[int, int], None] | None = None, cancelled: Callable[[], bool] = lambda: False,
+                    keep: bool = False) -> dict:
+    """Finds the topics of the conversations that have a vector, and records them as proposals. Returns what was found.
+    `keep`: nothing that exists is touched; only the conversations that no earlier run placed are read, and their topics are added."""
     say = progress or (lambda _text: None)
     ids, x = load_vectors(conn, guild_id, embed_model)
+    if keep:
+        placed = {r[0] for r in conn.execute(
+            "SELECT DISTINCT a.conversation_id FROM topic_assignments a JOIN topic_runs r ON r.id = a.run_id WHERE r.guild_id = %s", (guild_id,))}
+        rows = [i for i, cid in enumerate(ids) if cid not in placed]
+        ids, x = [ids[i] for i in rows], x[rows]
     if len(ids) < MIN_CONVERSATIONS:
         raise NotEnough(f"{len(ids)} conversations avec un vecteur : il en faut au moins {MIN_CONVERSATIONS} pour trouver des thèmes")
     rng = np.random.default_rng(seed)
@@ -279,13 +286,13 @@ def discover_themes(conn: psycopg.Connection, client: Ollama, guild_id: int, *, 
 
     with conn.transaction():
         # The proposals that nobody has touched are replaced; one that the person renamed, or that another was merged into, stays
-        removed = conn.execute(
+        removed = 0 if keep else conn.execute(
             """DELETE FROM topics WHERE guild_id = %s AND status = 'proposed' AND origin = 'discovered' AND touched_at IS NULL
                  AND NOT EXISTS (SELECT 1 FROM topics child WHERE child.merged_into = topics.id)""", (guild_id,)).rowcount
         run_id = conn.execute(
             "INSERT INTO topic_runs (guild_id, method, model, parameters, message_count) VALUES (%s, %s, %s, %s::jsonb, %s) RETURNING id",
             (guild_id, "embeddings clustering + model naming", f"{embed_model} + {name_model}",
-             json.dumps({**how, "seed": seed, "min_size": MIN_SIZE, "min_similarity": MIN_SIMILARITY,
+             json.dumps({**how, "seed": seed, "keep": keep, "read_up_to": max(ids), "min_size": MIN_SIZE, "min_similarity": MIN_SIMILARITY,
                          "min_margin": MIN_MARGIN, "unassigned": len(ids) - sum(len(f["members"]) for f in found),
                          "named_by_model": sum(f["named"] for f in found)}), len(ids))).fetchone()[0]
         for f in found:

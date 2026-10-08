@@ -50,6 +50,7 @@ export const api = {
   performance: () => request('/api/performance'),
   performanceSave: (body) => request('/api/performance', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   debates: () => request('/api/debates'),
+  debateComputers: () => request('/api/debates/computers'),
   debate: (id) => request(`/api/debates/${id}`),
   privacy: () => request('/api/privacy'),
   privacyFind: (q) => request(`/api/privacy/find${query({ q })}`),

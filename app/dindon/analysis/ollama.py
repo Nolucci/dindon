@@ -260,6 +260,18 @@ class OllamaPool:
             raise OllamaError("Aucun ordinateur d'analyse ne répond : " + "; ".join(errors))
         return sorted(found)
 
+    def known_models(self) -> dict[str, list[str]]:
+        """The models that each computer listed the last time it was asked (no network call): a computer that is not in it did not answer."""
+        with self._lock:
+            return {url: sorted(names) for url, names in self._models.items()}
+
+    def retry_failed(self) -> None:
+        """For a pool that lives for ever (the debates): a computer that failed is tried again, and the lists of models are read again. The counters of the live report are kept."""
+        with self._lock:
+            self._failed.clear()
+        with suppress(OllamaError):
+            self.models(timeout=2)
+
     def reset(self) -> None:
         """Try previously failed helpers again for a new analysis."""
         with self._lock:

@@ -565,7 +565,15 @@ def build_interactions(settings: Settings, service):
     from dindon.bot.rest import DiscordREST
     from dindon.debate.checker import build_checker
 
-    checker = build_checker(settings)
+    def load_helpers() -> tuple[str, ...]:
+        """The helper computers that the owner set in the interface (the same list as the analysis), else the ones of .env."""
+        from dindon.analysis import helpers
+
+        with connect(settings.database_url) as conn:
+            saved = helpers.load(conn)
+        return tuple(saved) if saved is not None else tuple(settings.analysis_workers)
+
+    checker = build_checker(settings, load_helpers)
     interactions = Interactions(settings.discord_token, settings.discord_api_url, service, activity=bool(settings.discord_client_id and settings.discord_client_secret))
     interactions.verification = checker is not None
     from dindon.debate.checker import notice_mode

@@ -274,6 +274,22 @@ def test_a_new_run_replaces_the_proposals_and_never_touches_what_the_person_deci
     assert ingest_db.execute("SELECT count(*) FROM topics WHERE status = 'proposed'").fetchone()[0] == 7
 
 
+def test_an_automatic_run_keeps_every_existing_topic_and_only_reads_what_is_not_placed(ingest_db, client, server):
+    prepared(ingest_db, client, server)
+    discover_themes(ingest_db, client, server.guild_id, embed_model="bge-m3", name_model="qwen3:14b", topics=6)
+    before = [r[0] for r in ingest_db.execute("SELECT id FROM topics ORDER BY id").fetchall()]
+    placed = ingest_db.execute("SELECT count(DISTINCT conversation_id) FROM topic_assignments").fetchone()[0]
+    try:
+        result = discover_themes(ingest_db, client, server.guild_id, embed_model="bge-m3", name_model="qwen3:14b", topics=3, keep=True)
+        assert result["replaced"] == 0
+    except NotEnough:
+        pass                                                     # nothing (or too little) was left to place: also fine
+    after = [r[0] for r in ingest_db.execute("SELECT id FROM topics ORDER BY id").fetchall()]
+    assert set(before) <= set(after)                             # nothing was removed
+    assert not ingest_db.execute("SELECT 1 FROM topic_assignments a1 JOIN topic_assignments a2 USING (conversation_id) WHERE a1.run_id < a2.run_id").fetchone()
+    assert ingest_db.execute("SELECT count(DISTINCT conversation_id) FROM topic_assignments").fetchone()[0] >= placed
+
+
 def test_a_name_that_the_model_cannot_give_is_replaced_by_the_keywords(ingest_db, client, ollama, server):
     prepared(ingest_db, client, server)
     ollama.garbage_chat = 2                                        # the first topic: two answers that are not JSON

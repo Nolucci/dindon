@@ -29,6 +29,21 @@ def overview(request: Request) -> dict:
             "debates": listed}
 
 
+COMPUTERS_STALE_SECONDS = 90          # the bot writes every few seconds while a computer works and every half minute otherwise: older than this, nobody is looking after the debates
+
+
+@router.get("/computers")
+def computers(request: Request) -> dict:
+    """What each computer that checks the debates is doing (the server and its helpers), as the bot last said it: busy or free, for how long, how many checks, how long they take, errors. Counts
+    and durations only, never a text. `fresh` is false when the bot has said nothing lately (no debate runs, or the bot is stopped)."""
+    with request.app.state.pool.connection() as conn:
+        row = conn.execute("SELECT data, extract(epoch FROM now() - updated_at) AS age FROM service_status WHERE name = 'debate_computers'").fetchone()
+    if row is None:
+        return {"computers": [], "model": None, "age_seconds": None, "fresh": False}
+    data = row["data"] or {}
+    return {"computers": data.get("computers", []), "model": data.get("model"), "age_seconds": round(float(row["age"])), "fresh": float(row["age"]) <= COMPUTERS_STALE_SECONDS}
+
+
 @router.get("/{debate_id}")
 def detail(debate_id: int, request: Request) -> dict:
     with request.app.state.pool.connection() as conn:

@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { api, AuthError } from '../lib/api.js';
 
   let { onAuthLost } = $props();
@@ -49,7 +49,28 @@
     }
   }
 
-  onMount(load);
+  // The computers that check the debates (the server and its helpers), as the bot last said it: refreshed every few seconds, and only while the page is visible
+  let fleet = $state(null);
+  let timer;
+  const seconds = (n) => (n == null ? '—' : n < 60 ? `${Math.round(n)} s` : `${Math.floor(n / 60)} min ${Math.round(n % 60)} s`);
+  const machine = (c) => (c.local ? 'Ce serveur' : c.url.replace(/^https?:\/\//, ''));
+  const state = (c) => (!c.online ? ['hors ligne', 'danger'] : !c.has_model ? ['modèle absent', 'danger'] : c.active ? [`calcule depuis ${seconds(c.running_for)}`, 'success'] : ['libre', '']);
+
+  async function loadFleet() {
+    if (document.hidden) return;
+    try {
+      fleet = await api.debateComputers();
+    } catch (error) {
+      if (error instanceof AuthError) onAuthLost();                    // any other failure: the last figures stay
+    }
+  }
+
+  onMount(() => {
+    load();
+    loadFleet();
+    timer = setInterval(loadFleet, 3000);
+  });
+  onDestroy(() => clearInterval(timer));
 </script>
 
 <div class="page">
@@ -71,6 +92,32 @@
           · modèle {overview.checks.model} · services : {overview.checks.search_services.join(', ') || 'aucun'}
         </p>
         {#if overview.checks.why_not}<p class="banner" role="status">Les corrections par les sources seules ne sont pas actives : {overview.checks.why_not}.</p>{/if}
+      {/if}
+    </section>
+
+    <section class="panel card" aria-label="Ordinateurs de vérification">
+      <h2 class="eyebrow">Ordinateurs qui vérifient les débats</h2>
+      {#if !fleet || fleet.computers.length === 0}
+        <p class="muted small">Rien à montrer : le bot n’a pas encore dit ce que font ses ordinateurs (aucun débat ne tourne, ou les vérifications sont désactivées).</p>
+      {:else}
+        {#if !fleet.fresh}<p class="banner" role="status">Le bot n’a rien dit depuis {seconds(fleet.age_seconds)} : les chiffres ci-dessous sont les derniers connus.</p>{/if}
+        <table>
+          <thead><tr><th>Ordinateur</th><th>État</th><th>Vérifications</th><th>Durée moyenne</th><th>Part du travail</th><th>Erreurs</th></tr></thead>
+          <tbody>
+            {#each fleet.computers as c (c.url)}
+              {@const [label, tone] = state(c)}
+              <tr>
+                <td>{machine(c)}</td>
+                <td><span class="badge small {tone}">{label}</span>{#if c.active && c.kind}<span class="muted small"> · {c.kind}</span>{/if}</td>
+                <td>{c.calls}</td>
+                <td>{seconds(c.average)}</td>
+                <td>{c.observed} %</td>
+                <td>{c.errors}{#if c.last_error}<span class="muted small"> · {c.last_error}</span>{/if}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+        <p class="hint">Modèle : {fleet.model}. « Calcule » veut dire qu’une vérification est en cours sur cet ordinateur : Ollama ne donne pas le taux d’utilisation du processeur, la page montre donc ce que Dindon lui a demandé. Les chiffres repartent de zéro quand le bot redémarre.</p>
       {/if}
     </section>
 
