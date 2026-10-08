@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from dindon.debate.reading import Chat, Reading
 
-PROMPT_VERSION = "local-5"
+PROMPT_VERSION = "local-6"
 TRUE, FALSE, UNSURE = "true", "false", "unsure"
 SYSTEM = (
     "Tu es un vérificateur de faits. On te donne UNE affirmation de fait, seule : tu ne sais ni qui l'a dite, ni dans quel débat, et tu n'as aucun avis. "
@@ -31,6 +31,7 @@ SYSTEM = (
     "Si tu réponds `true` ou `unsure`, `answer` est vide. Donne aussi `certainty`, ton degré de certitude de 0 à 100 : sous 80, réponds `unsure`.\n"
     "Exemples. « La Terre tourne autour du Soleil. » → true. « Paris est la capitale de l'Allemagne. » → false, answer « La capitale de l'Allemagne est Berlin. » "
     "« 70 % des Français sont des moines. » → false, answer « Les moines ne représentent qu'une toute petite fraction de la population française. » "
+    "« 90 % des habitants d'un pays commettent des délits. » → false, answer « Une petite minorité des habitants de n'importe quel pays commet des délits. » (une grande majorité d'un groupe de population ne commet pas de délits : c'est faux pour TOUS les groupes, de la même façon). "
     "« La France compte 80 millions de départements. » → false. « Le taux de chômage en France est de 7,3 %. » → unsure (un chiffre qui change). "
     "« Mon voisin a mangé deux pommes hier. » → unsure."
 )
