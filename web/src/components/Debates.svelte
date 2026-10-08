@@ -54,7 +54,7 @@
   let timer;
   const seconds = (n) => (n == null ? '—' : n < 60 ? `${Math.round(n)} s` : `${Math.floor(n / 60)} min ${Math.round(n % 60)} s`);
   const machine = (c) => (c.local ? 'Ce serveur' : c.url.replace(/^https?:\/\//, ''));
-  const state = (c) => (!c.online ? ['hors ligne', 'danger'] : !c.has_model ? ['modèle absent', 'danger'] : c.active ? [`calcule depuis ${seconds(c.running_for)}`, 'success'] : ['libre', '']);
+  const condition = (c) => (!c.online ? ['hors ligne', 'danger'] : !c.has_model ? ['modèle absent', 'danger'] : c.active ? [`calcule depuis ${seconds(c.running_for)}`, 'success'] : ['libre', '']);
 
   async function loadFleet() {
     if (document.hidden) return;
@@ -105,7 +105,7 @@
           <thead><tr><th>Ordinateur</th><th>État</th><th>Vérifications</th><th>Durée moyenne</th><th>Part du travail</th><th>Erreurs</th></tr></thead>
           <tbody>
             {#each fleet.computers as c (c.url)}
-              {@const [label, tone] = state(c)}
+              {@const [label, tone] = condition(c)}
               <tr>
                 <td>{machine(c)}</td>
                 <td><span class="badge small {tone}">{label}</span>{#if c.active && c.kind}<span class="muted small"> · {c.kind}</span>{/if}</td>
