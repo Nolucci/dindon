@@ -327,3 +327,14 @@ def test_a_reread_cannot_be_rolled_back_while_one_is_running(me, ingest_db, clie
     me.post("/api/reread/cancel")
     release.set()
     me.app.state.reread.wait(60)
+
+
+def test_the_corrections_carry_their_theme_the_new_one_when_the_reread_moved_them(me, ingest_db, client, ollama):
+    run = corrected_run(me, ingest_db, client, ollama)
+    first = me.get("/api/reread/changes").json()["changes"]
+    assert [c["theme"] for c in first] == [None, None]                                                    # no theme yet: they are grouped under « Sans thème »
+    topic = ingest_db.execute("INSERT INTO topics (guild_id, label, origin, status) VALUES (%s, 'Économie', 'discovered', 'validated') RETURNING id", (GUILD_ID,)).fetchone()[0]
+    claim = first[0]["claim"]
+    ingest_db.execute("INSERT INTO claim_topics (claim_id, topic_id, run_id) VALUES (%s, %s, %s)", (claim, topic, run))
+    moved = {c["claim"]: (c["theme"], c["theme_id"]) for c in me.get("/api/reread/changes").json()["changes"]}
+    assert moved[claim] == ("Économie", topic) and moved[first[1]["claim"]] == (None, None)

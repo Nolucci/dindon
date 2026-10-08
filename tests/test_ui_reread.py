@@ -71,6 +71,7 @@ def test_the_page_shows_what_there_is_to_reread_the_last_reread_and_its_correcti
         item.wait_for()
         assert "Position" in item.inner_text() and "Pour" in item.inner_text() and "Contre" in item.inner_text()
         assert not item.get_by_text("il contredit ce qui précède").is_visible()
+        item.locator("summary").first.click()
         item.get_by_text("Citations et motif", exact=True).click()
         assert "il contredit ce qui précède" in item.inner_text()
         item.get_by_text("Voir tout le contexte lu", exact=True).click()
@@ -169,5 +170,32 @@ def test_the_corrections_are_searched_selected_and_put_back_together_or_by_whole
         page.get_by_text("Aucune position ne correspond à cette recherche.").wait_for()
         page.get_by_label("Quelle relecture").select_option(index=1)
         page.get_by_role("button", name="Annuler toute cette relecture").wait_for()
+        browser.close()
+    assert errors == []
+
+
+def test_the_corrections_are_one_line_each_under_their_theme_and_unfold(base):
+    errors = []
+    with sync_api.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 1440, "height": 1000})
+        page.on("pageerror", lambda e: errors.append(str(e)[:200]))
+        page.goto(base)
+        page.fill("#password", PASSWORD)
+        page.click("button[type=submit]")
+        page.wait_for_selector("nav", timeout=20000)
+        page.get_by_role("button", name="Analyse", exact=True).click()
+        page.get_by_role("button", name="Relecture", exact=True).click()
+        theme = page.locator(".themeBlock").first
+        theme.wait_for()
+        assert "Sans thème" in theme.locator("summary.theme").inner_text()                               # blocks by theme
+        entry = page.locator(".changes li").first
+        entry.wait_for()
+        assert entry.locator("summary").first.bounding_box()["height"] < 60                              # one line
+        assert not entry.get_by_text("Citations et motif", exact=True).is_visible()                      # the details are behind it
+        entry.locator("summary").first.click()
+        assert entry.get_by_text("Citations et motif", exact=True).is_visible()
+        page.get_by_label("Regrouper par thème").uncheck()
+        assert page.locator(".themeBlock").count() == 0 and page.locator("ul.changes > li").count() == 1       # the plain list
         browser.close()
     assert errors == []

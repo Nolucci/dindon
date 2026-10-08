@@ -13,6 +13,7 @@ from dindon.analysis import reread
 from dindon.analysis.job import NotReady
 from dindon.api.auth import require_session
 from dindon.api.common import resolve_guild
+from dindon.api.positions import _theme_of_claim
 
 router = APIRouter(prefix="/api/reread", dependencies=[Depends(require_session)])
 
@@ -89,8 +90,8 @@ def changes(request: Request, guild: int | None = None, run: int | None = None, 
         total = conn.execute(f"SELECT count(*) AS n {joins} WHERE {where}", params).fetchone()["n"]
         rows = conn.execute(
             f"""SELECT r.run_id, r.claim_id, r.verdict, r.changes, r.reason, r.certainty, r.undone_at, r.created_at, r.context, r.people, cl.user_id, cl.text AS claim, cl.stance, cl.kind,
-                       p.text AS proposition, COALESCE(u.global_name, u.name) AS person
-                {joins} WHERE {where}
+                       p.text AS proposition, COALESCE(u.global_name, u.name) AS person, th.topic_id AS theme_id, tt.label AS theme
+                {joins} {_theme_of_claim()} WHERE {where}
                ORDER BY r.created_at DESC, r.claim_id LIMIT %(limit)s OFFSET %(offset)s""", params).fetchall()
         quotes: dict[int, list[str]] = {}
         for q in conn.execute("SELECT claim_id, quote FROM claim_evidence WHERE claim_id = ANY(%s) AND quote IS NOT NULL ORDER BY message_id", ([r["claim_id"] for r in rows],)):
@@ -114,7 +115,7 @@ def changes(request: Request, guild: int | None = None, run: int | None = None, 
             shown["proposition"] = [propositions.get(c["proposition_id"][0]), propositions.get(c["proposition_id"][1])]
         if "theme" in c:
             shown["theme"] = [topics.get(c["theme"][0]), topics.get(c["theme"][1])]
-        out.append({"run": r["run_id"], "claim": r["claim_id"], "user": str(r["user_id"]), "person": r["person"], "text": r["claim"], "proposition": r["proposition"], "quotes": quotes.get(r["claim_id"], [])[:3],
+        out.append({"run": r["run_id"], "claim": r["claim_id"], "user": str(r["user_id"]), "person": r["person"], "text": r["claim"], "proposition": r["proposition"], "theme": r["theme"], "theme_id": r["theme_id"], "quotes": quotes.get(r["claim_id"], [])[:3],
                     "verdict": r["verdict"], "changes": shown, "reason": r["reason"], "certainty": r["certainty"], "context": r["context"], "people": {ref: names.get(user) for ref, user in (r["people"] or {}).items()},
                     "person_ref": next((ref for ref, user in (r["people"] or {}).items() if user == str(r["user_id"])), None),
                     "undone": r["undone_at"] is not None, "at": r["created_at"].isoformat()})

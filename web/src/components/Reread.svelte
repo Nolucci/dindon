@@ -22,6 +22,22 @@
   let selected = $state([]);
   let notice = $state('');
   let searchTimer;
+  let grouped = $state(true);
+  let openGroups = $state([]);
+  const searching = $derived(q.trim() !== '' || kindFilter !== '' || runFilter !== '' || stateFilter !== 'all');
+  let groupsTouched = $state(false);        // until the person opens or folds a theme, the first one (the busiest) is open: something is always in sight
+  const isOpen = (key) => searching || openGroups.includes(key) || (!groupsTouched && groups[0]?.key === key);
+  const setGroup = (key, on) => { if (!groupsTouched) { groupsTouched = true; openGroups = groups[0] && groups[0].key !== key && !on ? [groups[0].key] : openGroups; } openGroups = on ? [...new Set([...openGroups, key])] : openGroups.filter((k) => k !== key); };
+  // The corrections under the theme they now have (the new one when the reread moved them), the busiest theme first
+  const groups = $derived.by(() => {
+    const by = new Map();
+    for (const c of changes) {
+      const key = c.theme_id ?? 0;
+      if (!by.has(key)) by.set(key, { key, label: c.theme ?? 'Sans thème', items: [] });
+      by.get(key).items.push(c);
+    }
+    return [...by.values()].sort((x, y) => y.items.length - x.items.length);
+  });
   let problem = $state('');
   let busy = $state(false);
   let theme = $state('');
@@ -171,6 +187,8 @@
   onDestroy(() => { clearInterval(timer); clearTimeout(searchTimer); });
 
   const value = (kind, text) => kind === 'stance' ? ({ accord: 'Pour', désaccord: 'Contre', nuance: 'Nuancé', aucune: 'Sans position' }[text] ?? text ?? '—') : kind === 'kind' ? ({ opinion: 'Opinion', fact: 'Fait', fait: 'Fait', question: 'Question', humour: 'Humour', other: 'Autre' }[text] ?? text ?? '—') : text ?? '—';
+  // The whole change on one line: « Position : Pour → Contre · Thème : A → B »
+  const summary = (change) => lines(change).map((l) => `${l.kind} : ${l.before} → ${l.after}`).join(' · ') || { corrected: 'Corrigée', uncertain: 'Incertaine', confirmed: 'Confirmée' }[change.verdict];
   const lines = (change) => Object.entries(change.changes).map(([kind, [before, after]]) => ({
     kind: { stance: 'Position', kind: 'Nature', proposition: 'Proposition', theme: 'Thème' }[kind] ?? kind, before: value(kind, before), after: value(kind, after),
   }));
@@ -269,39 +287,65 @@
     {#if !changes.length}
       <p class="muted">{q || kindFilter || runFilter || stateFilter !== 'all' ? 'Aucune position ne correspond à cette recherche.' : 'Rien à montrer pour l’instant.'}</p>
     {:else}
-      <ul class="changes">
-        {#each changes as change (`${change.run}-${change.claim}`)}
-          <li class:undone={change.undone}>
-            <header class="who">
-              {#if change.verdict === 'corrected' && !change.undone}<label class="pick"><input type="checkbox" checked={selected.includes(change.claim)} onchange={(e) => choose(change.claim, e.currentTarget.checked)} aria-label={`Sélectionner la position de ${change.person}`} /></label>{/if}
-              {#if onPerson}<button type="button" class="link" onclick={() => onPerson(change.user)}>{change.person}</button>{:else}<strong>{change.person}</strong>{/if}
-              <span class="muted small">{when(change.at)}</span>
-            </header>
-            {#if change.proposition}<p class="proposition">{change.proposition}</p>{/if}
-            {#each lines(change) as line}
-              <div class="diff"><span class="diffKind">{line.kind}</span><dl><div><dt>Avant</dt><dd><s>{line.before}</s></dd></div><div><dt>Après</dt><dd><strong>{line.after}</strong></dd></div></dl></div>
-            {/each}
-            {#if change.quotes.length || change.reason}
-              <details class="evidence"><summary>Citations et motif</summary>
-                {#each change.quotes as quote}<blockquote>{quote}</blockquote>{/each}
-                {#if change.reason}<p class="muted small">{change.reason}</p>{/if}
-              </details>
-            {/if}
-            {#if change.context}
-              <details class="evidence context"><summary>Voir tout le contexte lu</summary>
-                <p class="muted small">Ce que le modèle a lu, tel quel : les auteurs y sont anonymes, <code>EVIDENCE</code> marque les messages cités comme preuve.</p>
-                <ul class="legend">
-                  {#each Object.entries(change.people) as [ref, name]}<li><code>{ref}</code> = {name ?? 'inconnu'}{ref === change.person_ref ? ' (la personne évaluée)' : ''}</li>{/each}
-                </ul>
-                <pre class="lines">{change.context}</pre>
-              </details>
-            {/if}
-            {#if change.verdict === 'corrected'}
-              {#if change.undone}<span class="badge small">remise comme avant</span>{:else}<button type="button" class="btn small" onclick={() => undo(change)}>Garder l’ancienne position</button>{/if}
-            {/if}
-          </li>
+      <div class="viewbar">
+        <label class="check"><input type="checkbox" bind:checked={grouped} /> <span>Regrouper par thème</span></label>
+        {#if grouped && groups.length > 1}
+          <button type="button" class="tool-btn" onclick={() => { groupsTouched = true; openGroups = groups.map((g) => g.key); }}>Tout déplier</button>
+          <button type="button" class="tool-btn" onclick={() => { groupsTouched = true; openGroups = []; }}>Tout replier</button>
+        {/if}
+      </div>
+      {#snippet entry(change)}
+        <li class:undone={change.undone}>
+          <details class="entry">
+            <summary>
+              {#if change.verdict === 'corrected' && !change.undone}<input class="pick" type="checkbox" checked={selected.includes(change.claim)} onclick={(e) => e.stopPropagation()} onchange={(e) => choose(change.claim, e.currentTarget.checked)} aria-label={`Sélectionner la position de ${change.person}`} />{/if}
+              <strong class="who">{change.person}</strong>
+              <span class="what">{summary(change)}</span>
+              {#if change.undone}<span class="badge small">remise comme avant</span>{/if}
+              <span class="muted small when">{when(change.at)}</span>
+            </summary>
+            <div class="body">
+              {#if onPerson}<p><button type="button" class="link" onclick={() => onPerson(change.user)}>Voir la fiche de {change.person}</button></p>{/if}
+              {#if change.proposition}<p class="proposition">{change.proposition}</p>{/if}
+              {#if change.theme}<p class="muted small">Thème : {change.theme}</p>{/if}
+              {#each lines(change) as line}
+                <div class="diff"><span class="diffKind">{line.kind}</span><dl><div><dt>Avant</dt><dd><s>{line.before}</s></dd></div><div><dt>Après</dt><dd><strong>{line.after}</strong></dd></div></dl></div>
+              {/each}
+              {#if change.quotes.length || change.reason}
+                <details class="evidence"><summary>Citations et motif</summary>
+                  {#each change.quotes as quote}<blockquote>{quote}</blockquote>{/each}
+                  {#if change.reason}<p class="muted small">{change.reason}</p>{/if}
+                </details>
+              {/if}
+              {#if change.context}
+                <details class="evidence context"><summary>Voir tout le contexte lu</summary>
+                  <p class="muted small">Ce que le modèle a lu, tel quel : les auteurs y sont anonymes, <code>EVIDENCE</code> marque les messages cités comme preuve.</p>
+                  <ul class="legend">
+                    {#each Object.entries(change.people) as [ref, name]}<li><code>{ref}</code> = {name ?? 'inconnu'}{ref === change.person_ref ? ' (la personne évaluée)' : ''}</li>{/each}
+                  </ul>
+                  <pre class="lines">{change.context}</pre>
+                </details>
+              {/if}
+              {#if change.verdict === 'corrected' && !change.undone}<button type="button" class="btn small" onclick={() => undo(change)}>Garder l’ancienne position</button>{/if}
+            </div>
+          </details>
+        </li>
+      {/snippet}
+      {#if grouped}
+        {#each groups as group (group.key)}
+          {@const mine = group.items.filter((c) => c.verdict === 'corrected' && !c.undone)}
+          <details class="themeBlock" open={isOpen(group.key)} ontoggle={(e) => { if (!searching) setGroup(group.key, e.currentTarget.open); }}>
+            <summary class="theme">
+              {#if mine.length}<input class="pick" type="checkbox" checked={mine.every((c) => selected.includes(c.claim))} onclick={(e) => e.stopPropagation()}
+                onchange={(e) => (selected = e.currentTarget.checked ? [...new Set([...selected, ...mine.map((c) => c.claim)])] : selected.filter((id) => !mine.some((c) => c.claim === id)))} aria-label={`Sélectionner tout le thème ${group.label}`} />{/if}
+              <span class="themeName">{group.label}</span> <span class="count">{group.items.length} position{group.items.length > 1 ? 's' : ''}</span>
+            </summary>
+            <ul class="changes">{#each group.items as change (`${change.run}-${change.claim}`)}{@render entry(change)}{/each}</ul>
+          </details>
         {/each}
-      </ul>
+      {:else}
+        <ul class="changes">{#each changes as change (`${change.run}-${change.claim}`)}{@render entry(change)}{/each}</ul>
+      {/if}
       {#if more !== null}<button type="button" class="btn" onclick={() => loadChanges(true)}>Voir la suite</button>{/if}
     {/if}
   </section>
@@ -326,11 +370,34 @@
   .metrics dt { display: flex; align-items: center; gap: .5rem; min-height: 2rem; font-size: .8125rem; color: var(--text-secondary); }
   .metrics dd { font-size: 1.5rem; font-weight: 700; }
   .tabs .active { box-shadow: inset 0 0 0 1px var(--accent); }
-  .changes { list-style: none; display: flex; flex-direction: column; gap: .75rem; }
-  .changes > li { display: flex; flex-direction: column; gap: .875rem; padding: 1rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-control); }
-  .changes > li > .btn { align-self: flex-start; }
-  .changes li.undone { opacity: .65; }
-  .proposition { font-weight: 600; }
+  .changes { list-style: none; display: flex; flex-direction: column; margin: 0; padding: 0; }
+  .changes > li { border-bottom: 1px solid var(--border-subtle); }
+  .changes > li:last-child { border-bottom: 0; }
+  .changes li.undone { opacity: .6; }
+  .entry > summary { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .75rem; padding: .4375rem .5rem; cursor: pointer; list-style: none; min-width: 0; }
+  .entry > summary::-webkit-details-marker { display: none; }
+  .entry > summary::before { content: '▸'; flex: none; width: .875rem; color: var(--text-muted); font-size: .75rem; }
+  .entry[open] > summary::before { display: inline-block; transform: rotate(90deg); }
+  .entry > summary:hover { background: var(--surface-control); }
+  .entry .who { display: block; flex: 0 1 auto; min-width: 0; max-width: 10rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .entry .what { flex: 1 1 8rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: .875rem; }
+  .entry .when { flex: none; white-space: nowrap; }
+  .entry .body { display: flex; flex-direction: column; align-items: flex-start; gap: .75rem; padding: .5rem .75rem 1rem 1.75rem; }
+  .entry .body > * { max-width: 100%; overflow-wrap: anywhere; }
+  .entry .body { min-width: 0; }
+  .pick { flex: none; margin: 0; }
+  .themeBlock { border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-control); }
+  .themeBlock + .themeBlock { margin-top: .5rem; }
+  .theme { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .5rem; padding: .625rem .875rem; font-weight: 700; color: var(--text-primary); cursor: pointer; list-style: none; }
+  .theme::-webkit-details-marker { display: none; }
+  .theme::before { content: '▸'; display: inline-block; width: 1rem; color: var(--text-muted); transition: transform .15s; }
+  .themeBlock[open] > .theme::before { transform: rotate(90deg); }
+  .theme .pick { align-self: center; }
+  .themeName { overflow-wrap: anywhere; }
+  .count { color: var(--text-muted); font-weight: 400; font-size: .8125rem; }
+  .themeBlock > .changes { padding: 0 .5rem .5rem; }
+  .viewbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; }
+  .proposition { font-weight: 600; overflow-wrap: anywhere; }
   blockquote { margin: .5rem 0; padding-left: .75rem; border-left: 2px solid var(--border-subtle); color: var(--text-secondary); }
   .diff { display: flex; flex-direction: column; gap: .375rem; font-size: .875rem; }
   .diffKind { font-weight: 600; }
@@ -345,8 +412,6 @@
   .bulk { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; padding: .625rem .75rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-control); }
   .notice { padding: .5rem .75rem; border-radius: var(--radius-md); background: var(--bg-secondary); font-size: .875rem; }
   .pick { display: inline-flex; align-items: center; margin-right: .5rem; }
-  .who { justify-content: flex-start; }
-  .who .small { margin-left: auto; }
   @media (max-width: 900px) { .finder { grid-template-columns: 1fr 1fr; } .finder input { grid-column: 1 / -1; } }
   @media (max-width: 480px) { .finder { grid-template-columns: 1fr; } }
   .legend { list-style: none; display: flex; flex-wrap: wrap; gap: .25rem 1rem; margin: .25rem 0 .5rem; padding: 0; font-size: .8125rem; }

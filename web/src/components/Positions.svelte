@@ -46,6 +46,14 @@
   const pageSize = 50;
   let listLoading = $state(false);
   let listRequest = 0;
+  // The themes are blocks that fold: closed unless the person opened them (all of them open while a search or a filter is on, so that nothing it finds is hidden)
+  let openThemes = $state([]);
+  let themesTouched = $state(false);     // until the person opens or folds a theme, the first one (the busiest) is open: something is always in sight
+  const themeOpen = (key) => filtering || openThemes.includes(key) || (!themesTouched && groups[0]?.key === key);
+  const setTheme = (key, on) => {
+    if (!themesTouched) { themesTouched = true; if (!on && groups[0] && groups[0].key !== key) openThemes = [groups[0].key]; }
+    openThemes = on ? [...new Set([...openThemes, key])] : openThemes.filter((k) => k !== key);
+  };
   let newAxis = $state('');          // adding a link to an axis
   let newPole = $state('1');
   let newStrength = $state('1');
@@ -272,12 +280,19 @@
       {:else if data && !data.propositions.length}
         <p class="muted empty">Aucune position pour l’instant.</p>
       {/if}
+      {#if groups.length > 1 && !filtering}
+        <div class="foldAll">
+          <button type="button" class="tool-btn" onclick={() => { themesTouched = true; openThemes = groups.map((g) => g.key); }}>Tout déplier</button>
+          <button type="button" class="tool-btn" onclick={() => { themesTouched = true; openThemes = []; }}>Tout replier</button>
+        </div>
+      {/if}
       {#each groups as group (group.key)}
-        <h3 class="theme">{group.theme} <span class="count">{group.items.length} proposition{group.items.length > 1 ? 's' : ''} · {group.people} positions</span></h3>
+        <details class="themeBlock" open={themeOpen(group.key)} ontoggle={(e) => { if (!filtering) setTheme(group.key, e.currentTarget.open); }}>
+          <summary class="theme"><span class="themeName">{group.theme}</span> <span class="count">{group.items.length} proposition{group.items.length > 1 ? 's' : ''} · {group.people} positions</span></summary>
         <ul class="list">
           {#each group.items as p (p.id)}
             <li class="panel prop" class:open={opened?.id === p.id}>
-              <button class="row" type="button" aria-expanded={opened?.id === p.id} onclick={() => toggle(p)}>
+              <button class="row" type="button" aria-expanded={opened?.id === p.id} onclick={() => toggle(p)} title={p.text}>
                 <span class="text">{p.text}</span>
                 <span class="bar" role="img" aria-label="{p.for} pour, {p.nuanced} nuancés, {p.against} contre">
                   <span class="seg for" style="width: {share(p, 'for')}%"></span><span class="seg mid" style="width: {share(p, 'nuanced')}%"></span><span class="seg against" style="width: {share(p, 'against')}%"></span>
@@ -286,22 +301,23 @@
               </button>
               {#if opened?.id === p.id}
                 <div class="people">
+                  <p class="full">{p.text}</p>
                   {#if opened.loading}<p class="muted">Chargement…</p>{/if}
                   {#if opened.people.length > 4}
                     <input class="field-input" type="search" placeholder="Chercher une personne ou un rôle dans cette proposition" bind:value={personQ} aria-label="Chercher une personne dans cette proposition" />
                   {/if}
                   {#each opened.people.filter((w) => matches(personQ, w.label, w.roles.join(' '), w.evidence.map((e) => e.quote).join(' '))) as who (who.id)}
-                    <article class="person">
-                      <header>
-                        <strong>{who.label}</strong>
+                    <details class="person">
+                      <summary>
+                        <strong class="who">{who.label}</strong>
                         <span class="badge small" class:success={who.stance === 1} class:danger={who.stance === -1}>{STANCE[who.stance][0]}</span>
-                        {#each who.roles as role}<span class="role">{role}</span>{/each}
-                        <details class="confidence"><summary>Estimation</summary><span class="muted small">Confiance estimée : {Math.round(who.confidence * 100)} %</span></details>
-                      </header>
+                        {#each who.roles.slice(0, 2) as role}<span class="role">{role}</span>{/each}
+                        <span class="muted small">{who.evidence.length} citation{who.evidence.length > 1 ? 's' : ''} · confiance {Math.round(who.confidence * 100)} %</span>
+                      </summary>
                       {#each who.evidence as e}
                         <blockquote>« {e.quote} » <span class="muted small">— #{e.channel}, {dayOrNothing(e.at)}</span></blockquote>
                       {/each}
-                    </article>
+                    </details>
                   {/each}
                   {#if !opened.loading}<details class="reviewDetails"><summary>Réviser la proposition et ses axes</summary>                    <div class="review">
                       {#if p.status === 'rejected'}
@@ -351,6 +367,7 @@
             </li>
           {/each}
         </ul>
+        </details>
       {/each}
       {#if data && data.matching > pageSize}
         <nav class="pagination" aria-label="Pages des propositions">
@@ -447,20 +464,34 @@
   .progress progress { flex: 1 1 12rem; }
   .lines { flex-basis: 100%; max-height: 9rem; overflow: auto; padding: 0.625rem 0.75rem; border-radius: var(--radius-md); background: var(--bg-tertiary); font-size: 0.75rem; color: var(--text-secondary); white-space: pre-wrap; }
   .count { margin-left: 0.375rem; color: var(--text-muted); font-weight: 400; }
-  .theme { margin-top: 1rem; font-size: 1rem; font-weight: 700; color: var(--text-primary); }
-  .list { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
-  .prop { padding: 0; overflow: hidden; }
-  .row { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 11rem; gap: 0.25rem 1rem; align-items: center; padding: 0.75rem 1rem; background: none; border: none; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+  .themeBlock { border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--bg-secondary); }
+  .themeBlock + .themeBlock { margin-top: 0.5rem; }
+  .theme { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.5rem; padding: 0.625rem 0.875rem; font-size: 0.9375rem; font-weight: 700; color: var(--text-primary); cursor: pointer; list-style: none; }
+  .theme::-webkit-details-marker { display: none; }
+  .theme::before { content: '▸'; display: inline-block; width: 1rem; color: var(--text-muted); transition: transform 0.15s; }
+  .themeBlock[open] > .theme::before { transform: rotate(90deg); }
+  .themeName { overflow-wrap: anywhere; }
+  .foldAll { display: flex; gap: 0.5rem; justify-content: flex-end; }
+  .list { list-style: none; display: flex; flex-direction: column; gap: 0; margin: 0; padding: 0 0.5rem 0.5rem; }
+  .prop { padding: 0; overflow: hidden; border-radius: var(--radius-md); background: transparent; border: 0; box-shadow: none; }
+  .prop + .prop { border-top: 1px solid var(--border-subtle); border-radius: 0; }
+  .row { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 5rem auto; gap: 0.75rem; align-items: center; padding: 0.4375rem 0.5rem; background: none; border: none; text-align: left; color: inherit; font: inherit; cursor: pointer; }
   .row:hover { background: var(--surface-control); }
-  .text { color: var(--text-primary); font-weight: 600; }
+  .text { color: var(--text-primary); font-weight: 600; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .full { font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; }
   .bar { display: flex; height: 0.5rem; border-radius: 999px; overflow: hidden; background: var(--bg-tertiary); }
   .seg.for { background: var(--success); }
   .seg.mid { background: var(--text-muted); }
   .seg.against { background: var(--danger); }
-  .nums { grid-column: 1 / -1; font-size: 0.75rem; color: var(--text-muted); }
-  .people { display: flex; flex-direction: column; gap: 0.625rem; padding: 0.25rem 1rem 1rem; border-top: 1px solid var(--border-subtle); }
-  .person { display: flex; flex-direction: column; gap: 0.25rem; padding-top: 0.625rem; }
-  .person header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .nums { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .people { display: flex; flex-direction: column; gap: 0.375rem; padding: 0.5rem 0.5rem 0.75rem; border-top: 1px solid var(--border-subtle); }
+  .person { border-bottom: 1px solid var(--border-subtle); padding: 0.125rem 0; }
+  .person > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; padding: 0.3125rem 0.25rem; cursor: pointer; list-style: none; }
+  .person > summary::-webkit-details-marker { display: none; }
+  .person > summary::before { content: '▸'; width: 0.875rem; color: var(--text-muted); font-size: 0.75rem; }
+  .person[open] > summary::before { transform: rotate(90deg); display: inline-block; }
+  .person .who { overflow-wrap: anywhere; }
+  .person blockquote { margin: 0.125rem 0 0.375rem 1.25rem; }
   .role { padding: 0.0625rem 0.5rem; border-radius: 999px; border: 1px solid var(--border-subtle); font-size: 0.6875rem; color: var(--text-secondary); }
   blockquote { margin: 0; padding: 0.375rem 0.75rem; border-left: 3px solid var(--border-strong, var(--border-subtle)); color: var(--text-secondary); font-size: 0.875rem; line-height: 1.5; }
   .small { font-size: 0.75rem; }
@@ -469,5 +500,5 @@
   .linkName { font-weight: 600; color: var(--text-primary); }
   .add { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
   .badge.small { min-height: 1.5rem; font-size: 0.6875rem; }
-  @media (max-width: 720px) { .page { padding: 1rem 1rem 2rem; } .row { grid-template-columns: 1fr; } }
+  @media (max-width: 720px) { .page { padding: 1rem 1rem 2rem; } .row { grid-template-columns: minmax(0, 1fr) 4rem; } .row .nums { grid-column: 1 / -1; white-space: normal; } }
 </style>

@@ -68,8 +68,12 @@ def test_the_person_reads_the_positions_then_sees_who_says_what_with_the_quote(b
         row.wait_for()
         assert "1 pour · 0 nuancés · 1 contre" in row.inner_text()
         row.click()
-        page.get_by_text(SAYS_A, exact=False).wait_for()
+        page.locator(".people .person").first.wait_for()
+        assert page.locator(".people .person").count() == 2                                          # each person is one line…
+        assert not page.get_by_text(SAYS_A, exact=False).is_visible()                                # …and the quote is behind it
         assert page.get_by_text("Contre", exact=True).is_visible() and page.get_by_text("Pour", exact=True).is_visible()
+        page.locator(".people .person > summary").first.click()
+        page.get_by_text(SAYS_A, exact=False).wait_for()
         assert ingest_db.execute("SELECT count(*) FROM claims").fetchone() == (2,)
         browser.close()
     assert errors == []
