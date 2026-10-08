@@ -16,7 +16,7 @@ Audit du site consulté le 8 octobre 2026. Corrections réalisées dans le proje
 | Système | Très longue page ; alertes et réglages mélangés ; état vert malgré un ordinateur hors ligne ; consentement rouge même accordé | Sections État, Analyses auto, Discord, Performance, Maintenance ; accès direct depuis automatisation ; état des ordinateurs dans le résumé ; détails performance repliés ; consentement neutre quand accordé ; suppression isolée et confirmation du serveur |
 | Vie privée | Longue introduction ; actions incompatibles avec l’état actuel ; informations d’effacement répétées | Recherche puis état de la personne ; arrêt/reprise selon état ; export ; portée de l’effacement dépliable ; registre, conservation et journal préservés |
 | Invitation | « N’écrit pas » contredit les permissions ; restriction du bot privé après l’action ; lien brut encombrant | Restriction privée visible avant l’action ; CTA explicite ; permissions exactes dépliables ; collecte expliquée brièvement ; lien et copie conservés |
-| Ensemble | Police artificiellement réduite à 80 %, texte gris peu lisible, styles de titre et marges divergents | Police à taille normale ; gris plus contrasté ; surface sobre ; largeur de lecture et espacement communs ; filtres adaptables ; conservation du clavier et des modales |
+| Ensemble | Densité trop élevée à 100 %, texte gris peu lisible, styles de titre et marges divergents | Rendu ordinateur réduit de 20 % à zoom navigateur 100 % ; mobile à taille lisible ; gris plus contrasté ; largeur de lecture et espacement communs ; filtres adaptables ; conservation du clavier et des modales |
 
 ## Parcours de validation
 
@@ -39,3 +39,20 @@ La compilation de production est réussie. Les parcours navigateur ont été tes
 Les captures à 1440 et 390 px couvrent les pages et les sections de Système ; les essais contrôlent le retour du navigateur, le rechargement d’une adresse, l’ouverture des preuves et l’absence de débordement horizontal. L’import est vérifié avec un service Discord simulé ; aucun import, effacement ou envoi n’a été effectué sur le site de production.
 
 Ces changements sont locaux et ne sont pas encore déployés sur dindon.serveurnf.fr.
+
+## Reprise de la densité et des débordements
+
+À la demande de l’utilisateur, la taille de référence sur ordinateur passe à 80 % : textes, espacements, navigation et éléments de la carte diminuent ensemble. La largeur de lecture utilise la même échelle (960 px au lieu de 1 200 px). À 720 px et moins, la typographie conserve sa taille normale, les boutons principaux restent hauts de 44 px et les champs utilisent 16 px pour éviter le zoom de saisie sur téléphone. La carte adapte aussi sa densité lors d’un changement de largeur.
+
+| Zone | Correction supplémentaire |
+| --- | --- |
+| Thèmes | Grilles sans largeur minimale imposée ; titres et état peuvent changer de ligne ; mots-clés et liens longs restent dans la carte |
+| Positions | Propositions et rôles longs reviennent à la ligne ; réglages avancés adaptables ; menu des thèmes alimenté même pendant une recherche rapide |
+| Analyse et relecture | Onglets lisibles sur les petits téléphones ; titres des étapes sur plusieurs lignes ; grilles de machines adaptables |
+| Fiche personne | Rôles adaptables ; noms sous les axes dans le flux du document pour éviter les superpositions ; pôles longs répartis sur deux colonnes |
+| Système | Grilles de cartes, profils de performance et curseurs adaptées à la largeur disponible ; en-têtes repliables sur plusieurs lignes ; valeurs longues dans les encadrés |
+| Vie privée | Recherche et action peuvent passer sur deux lignes ; noms et identifiants longs restent dans leur bloc |
+| Import et invitation | Noms de salons et de serveurs lisibles sur plusieurs lignes ; titre de fenêtre flexible ; fermeture préservée |
+| Exports | Menu déplié dans le flux sur téléphone pour rester dans l’écran |
+
+La validation couvre les pages de consultation et toutes les sections de Système à 320, 390, 720, 1 024 et 1 440 px. Elle contrôle aussi les débordements internes aux composants, y compris avec des noms, mots-clés et URLs très longs. Les tableaux et journaux conservent leur défilement volontaire.

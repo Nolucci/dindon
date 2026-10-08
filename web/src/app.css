@@ -74,10 +74,10 @@
   padding: 0;
 }
 
-/* The whole page is drawn at 80% of the browser's size: what was comfortable at a browser zoom of 80% is now 100%.
-   Every size is in rem, so this one line scales them all (the map reads it too: see UI in lib/mapgraph.js). */
+/* Compact desktop density, also read by the map canvas in lib/mapgraph.js.
+   Phones retain their readable type and touch targets. */
 html {
-  font-size: 100%;
+  font-size: 80%;
 }
 
 body {
@@ -459,7 +459,7 @@ input[type='date'] {
 
 /* Consultation pages share one reading width and spacing. */
 .page:not(.embedded), .analysisPage > .content { padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 2.5rem; }
-.page:not(.embedded) > *, .analysisPage > .content > * { width: 100%; max-width: 1200px; margin-inline: auto; }
+.page:not(.embedded) > *, .analysisPage > .content > * { width: 100%; max-width: 75rem; margin-inline: auto; }
 .page.embedded { padding: 0; }
 .eyebrow { text-transform: none; letter-spacing: normal; font-size: .8125rem; }
 .toolbar { flex-wrap: wrap; }
@@ -478,3 +478,15 @@ blockquote { overflow-wrap: anywhere; }
 .page .eyebrow, .analysisPage .eyebrow { font-size: .8125rem; letter-spacing: normal; }
 
 .analysisPage > .content { max-width: none; }
+
+/* Names, URLs and role labels must fit their containing cards. */
+.page, .analysisPage, aside, .modal { overflow-wrap: anywhere; }
+.btn, .badge { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.btn { padding-block: .375rem; }
+.badge { text-align: center; }
+input, select, textarea { min-width: 0; max-width: 100%; }
+@media (max-width: 720px) {
+  html { font-size: 100%; }
+  .btn, .tool-btn { min-height: 44px; }
+  input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea { font-size: 16px; }
+}

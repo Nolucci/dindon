@@ -30,7 +30,9 @@
 
 <style>
   .axis { display: flex; flex-direction: column; gap: 0.1875rem; }
-  .poles { display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-muted); }
+  .poles { display: flex; gap: .75rem; justify-content: space-between; font-size: 0.6875rem; color: var(--text-muted); }
+  .poles span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .poles span:last-child { text-align: right; }
   .track { position: relative; height: 0.625rem; border-radius: 999px; background: linear-gradient(90deg, #ed4245 0%, #c9a227 50%, #3ba55d 100%); }
   .track.empty { background: var(--bg-tertiary); }
   .compact .track { height: 0.5rem; }
@@ -41,9 +43,9 @@
   .whisker::after { right: 0; }
   .dot { position: absolute; top: 50%; width: 0.875rem; height: 0.875rem; margin: -0.4375rem 0 0 -0.4375rem; border-radius: 50%; background: #fff; border: 2px solid var(--bg-primary, #1e1f22); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); }
   /* what a role expects: a segment under the bar where the role would put someone, then its name */
-  .role { position: relative; height: 1.125rem; font-size: 0.625rem; color: var(--text-muted); }
+  .role { position: relative; padding-top: .5rem; min-height: 1.125rem; font-size: 0.625rem; color: var(--text-muted); }
   .role .range { position: absolute; top: 0.125rem; height: 0.25rem; min-width: 0.25rem; border-radius: 999px; background: var(--text-secondary); opacity: 0.7; }
-  .role .name { position: absolute; top: 0.375rem; left: 0; line-height: 1; }
+  .role .name { display: block; line-height: 1.3; overflow-wrap: anywhere; }
   .role.bad .range { background: #ed4245; opacity: 0.9; }
   .role.bad .name { color: #ed4245; }
 </style>

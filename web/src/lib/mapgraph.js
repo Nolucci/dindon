@@ -26,8 +26,7 @@ const NODE_DEFAULT = [219, 222, 225]; // Discord's color for a name without a co
 const MIN_CONTRAST = 2;               // a color darker than this against the background is lightened (a black role would vanish)
 const NAMED_NEIGHBORS = 14;         // when someone is in focus, their strongest links show a name
 // The page is drawn at 80% of the browser's size (`html { font-size: 80% }`, see app.css): the sizes of the map follow it
-const UI = (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
-const LABEL_PILL_EXTRA = 28 * UI;      // how far the pill of a hovered name goes beyond the name
+let UI = (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
 
 // The person under the mouse, or selected: a glow in their own color and a white ring around the point, and their name in a
 // blurple pill (the accent of the dashboard) with white letters, so that it stands out from every other name on the map
@@ -170,6 +169,7 @@ export function groupedLayout(people) {
 export class MapGraph {
   // `imageProgram`: Sigma's program that draws a picture in a point (the Activity gives one: the people's photos in the color of their name)
   constructor(container, { onSelect, onHover, imageProgram }) {
+    UI = (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
     this.container = container;
     container.__map = this; // so that a test in a browser can ask where the names are
     this.flashCount = 0;
@@ -286,7 +286,7 @@ export class MapGraph {
   // on it or on the pill that opens around it, which is wider than the name.
   labelAt(x, y) {
     const inside = (b, extra = 0) => x >= b.left && x <= b.right + extra && y >= b.top && y <= b.bottom;
-    if (this.labelBox && inside(this.labelBox, LABEL_PILL_EXTRA)) return this.labelBox;
+    if (this.labelBox && inside(this.labelBox, 28 * UI)) return this.labelBox;
     for (let i = this.labelBoxes.length - 1; i >= 0; i--) if (inside(this.labelBoxes[i])) return this.labelBoxes[i];
     return null;
   }
@@ -760,6 +760,16 @@ export class MapGraph {
 
   // The page changed the size of the map (the person's card opens or closes)
   resized() {
+    const next = (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
+    if (next !== UI) {
+      const ratio = next / UI;
+      UI = next;
+      this.graph.updateEachNodeAttributes((id, attributes) => ({ ...attributes, size: attributes.size * ratio }));
+      this.graph.updateEachEdgeAttributes((id, attributes) => ({ ...attributes, size: attributes.size * ratio }));
+      this.renderer.setSetting('stagePadding', 64 * UI);
+      this.renderer.setSetting('labelSize', 12 * UI);
+      this.renderer.setSetting('labelGridCellSize', 64 * UI);
+    }
     this.renderer.resize();
     this.renderer.refresh();
   }

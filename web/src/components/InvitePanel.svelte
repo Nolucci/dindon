@@ -204,6 +204,7 @@
 
   .servers li {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.625rem;
     padding: 0.5rem 0.25rem;
@@ -215,11 +216,9 @@
   }
 
   .name {
-    flex: 1;
+    flex: 1 1 12rem;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
     color: var(--text-primary);
     font-weight: 500;
   }

@@ -110,6 +110,8 @@
   }
 
   h2 {
+    min-width: 0;
+    overflow-wrap: anywhere;
     font-size: 0.9375rem;
     font-weight: 700;
     color: var(--text-primary);
@@ -117,6 +119,7 @@
   }
 
   .closeBtn {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;

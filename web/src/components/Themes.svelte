@@ -381,7 +381,7 @@
 
   .counts {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 7.5rem), 1fr));
     gap: 0.625rem;
   }
 
@@ -523,7 +523,7 @@
 
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr));
     gap: 1rem;
   }
 
@@ -541,12 +541,14 @@
 
   .topic > header {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
     gap: 0.75rem;
   }
 
   h3 {
+    flex: 1 1 12rem;
     font-size: 1rem;
     font-weight: 600;
     color: var(--text-primary);

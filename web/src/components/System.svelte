@@ -759,7 +759,7 @@
   .grid {
     align-items: start;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
     gap: 1rem;
   }
 
@@ -773,6 +773,7 @@
 
   .card > header {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
@@ -798,10 +799,14 @@
   }
 
   dt {
+    min-width: 0;
+    flex: 1;
     color: var(--text-muted);
   }
 
   dd {
+    min-width: 0;
+    max-width: 65%;
     color: var(--text-primary);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
@@ -850,10 +855,10 @@
   .status div { display: flex; gap: 1rem; padding: 0.375rem 0; border-top: 1px solid var(--border-subtle); font-size: 0.8125rem; }
   .status dt { flex: 0 0 7rem; color: var(--text-muted); }
   .status dd { color: var(--text-primary); }
-  .presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.5rem; }
+  .presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); gap: 0.5rem; }
   .preset { display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start; padding: 0.625rem 0.75rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-control); color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; }
   .preset.on { border-color: var(--accent, #5865f2); box-shadow: 0 0 0 1px var(--accent, #5865f2) inset; }
-  .knobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 1rem 1.5rem; }
+  .knobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 1rem 1.5rem; }
   .knob { display: flex; flex-direction: column; gap: 0.375rem; }
   .knobHead { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.8125rem; color: var(--text-primary); font-weight: 600; }
   .knobHead output { color: var(--text-secondary); font-variant-numeric: tabular-nums; }

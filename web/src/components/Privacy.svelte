@@ -225,8 +225,8 @@
   h1 { font-size: clamp(1.5rem, 2vw, 1.9rem); line-height: 1.1; font-weight: 700; color: var(--text-primary); }
   .subtitle { max-width: 68ch; margin-top: 0.5rem; color: var(--text-secondary); }
   .card { padding: 1rem 1.125rem; display: flex; flex-direction: column; gap: 0.75rem; box-shadow: var(--shadow-sm); }
-  form { display: flex; gap: 0.5rem; }
-  form .field-input { flex: 1; }
+  form { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  form .field-input { flex: 1 1 12rem; min-width: 0; }
   .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   ul { list-style: none; display: flex; flex-direction: column; }
   .rows li, .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 0.625rem; padding: 0.5rem 0.25rem; border-bottom: 1px solid var(--border-subtle); }

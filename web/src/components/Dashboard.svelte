@@ -370,7 +370,7 @@
   }
 </script>
 
-<svelte:window onkeydown={escape} />
+<svelte:window onkeydown={escape} onresize={() => map?.resized()} />
 
 <div class="layout">
   <Navbar {guilds} {guild} {view} onView={showView} onGuildChange={guildPicked} onImport={() => (showImport = true)} onInvite={() => (showInvite = true)} onLogout={logout} />

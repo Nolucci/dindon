@@ -203,14 +203,15 @@
   .pipeline button:hover, .pipeline button:focus-visible { border-color: var(--text-muted); }
   .pipeline button.current { border-color: var(--accent, #8b6cff); box-shadow: inset 0 0 0 1px var(--accent, #8b6cff); }
   .pipeline button.complete .stepNumber { background: var(--accent, #8b6cff); color: white; }
-  .stepTop { display: flex; align-items: center; gap: .45rem; font-size: .9rem; }
+  .stepTop { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; font-size: .9rem; }
+  .stepTop strong { flex: 1 1 5rem; min-width: 0; }
   .stepNumber { display: inline-grid; place-items: center; flex: none; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: var(--bg-primary); font-size: .72rem; }
   .stepState { margin-left: auto; color: var(--text-muted); font-size: .7rem; }
   .stepDetail { color: var(--text-secondary); font-size: .78rem; font-variant-numeric: tabular-nums; }
   .live { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; padding: .75rem 1rem; border-radius: var(--radius-lg); background: var(--bg-secondary); font-size: .8rem; font-variant-numeric: tabular-nums; }
   .live progress { flex: 1 1 10rem; height: .65rem; accent-color: var(--accent, #8b6cff); }
   .machines h2 { margin: 0 0 .5rem; font-size: 1rem; color: var(--text-primary); }
-  .machines ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: .55rem; }
+  .machines ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: .55rem; }
   .machines li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .25rem .5rem; padding: .75rem .85rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--bg-secondary); font-size: .78rem; font-variant-numeric: tabular-nums; }
   .machines li.busy { border-color: var(--accent, #8b6cff); }
   .machines li.down { opacity: .7; }
@@ -232,4 +233,8 @@
   .detailIntro h2 { margin: 0 0 .35rem; font-size: 1.2rem; color: var(--text-primary); }
   .empty { padding: 1.25rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); color: var(--text-secondary); }
   @media (max-width: 720px) { .content { padding: 1rem 1rem 2rem; } .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sections button { padding: .6rem .25rem; font-size: .8rem; } }
+  @media (max-width: 480px) {
+    .sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .sections button { min-height: 44px; }
+  }
 </style>

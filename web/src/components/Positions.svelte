@@ -71,7 +71,7 @@
     listLoading = false;
     if (d) {
       data = d;
-      if (!filtering) themes = d.themes;
+      themes = d.themes;
       onUpdate();
     }
     if (i) info = i;
@@ -430,13 +430,13 @@
   .subtitle { max-width: 68ch; margin-top: 0.5rem; color: var(--text-secondary); }
   .card { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
   .head { display: flex; align-items: center; justify-content: space-between; }
-  .counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.625rem; }
+  .counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); gap: 0.625rem; }
   .metric { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.75rem 0.875rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-control); }
   .metric dt { font-size: 0.6875rem; font-weight: 700; letter-spacing: normal; text-transform: none; color: var(--text-muted); }
   .metric dd { font-size: 1.25rem; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
   .unit { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
   .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
-  .inline { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: var(--text-secondary); }
+  .inline { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: var(--text-secondary); }
   .hint { font-size: 0.75rem; }
   .advanced .inline { margin-top: 0.75rem; margin-right: 1rem; }
   .num { width: 6rem; }

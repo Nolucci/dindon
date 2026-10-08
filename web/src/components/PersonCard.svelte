@@ -223,7 +223,7 @@
   .axisName { font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); }
   .flag { font-size: 0.6875rem; font-weight: 700; color: #ed4245; }
   .contrib { gap: 0.25rem; padding-left: 0.5rem; font-size: 0.75rem; color: var(--text-secondary); }
-  .roles li { display: flex; align-items: center; gap: 0.5rem; }
+  .roles li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
   .roleName { font-weight: 600; color: var(--text-primary); font-size: 0.875rem; }
   .chips { display: flex; flex-wrap: wrap; gap: 0.375rem; margin: 0.5rem 0; }
   .chip { padding: 0.25rem 0.625rem; border-radius: 999px; border: 1px solid var(--border-subtle); background: var(--surface-control); color: var(--text-secondary); font: inherit; font-size: 0.75rem; cursor: pointer; }
