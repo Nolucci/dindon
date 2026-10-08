@@ -4,7 +4,7 @@ anybody, and what the page says is text written by anybody. Nothing here trusts 
 What it protects against:
 
 * **Reaching this machine or its network** (SSRF). Only public addresses are connected to: every address that the name resolves to is checked (private, loopback, link-local,
-  carrier-grade NAT, reserved, multicast, and IPv6 forms that hide an IPv4 address: mapped, 6to4, Teredo, NAT64). The check is made again on **every redirect**, and the
+  carrier-grade NAT, reserved, multicast, and IPv6 forms that hide an IPv4 address: mapped, 6to4, Teredo, and NAT64 unless the IPv4 inside it is public). The check is made again on **every redirect**, and the
   connection goes to the address that was checked (not to a name that could answer differently the second time: DNS rebinding), while TLS still checks the certificate
   against the real host name. Only the ports 80 and 443, and no credentials in the address.
 * **Heavy or hostile answers**: a limit on the size read (the rest is dropped), on the total time, on redirects, only text pages (HTML, plain text), no compressed
@@ -62,7 +62,9 @@ def public_only(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
             return public_only(ip.ipv4_mapped)
         if ip.sixtofour is not None:
             return public_only(ip.sixtofour)
-        if ip in TEREDO or ip in NAT64:
+        if ip in NAT64:
+            return public_only(ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF))     # a DNS64 resolver adds one to every IPv4-only site: fine when the IPv4 inside it is public
+        if ip in TEREDO:
             return False
     return ip.is_global and not ip.is_multicast
 

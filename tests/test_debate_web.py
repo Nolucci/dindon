@@ -135,13 +135,14 @@ def test_the_owner_can_add_sources_without_touching_the_defaults():
     "224.0.0.1", "255.255.255.255", "198.18.0.1", "::1", "::", "fe80::1", "fc00::1", "fd12:3456::1", "ff02::1",
     "::ffff:127.0.0.1", "::ffff:10.1.2.3", "::ffff:169.254.169.254",                      # IPv6 that hides a private IPv4
     "2002:7f00:0001::1", "2002:0a00:0001::1",                                            # 6to4 around 127.0.0.1 and 10.0.0.1
-    "64:ff9b::7f00:1", "2001:0:4136:e378:8000:63bf:3fff:fdd2",                           # NAT64, Teredo
+    "64:ff9b::7f00:1", "64:ff9b::a00:1", "2001:0:4136:e378:8000:63bf:3fff:fdd2",              # NAT64 around 127.0.0.1 and 10.0.0.1, Teredo
 ])
 def test_no_address_of_this_machine_or_its_network_is_ever_connected_to(address):
     assert web.public_only(ipaddress.ip_address(address)) is False
 
 
-@pytest.mark.parametrize("address", ["93.184.216.34", "8.8.8.8", "151.101.1.69", "2606:2800:220:1:248:1893:25c8:1946", "2a00:1450:4007:80b::200e", "::ffff:8.8.8.8"])
+@pytest.mark.parametrize("address", ["93.184.216.34", "8.8.8.8", "151.101.1.69", "2606:2800:220:1:248:1893:25c8:1946", "2a00:1450:4007:80b::200e", "::ffff:8.8.8.8",
+                                     "64:ff9b::c2fe:25a3"])                      # NAT64 around a public IPv4 (what a DNS64 resolver adds)
 def test_public_addresses_are_allowed(address):
     assert web.public_only(ipaddress.ip_address(address)) is True
 
