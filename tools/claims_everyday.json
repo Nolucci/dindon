@@ -1,0 +1,818 @@
+{
+ "version": 1,
+ "labelled_by": "Claude, from stable common knowledge (no figure that changes with time)",
+ "how": "everyday claims of the kind said in a debate: obvious falsehoods, obvious truths, and things nobody could check. Split dev/test like claims_reference.json.",
+ "messages": [],
+ "claims": [
+  {
+   "id": "e01",
+   "claim": "Paris est la capitale de l'Allemagne.",
+   "query": "capitale de l'Allemagne",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e02",
+   "claim": "La reine d'Angleterre s'appelle Elizabeth VIII.",
+   "query": "Elizabeth VIII reine",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e03",
+   "claim": "65 % des Français sont marocains.",
+   "query": "part de la population française d'origine marocaine",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e04",
+   "claim": "Plus de 80 % des personnes blanches commettent des crimes.",
+   "query": "part de la population qui commet des crimes",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e05",
+   "claim": "La présidente de la République française s'appelle Brigitte.",
+   "query": "présidente de la République française",
+   "expected": "contradicted",
+   "confidence": "medium",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e06",
+   "claim": "La Terre est plate.",
+   "query": "forme de la Terre",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e07",
+   "claim": "Le Soleil tourne autour de la Terre.",
+   "query": "Terre Soleil héliocentrisme",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e08",
+   "claim": "Napoléon est mort en 1950.",
+   "query": "date de mort de Napoléon",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e09",
+   "claim": "La Révolution française a commencé en 1889.",
+   "query": "début de la Révolution française",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e10",
+   "claim": "La Seconde Guerre mondiale s'est terminée en 1960.",
+   "query": "fin de la Seconde Guerre mondiale",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e11",
+   "claim": "Le mont Everest se trouve en Afrique.",
+   "query": "localisation du mont Everest",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e12",
+   "claim": "L'eau bout à 50 degrés Celsius au niveau de la mer.",
+   "query": "température d'ébullition de l'eau",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e13",
+   "claim": "Un être humain adulte a 12 os.",
+   "query": "nombre d'os adulte",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e14",
+   "claim": "La Seine traverse la ville de Marseille.",
+   "query": "Seine villes traversées",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e15",
+   "claim": "La tour Eiffel se trouve à Londres.",
+   "query": "localisation tour Eiffel",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e16",
+   "claim": "La France a gagné la Coupe du monde de football en 1966.",
+   "query": "France Coupe du monde victoires",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e17",
+   "claim": "L'Espagne est un pays d'Amérique du Sud.",
+   "query": "Espagne continent",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e18",
+   "claim": "Victor Hugo a écrit Les Fleurs du mal.",
+   "query": "auteur des Fleurs du mal",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e19",
+   "claim": "Le Brésil a pour langue officielle l'espagnol.",
+   "query": "langue officielle du Brésil",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e20",
+   "claim": "Le Pacifique est le plus petit océan du monde.",
+   "query": "plus petit océan",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e21",
+   "claim": "L'Union européenne compte 50 États membres.",
+   "query": "nombre d'États membres de l'UE",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e22",
+   "claim": "Il y a 14 mois dans une année.",
+   "query": "nombre de mois dans une année",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e23",
+   "claim": "Les Français sont majoritairement musulmans.",
+   "query": "religion majoritaire en France",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e24",
+   "claim": "La France est une monarchie.",
+   "query": "régime politique de la France",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e25",
+   "claim": "Le dollar est la monnaie officielle de la France.",
+   "query": "monnaie officielle de la France",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e26",
+   "claim": "Le Premier ministre français est élu au suffrage universel direct.",
+   "query": "élection du Premier ministre",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e27",
+   "claim": "La Seine est un fleuve d'Espagne.",
+   "query": "Seine fleuve pays",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e28",
+   "claim": "Les vaccins contiennent des puces électroniques.",
+   "query": "vaccins puces électroniques",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e29",
+   "claim": "L'homme n'a jamais marché sur la Lune.",
+   "query": "alunissage Apollo 11",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e30",
+   "claim": "Louis XIV a vécu au XIXe siècle.",
+   "query": "Louis XIV siècle",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e31",
+   "claim": "Le chat est un oiseau.",
+   "query": "chat classification animale",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e32",
+   "claim": "La capitale de l'Italie est Milan.",
+   "query": "capitale de l'Italie",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e33",
+   "claim": "L'Allemagne n'a jamais été divisée en deux États.",
+   "query": "Allemagne division RFA RDA",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e34",
+   "claim": "Le Mur de Berlin est tombé en 1999.",
+   "query": "chute du mur de Berlin",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e35",
+   "claim": "Les Français représentent la majorité de la population mondiale.",
+   "query": "population mondiale France",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e36",
+   "claim": "Il y a plus de 500 millions de Français.",
+   "query": "population de la France",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e37",
+   "claim": "La France a 12 régions en métropole.",
+   "query": "nombre de régions métropolitaines",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e38",
+   "claim": "L'Assemblée nationale siège à Strasbourg.",
+   "query": "siège de l'Assemblée nationale",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e39",
+   "claim": "Le Rhône se jette dans l'océan Atlantique.",
+   "query": "embouchure du Rhône",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e40",
+   "claim": "Les immigrés représentent plus de 50 % de la population française.",
+   "query": "part des immigrés dans la population française",
+   "expected": "contradicted",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e41",
+   "claim": "Paris est la capitale de la France.",
+   "query": "capitale de la France",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e42",
+   "claim": "La Terre tourne autour du Soleil.",
+   "query": "Terre Soleil",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e43",
+   "claim": "L'eau bout à 100 degrés Celsius au niveau de la mer.",
+   "query": "ébullition de l'eau",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e44",
+   "claim": "Napoléon est mort en 1821.",
+   "query": "mort de Napoléon",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e45",
+   "claim": "La Révolution française a commencé en 1789.",
+   "query": "Révolution française début",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e46",
+   "claim": "La Seconde Guerre mondiale s'est terminée en 1945.",
+   "query": "fin Seconde Guerre mondiale",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e47",
+   "claim": "Le mont Everest se trouve dans l'Himalaya.",
+   "query": "Everest localisation",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e48",
+   "claim": "La tour Eiffel se trouve à Paris.",
+   "query": "tour Eiffel",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e49",
+   "claim": "La France a gagné la Coupe du monde de football en 1998.",
+   "query": "France Coupe du monde 1998",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e50",
+   "claim": "Victor Hugo a écrit Les Misérables.",
+   "query": "auteur des Misérables",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e51",
+   "claim": "Le portugais est la langue officielle du Brésil.",
+   "query": "langue officielle du Brésil",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e52",
+   "claim": "L'océan Pacifique est le plus grand océan du monde.",
+   "query": "plus grand océan",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e53",
+   "claim": "Une année compte 12 mois.",
+   "query": "mois dans une année",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e54",
+   "claim": "La France est une république.",
+   "query": "régime politique de la France",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e55",
+   "claim": "L'euro est la monnaie officielle de la France.",
+   "query": "monnaie de la France",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e56",
+   "claim": "Le Mur de Berlin est tombé en 1989.",
+   "query": "chute du mur de Berlin",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e57",
+   "claim": "Apollo 11 a posé des hommes sur la Lune en 1969.",
+   "query": "Apollo 11",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e58",
+   "claim": "Le chat est un mammifère.",
+   "query": "chat mammifère",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e59",
+   "claim": "La capitale de l'Italie est Rome.",
+   "query": "capitale de l'Italie",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e60",
+   "claim": "L'Allemagne a été divisée en deux États de 1949 à 1990.",
+   "query": "Allemagne RFA RDA",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e61",
+   "claim": "Le Rhône se jette dans la mer Méditerranée.",
+   "query": "embouchure du Rhône",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e62",
+   "claim": "La France métropolitaine compte 13 régions.",
+   "query": "régions de France métropolitaine",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e63",
+   "claim": "La Seine traverse Paris.",
+   "query": "Seine Paris",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e64",
+   "claim": "L'Assemblée nationale siège à Paris.",
+   "query": "siège de l'Assemblée nationale",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e65",
+   "claim": "Louis XIV est mort en 1715.",
+   "query": "mort de Louis XIV",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e66",
+   "claim": "Le Premier ministre français est nommé par le président de la République.",
+   "query": "nomination du Premier ministre",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e67",
+   "claim": "La Terre compte sept continents selon la convention la plus répandue.",
+   "query": "nombre de continents",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e68",
+   "claim": "Les humains ont mis le pied sur la Lune.",
+   "query": "humains sur la Lune",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e69",
+   "claim": "L'Espagne est un pays d'Europe.",
+   "query": "Espagne continent",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e70",
+   "claim": "Un être humain adulte a 206 os.",
+   "query": "os adulte",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e71",
+   "claim": "Marie Curie a reçu deux prix Nobel.",
+   "query": "Marie Curie prix Nobel",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e72",
+   "claim": "La Joconde a été peinte par Léonard de Vinci.",
+   "query": "auteur de la Joconde",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e73",
+   "claim": "Le Rhin traverse l'Allemagne.",
+   "query": "Rhin Allemagne",
+   "expected": "confirmed",
+   "confidence": "high",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e74",
+   "claim": "Ma voisine a mangé trois pommes hier.",
+   "query": "voisine pommes",
+   "expected": "unverifiable",
+   "confidence": "medium",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e75",
+   "claim": "Le nombre exact de personnes qui regardent ce salon est de 143.",
+   "query": "nombre de personnes salon",
+   "expected": "unverifiable",
+   "confidence": "medium",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e76",
+   "claim": "Mon cousin a dépensé 312 euros en essence en mars dernier.",
+   "query": "cousin essence mars",
+   "expected": "unverifiable",
+   "confidence": "medium",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e77",
+   "claim": "La moitié des gens de ce serveur préfèrent le thé au café.",
+   "query": "thé café préférence serveur",
+   "expected": "unverifiable",
+   "confidence": "medium",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e78",
+   "claim": "Le prochain gouvernement sera meilleur que le précédent.",
+   "query": "prochain gouvernement meilleur",
+   "expected": "unverifiable",
+   "confidence": "medium",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e79",
+   "claim": "Il y aura exactement 41 000 touristes à Nice l'été prochain.",
+   "query": "touristes Nice été prochain",
+   "expected": "unverifiable",
+   "confidence": "medium",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e80",
+   "claim": "Le premier qui a eu l'idée du fromage était un berger breton.",
+   "query": "origine fromage berger breton",
+   "expected": "unverifiable",
+   "confidence": "medium",
+   "pair": null,
+   "side": null,
+   "note": ""
+  },
+  {
+   "id": "e81",
+   "claim": "Il pleuvra à Lille le 3 mars de l'an prochain.",
+   "query": "météo Lille 3 mars",
+   "expected": "unverifiable",
+   "confidence": "medium",
+   "pair": null,
+   "side": null,
+   "note": ""
+  }
+ ]
+}

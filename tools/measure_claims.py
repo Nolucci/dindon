@@ -98,6 +98,7 @@ def main() -> None:
         p = sub.add_parser(name)
         p.add_argument("--model", default=os.environ.get("DINDON_DEBATE_MODEL", "qwen3:14b"))
         p.add_argument("--ollama", default=os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434"))
+        p.add_argument("--reference", default=str(REFERENCE), help="the reference set (default: tools/claims_reference.json; tools/claims_everyday.json: everyday claims)")
         p.add_argument("--limit", type=int, default=0, help="only the first N (to try it)")
         p.add_argument("--split", choices=("dev", "test", "all"), default="all", help="dev: to tune the instructions; test: the figures to report (do not tune on it)")
         p.add_argument("--out", help="where to write what was predicted (default: political/measure-<kind>.json)")
@@ -108,7 +109,7 @@ def main() -> None:
     scoring.add_argument("kind", choices=("reading", "local", "verify"))
     scoring.add_argument("file")
     args = parser.parse_args()
-    reference = json.loads(REFERENCE.read_text(encoding="utf-8"))
+    reference = json.loads(Path(getattr(args, "reference", REFERENCE)).read_text(encoding="utf-8"))
     if args.mode == "score":
         saved = json.loads(Path(args.file).read_text(encoding="utf-8"))
         kind = args.kind

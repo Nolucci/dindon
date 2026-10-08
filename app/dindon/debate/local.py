@@ -15,27 +15,38 @@ from dataclasses import dataclass
 
 from dindon.debate.reading import Chat, Reading
 
-PROMPT_VERSION = "local-4"
+PROMPT_VERSION = "local-5"
 TRUE, FALSE, UNSURE = "true", "false", "unsure"
 SYSTEM = (
-    "Tu es un vérificateur de faits très prudent. On te donne UNE affirmation de fait, seule : tu ne sais ni qui l'a dite, ni dans quel débat, et tu n'as aucun avis. "
-    "Sans chercher sur Internet, réponds `true` seulement si tu es CERTAIN qu'elle est exacte, `false` seulement si tu es CERTAIN qu'elle est inexacte, et `unsure` dans tous les autres cas. "
-    "Tu réponds `unsure` pour tout ce qui change avec le temps (chiffres récents, prix, résultats, personnes en poste, lois récentes), pour tout ce que tu ne connais pas précisément, "
-    "pour tout ce qui dépend d'une définition ou d'un périmètre, et dès que tu hésites : mieux vaut se taire que se tromper. "
-    "Si tu réponds `false`, écris dans `answer` UNE phrase qui dit ce que tu sais d'exact (le bon chiffre, la bonne date, le bon fait), sans adresse Internet, sans « selon », sans adjectif, "
-    "sans parler de la personne qui a affirmé. Si tu réponds `true` ou `unsure`, `answer` est vide. Donne aussi `certainty`, ton degré de certitude de 0 à 100 : "
-    "sous 80, réponds `unsure`. Une correction doit dire quelque chose de DIFFÉRENT de l'affirmation (un autre chiffre, une autre date, un autre fait) : si tu retrouves les mêmes chiffres, c'est que tu n'as pas de correction.\n"
+    "Tu es un vérificateur de faits. On te donne UNE affirmation de fait, seule : tu ne sais ni qui l'a dite, ni dans quel débat, et tu n'as aucun avis. "
+    "Sans chercher sur Internet, tu dis si elle est exacte (`true`), inexacte (`false`) ou si tu ne peux pas trancher (`unsure`). "
+    "D'abord, dans `reasoning`, écris en une ou deux phrases ce que tu sais de l'objet de l'affirmation (le fait exact, l'ordre de grandeur) et si l'affirmation le respecte.\n"
+    "Tu réponds `false` quand ce que tu sais est incompatible avec l'affirmation : un fait établi et stable (géographie, histoire, sciences, institutions), un nom ou une date que tu connais, "
+    "un chiffre ou une proportion dont l'ordre de grandeur est connu et très éloigné de celui de l'affirmation (même sans connaître le chiffre exact), une personne ou une fonction qui n'existe pas ou n'a jamais existé, "
+    "une généralisation absurde (« la majorité des X font Y » alors que ce n'est manifestement pas le cas). Tu réponds `true` quand tu es certain que l'affirmation est exacte. "
+    "Tu réponds `unsure` pour ce qui change vraiment avec le temps (résultats récents, prix, personnes en poste dont tu n'es pas sûr), pour ce que tu ne connais pas, "
+    "pour ce qui dépend d'une définition ou d'un périmètre flou, pour ce qui est invérifiable, et dès que ce que tu sais ne suffit pas pour trancher.\n"
+    "Si tu réponds `false`, écris dans `answer` UNE phrase qui dit ce que tu sais d'exact (le bon fait, la bonne date, le bon ordre de grandeur), sans adresse Internet, sans « selon », sans adjectif, "
+    "sans parler de la personne qui a affirmé. Cette phrase doit dire quelque chose de DIFFÉRENT de l'affirmation : si tu retrouves le même fait, c'est que l'affirmation est vraie. "
+    "Si tu réponds `true` ou `unsure`, `answer` est vide. Donne aussi `certainty`, ton degré de certitude de 0 à 100 : sous 80, réponds `unsure`.\n"
     "Exemples. « La Terre tourne autour du Soleil. » → true. « Paris est la capitale de l'Allemagne. » → false, answer « La capitale de l'Allemagne est Berlin. » "
-    "« Le taux de chômage en France est de 7,3 %. » → unsure (un chiffre qui change)."
+    "« 70 % des Français sont des moines. » → false, answer « Les moines ne représentent qu'une toute petite fraction de la population française. » "
+    "« La France compte 80 millions de départements. » → false. « Le taux de chômage en France est de 7,3 %. » → unsure (un chiffre qui change). "
+    "« Mon voisin a mangé deux pommes hier. » → unsure."
 )
-SCHEMA = {"type": "object", "properties": {"verdict": {"type": "string", "enum": [TRUE, FALSE, UNSURE]}, "answer": {"type": "string"}, "certainty": {"type": "integer"}},
-          "required": ["verdict", "answer", "certainty"]}
+SCHEMA = {"type": "object", "properties": {"reasoning": {"type": "string"}, "verdict": {"type": "string", "enum": [TRUE, FALSE, UNSURE]}, "answer": {"type": "string"}, "certainty": {"type": "integer"}},
+          "required": ["reasoning", "verdict", "answer", "certainty"]}
+CHECK_SYSTEM = (
+    "On te donne une AFFIRMATION et une CORRECTION proposée. Réponds `contradicts` seulement si la correction est incompatible avec l'affirmation : les deux ne peuvent pas être vraies en même temps "
+    "(un autre fait, une autre date, un autre chiffre, un autre ordre de grandeur). Réponds `same` si la correction dit la même chose que l'affirmation (reformulée, ou avec les mêmes faits), "
+    "`unrelated` si elle parle d'autre chose. En cas de doute : `same`."
+)
+CHECK_SCHEMA = {"type": "object", "properties": {"relation": {"type": "string", "enum": ["contradicts", "same", "unrelated"]}}, "required": ["relation"]}
 MIN_ANSWER, MAX_ANSWER = 15, 400
 MIN_CERTAINTY = 80                                                              # what the model says of its own certainty: not a proof, but a model that hesitates must not speak
+MIN_CERTAINTY_COMPARING = 90                                                    # a claim that compares a figure with a threshold: the model must be surer (it gets the arithmetic wrong more often)
 _NOT_CLEAN = re.compile(r"https?://|www\.|\[|\]|<|>|@", re.I)
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
-# A claim that compares a figure with a threshold (« plus de 50 % », « inférieur à 1 000 euros ») needs the exact figure AND the arithmetic: a language model that answers from memory gets the comparison
-# wrong too often (measured: docs/regles-du-bot.md « Mesure »). Dindon does not answer those on its own: they go on the Internet, or nothing is said.
 _COMPARES = re.compile(r"\b(?:plus|moins) (?:de|que|d')|\bau (?:moins|plus)\b|\b(?:sup[ée]rieur|inf[ée]rieur)e?s?\b|\bd[ée]pass\w*|\bexc[èe]d\w*|\bau[- ](?:dessus|dessous)\b|\ben dessous\b|\bla moiti[ée]\b|\ble (?:double|triple|quart|tiers)\b|\bmajorit|\bminorit|[<>]", re.I)
 
 
@@ -52,16 +63,16 @@ class Local:
 
 
 def answer_claim(llm: Chat, model: str, reading: Reading) -> Local:
-    """Dindon's answer to one claim, without the Internet. Raises what the model raises when it cannot answer (the message is tried again later); anything it gets wrong becomes `unsure`."""
-    if _COMPARES.search(reading.claim):
-        return Local(UNSURE)                                                    # a figure against a threshold: not for a model's memory (the model is not even asked)
+    """Dindon's answer to one claim, without the Internet. Raises what the model raises when it cannot answer (the message is tried again later); anything it gets wrong becomes `unsure`.
+    The model reasons first, then says; a `false` is then read again by a second, narrow question (does the correction really contradict the claim?), because a model that is right about the
+    fact sometimes says `false` while restating it."""
     said = llm.chat_json(model, SYSTEM, f"Affirmation :\n«{reading.claim}»", SCHEMA, num_ctx=2048)
     verdict = str(said.get("verdict") or "").strip().lower() if isinstance(said, dict) else ""
     try:
         certainty = int(said.get("certainty")) if isinstance(said, dict) else 0
     except (TypeError, ValueError):
         certainty = 0
-    if verdict not in (TRUE, FALSE) or certainty < MIN_CERTAINTY:
+    if verdict not in (TRUE, FALSE) or certainty < (MIN_CERTAINTY_COMPARING if _COMPARES.search(reading.claim) else MIN_CERTAINTY):
         return Local(UNSURE)                                                    # not certain, by its own account: Dindon says nothing
     if verdict == TRUE:
         return Local(TRUE)
@@ -70,4 +81,7 @@ def answer_claim(llm: Chat, model: str, reading: Reading) -> Local:
         return Local(UNSURE)                                                    # nothing to say, or something that must not be said: Dindon does not answer
     if _figures(reading.claim) and _figures(reading.claim) <= _figures(sentence):
         return Local(UNSURE)                                                    # a « correction » that keeps every figure of the claim corrects nothing: the model contradicts itself
+    relation = llm.chat_json(model, CHECK_SYSTEM, f"AFFIRMATION : {reading.claim}\nCORRECTION : {sentence}", CHECK_SCHEMA, num_ctx=2048)
+    if not isinstance(relation, dict) or relation.get("relation") != "contradicts":
+        return Local(UNSURE)                                                    # the « correction » says what the claim says: not a correction
     return Local(FALSE, sentence)
