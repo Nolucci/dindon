@@ -4,7 +4,8 @@ A free subject is refined by the local model and shown privately for approval be
 any database row or Discord thread is created. Axis questions can be opened directly.
 `/dindon suivi` reads current votes and statistics; legacy end buttons also open the
 summary. Debates close automatically after silence or when a previously occupied
-camp empties. The tick handles counts, reconnect recovery and owed publications.
+camp empties; `/dindon terminer` lets their author or a moderator close them.
+The tick handles counts, reconnect recovery and owed publications.
 """
 from __future__ import annotations
 
@@ -294,7 +295,7 @@ class Debates:
         try:                                                           # what is already known to be refused: not worth a popup
             axes, where = await self.db(checks)
         except DebateRefused as refusal:
-            await say(data, self._refusal(refusal.code))
+            await say(data, await self._start_refusal(refusal.code, user_id))
             return
         except Exception as error:
             log.error("a debate could not be checked (%s)", type(error).__name__)
@@ -399,10 +400,11 @@ class Debates:
         try:
             debate = await self.db(lambda c: store.start(c, **parameters, now=started))
         except DebateRefused as refusal:
+            message = await self._start_refusal(refusal.code, parameters["created_by"])
             if deferred:
-                await self.interactions.finish(data, Reply(self._refusal(refusal.code)))
+                await self.interactions.finish(data, Reply(message))
             else:
-                await self.interactions.say(data, self._refusal(refusal.code))
+                await self.interactions.say(data, message)
             return
         except Exception as error:
             log.error("a debate could not be written (%s)", type(error).__name__)
@@ -418,6 +420,69 @@ class Debates:
     @staticmethod
     def _refusal(code: str) -> str:
         return texts.REFUSALS.get(code, TEXT["failed"]).format(n=rules.MAX_OPEN_PER_SERVER)
+
+    async def _start_refusal(self, code: str, user_id: int) -> str:
+        message = self._refusal(code)
+        if code == "person_limit":
+            row = await self.db(lambda c: c.execute("SELECT guild_id, thread_id FROM debates WHERE created_by = %s AND status = 'open' ORDER BY id LIMIT 1", (user_id,)).fetchone())
+            if row and row[1]:
+                message += f" [Retrouver votre débat](https://discord.com/channels/{row[0]}/{row[1]})."
+        return message
+
+    async def end_command(self, data: dict, user_id: int, option: dict) -> None:
+        """Close an existing debate by command, preserving its votes and final statistics."""
+        guild_id = data.get("guild_id")
+        if not guild_id or not self.allowed(guild_id):
+            await self.interactions.say(data, TEXT["elsewhere"])
+            return
+        await self.interactions.defer(data)
+        try:
+            values = {o.get("name"): o.get("value") for o in option.get("options") or []}
+            moderator = self._moderator(data)
+            if values.get("debat"):
+                selected = await self.db(lambda c: store.get(c, int(values["debat"])))
+            else:
+                row = await self.db(lambda c: c.execute("SELECT id FROM debates WHERE guild_id = %s AND thread_id = %s ORDER BY id DESC LIMIT 1",
+                                                        (int(guild_id), int(data.get("channel_id") or 0))).fetchone())
+                if row is None:
+                    rows = await self.db(lambda c: c.execute("SELECT id, topic, created_by FROM debates WHERE guild_id = %s AND status = 'open' AND (created_by = %s OR %s) ORDER BY id",
+                                                            (int(guild_id), user_id, moderator)).fetchall())
+                    own = [r for r in rows if r[2] == user_id]
+                    if len(own) == 1:
+                        row = own[0]
+                    elif len(rows) == 1:
+                        row = (rows[0][0],)
+                    else:
+                        message = "Précisez le numéro : `/dindon terminer debat:NUMÉRO`.\n" + "\n".join(f"• #{i} · {texts._plain(topic)}" for i, topic, _ in rows) if rows else "Vous n’avez aucun débat ouvert à terminer sur ce serveur."
+                        await self.interactions.finish(data, Reply(message))
+                        return
+                selected = await self.db(lambda c: store.get(c, row[0]))
+            if selected is None or selected.guild_id != int(guild_id):
+                await self.interactions.finish(data, Reply(texts.REFUSALS["unknown"]))
+                return
+            if selected.created_by != user_id and not moderator:
+                await self.interactions.finish(data, Reply("Seuls l’auteur du débat ou un modérateur peuvent le terminer."))
+                return
+            if selected.status != "open":
+                await self.interactions.finish(data, Reply(texts.REFUSALS["not_open"]))
+                return
+            if not self._loaded:
+                await self.load()
+            if self._gap:
+                await self._catch_up()
+                if self._gap:
+                    await self.interactions.finish(data, Reply("Les derniers messages n’ont pas pu être récupérés. Réessayez de terminer le débat dans un instant."))
+                    return
+            await self._flush_poll_votes()
+            await self._flush_messages()
+            closed = await self.db(lambda c: store.end(c, selected.id, rules.ENDED, self.clock()))
+            if closed and closed.thread_id:
+                self._threads.pop(str(closed.thread_id), None)
+                self._owing = True
+            await self.interactions.finish(data, Reply(TEXT["ended"]))
+        except Exception as error:
+            log.warning("a debate could not be closed by command (%s)", type(error).__name__)
+            await self.interactions.finish(data, Reply(TEXT["failed"]))
 
     async def follow_command(self, data: dict, user_id: int, option: dict) -> None:
         """A private live summary, selected from the current thread or the server's open debates."""

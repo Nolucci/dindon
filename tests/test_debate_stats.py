@@ -143,7 +143,7 @@ def fake_stats(people=14, claims_n=0, **overrides):
 def test_the_summary_says_why_it_ended_and_the_figures_and_what_was_checked():
     page = texts.stats_page(fake_stats(claims_n=5), 0)
     embed = page["embeds"][0]
-    assert embed["title"] == "🏁 Débat terminé" and "terminé à la demande d'un modérateur" in embed["description"] and "Le \\*nucléaire\\*" in embed["description"]
+    assert embed["title"] == "🏁 Débat terminé" and "Le débat a été clôturé." in embed["description"] and "Le \\*nucléaire\\*" in embed["description"]
     assert "**14** participant(s) · **200** message(s) · durée **1 h 30 min**" in embed["description"] and "période" not in embed["description"]
     assert "✅ Pour **4** · ❔ Ne sait pas **4** · ❌ Contre **3** · sans position **3**" in embed["description"]
     assert "3 personne(s) ont changé de position" in embed["description"] and "**5** affirmation(s) vérifiée(s)" in embed["description"]
@@ -159,7 +159,7 @@ def test_a_debate_opened_without_verification_says_nothing_of_it_even_when_the_c
 
 
 @pytest.mark.parametrize(("reason", "words"), [
-    ("ended", "terminé à la demande"),
+    ("ended", "Le débat a été clôturé."),
     ("silence", "Plus personne n'a écrit depuis un moment"),
     ("no_participants", "Personne n'a pris part"),
     ("failed", "Le débat est terminé."),

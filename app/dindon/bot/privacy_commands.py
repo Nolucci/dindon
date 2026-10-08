@@ -38,7 +38,7 @@ log = logging.getLogger("dindon.bot.privacy")
 EPHEMERAL = 64
 CHANNEL_MESSAGE, DEFERRED_MESSAGE, UPDATE_MESSAGE, MODAL = 4, 5, 7, 9
 DEFERRED_UPDATE = 6
-SUBCOMMANDS = ("info", "mes-donnees", "stop", "effacer", "reprendre", "card", "mycard", "map", "debat", "suivi", "param")
+SUBCOMMANDS = ("info", "mes-donnees", "stop", "effacer", "reprendre", "card", "mycard", "map", "debat", "suivi", "terminer", "param")
 COOLDOWN_SECONDS = 15
 MAX_FILE_BYTES = 7_000_000          # under every limit of Discord for an attachment
 
@@ -65,6 +65,8 @@ COMMAND = {
          "options": [{"type": 3, "name": "sujet", "description": "La question débattue (vide : vous pourrez choisir un axe dans la fenêtre)", "required": False, "min_length": 3, "max_length": 200}]},
         {"type": 1, "name": "suivi", "description": "Voir où en est un débat, ses votes et ses statistiques",
          "options": [{"type": 4, "name": "debat", "description": "Numéro du débat (facultatif depuis son fil)", "min_value": 1}]},
+        {"type": 1, "name": "terminer", "description": "Clôturer un débat dont vous êtes l’auteur, ou comme modérateur",
+         "options": [{"type": 4, "name": "debat", "description": "Numéro du débat (sinon : celui de ce fil ou votre débat ouvert)", "min_value": 1}]},
         {"type": 1, "name": "param", "description": "Choisir le forum des débats et le salon des sondages (modérateurs)",
          "options": [{"type": 7, "name": "forum", "description": "Le forum des débats : chaque débat y devient un post", "channel_types": [15]},
                      {"type": 7, "name": "sondages", "description": "Le salon texte où publier les sondages liés aux débats", "channel_types": [0, 5]},
@@ -517,13 +519,15 @@ class Interactions:
             await self._mycard(data, user_id, text)
         elif sub == "map":
             await self._map(data, user_id, options[0], text)
-        elif sub in ("debat", "suivi", "param"):
+        elif sub in ("debat", "suivi", "terminer", "param"):
             if self.debates is None:
                 await self._callback(data, CHANNEL_MESSAGE, text["no_debates"])
             elif sub == "param":
                 await self.debates.param_command(data, user_id, options[0])
             elif sub == "suivi":
                 await self.debates.follow_command(data, user_id, options[0])
+            elif sub == "terminer":
+                await self.debates.end_command(data, user_id, options[0])
             else:
                 await self.debates.command(data, user_id, options[0])
         elif self.service.too_soon(user_id):

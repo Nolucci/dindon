@@ -44,7 +44,7 @@ NOTICE = ("Pour vérifier ce qu'une personne affirme dans un débat, Dindon envo
           "de ce serveur. Pour l'instant, il note ses vérifications sans rien publier.")
 
 REASONS = {
-    rules.ENDED: "Le débat a été terminé à la demande d'un modérateur.",
+    rules.ENDED: "Le débat a été clôturé.",
     rules.AGREED: "La majorité du plus petit camp a demandé la fin du débat.",
     rules.ONE_SIDED: "Un des deux camps s'est vidé : le débat est terminé.",
     rules.SILENCE: "Plus personne n'a écrit depuis un moment : le débat s'est terminé de lui-même.",
@@ -56,7 +56,7 @@ REFUSALS = {                                    # what a person is told when a r
     "context": "Le contexte ne peut pas dépasser 1 000 caractères.",
     "quiet": "Cette durée de silence n'est pas possible.",
     "blocked": "Vous avez demandé à ne pas être enregistré·e : vous ne pouvez pas prendre part à un débat. `/dindon reprendre` change cela.",
-    "person_limit": "Vous avez déjà un débat ouvert : terminez-le pour en lancer un autre.",
+    "person_limit": "Vous avez déjà un débat ouvert. `/dindon suivi` affiche son état et ses votes ; `/dindon terminer` le clôture pour en lancer un autre.",
     "server_limit": "Il y a déjà trop de débats ouverts sur ce serveur ({n}) : réessayez quand l'un d'eux sera terminé.",
     "channel_busy": "Un débat est déjà ouvert dans ce salon : terminez-le, ou ouvrez celui-ci dans un fil.",
     "not_open": "Ce débat est terminé.",
