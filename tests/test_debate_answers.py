@@ -81,18 +81,17 @@ def row(db, answer_id):
 # --- the answer, under the message -----------------------------------------------------------------------------------------
 
 
-def test_a_claim_that_dindon_is_certain_is_false_is_answered_under_the_message_without_a_word_on_the_internet(answering, ingest_db):
+def test_a_claim_that_dindon_is_certain_is_false_is_answered_under_the_message_as_not_reliable_with_one_button_to_verify(answering, ingest_db):
     place, debate, message_id, answer_id = wrong(answering, ingest_db)
     assert row(ingest_db, answer_id) == ("false", WRONG.answer, False, False, False) and answering.checker.searched == [] and claims.unread_count(ingest_db) == 0
     assert ingest_db.execute("SELECT count(*) FROM debate_claims").fetchone()[0] == 0                              # nothing was checked, so nothing is claimed
     [(_, message)] = dindon_messages(answering, place)
     embed = message["embeds"][0]
-    assert embed["title"] == "💬 Réponse de Dindon" and CLAIM in embed["description"] and WRONG.answer in embed["description"]
-    assert "sans recherche sur Internet et sans source" in embed["description"] and "elle peut se tromper" in embed["description"] and "ne prend pas parti" in embed["footer"]["text"]
+    assert embed["title"] == "⚠️ Réponse de Dindon (non fiable)" and CLAIM in embed["description"] and WRONG.answer in embed["description"]
+    assert "Non fiable" in embed["description"] and "sans source" in embed["description"] and "elle peut se tromper" in embed["description"] and "ne prend pas parti" in embed["footer"]["text"]
     assert message["message_reference"] == {"message_id": str(message_id), "fail_if_not_exists": False} and message["allowed_mentions"] == {"parse": [], "replied_user": False}
-    valid, invalid = message["components"][0]["components"]
-    assert (valid["label"], valid["emoji"]["name"], valid["custom_id"]) == ("Valide · 0", "✅", f"dindon:debat:val:{answer_id}:valid")
-    assert (invalid["label"], invalid["emoji"]["name"], invalid["custom_id"]) == ("Invalide · 0", "❌", f"dindon:debat:val:{answer_id}:invalid")
+    [check_button] = message["components"][0]["components"]
+    assert len(message["components"]) == 1 and (check_button["label"], check_button["emoji"]["name"], check_button["custom_id"]) == ("Vérifier", "🔎", f"dindon:debat:val:{answer_id}:check")
     everything = json.dumps(message, ensure_ascii=False).lower()
     for who in ("bobby", "bob", str(BOB_ID), "alice"):
         assert who not in everything, who                                                                         # it names nobody
@@ -110,13 +109,14 @@ def test_a_claim_that_it_is_certain_is_true_is_noted_and_nothing_is_said(answeri
     assert ingest_db.execute("SELECT verdict, answer FROM debate_answers").fetchall() == [("true", None)] and dindon_messages(answering, place) == [] and answering.checker.searched == []
 
 
-def test_a_claim_that_it_is_not_sure_of_goes_on_the_internet_and_is_noted_but_not_published_in_answer_mode(answering, ingest_db):
+def test_a_claim_that_a_trusted_source_contradicts_is_corrected_as_certain_with_its_quotation_in_answer_mode_too(answering, ingest_db):
     place, debate = opened(answering, ingest_db)
     said(answering, place, ingest_db, BOB, UNSURE_SAYS)
     assert check(answering) is True
     answering.tick(seconds=30)
     assert ingest_db.execute("SELECT count(*) FROM debate_answers").fetchone()[0] == 0 and ingest_db.execute("SELECT verdict FROM debate_claims").fetchall() == [("contradicted",)]
-    assert dindon_messages(answering, place) == [] and answering.discord.posted(place, "Vérification") == []        # the sources speak by themselves only in live mode, behind the lock
+    [message] = answering.discord.posted(place, "Vérification")
+    assert dindon_messages(answering, place) == [] and "Sûr" in message["embeds"][0]["description"] and QUOTE in message["embeds"][0]["description"] and "insee.fr" in message["embeds"][0]["description"]
 
 
 def test_in_observation_dindon_never_answers_it_only_notes_what_the_internet_says(ingest_url, tmp_path, ingest_db):
@@ -221,7 +221,7 @@ def test_an_answer_survives_a_restart_and_is_posted_once(answering, ingest_db):
 # --- Valide and Invalide ------------------------------------------------------------------------------------------------------------
 
 
-def test_a_vote_is_recorded_changed_and_counted_and_the_counters_are_shown_on_the_message(answering, ingest_db):
+def test_a_vote_of_the_older_messages_is_recorded_changed_and_counted_and_the_message_takes_the_new_form(answering, ingest_db):
     place, debate, _, answer_id = wrong(answering, ingest_db)
     judge(answering, CAROL_ID, place, answer_id, "valid")
     assert "Vote enregistré : ✅ Valide" in answering.sent.last()
@@ -234,7 +234,7 @@ def test_a_vote_is_recorded_changed_and_counted_and_the_counters_are_shown_on_th
     judge(answering, DAN_ID, place, answer_id, "valid")
     answering.tick(seconds=6)
     [(_, message)] = dindon_messages(answering, place)
-    assert [b["label"] for b in message["components"][0]["components"]] == ["Valide · 1", "Invalide · 1"]
+    assert [b["label"] for b in message["components"][0]["components"]] == ["Vérifier"]                                # the votes of the older messages still count; the message no longer shows them
     assert ingest_db.execute("SELECT count(*) FROM debate_answer_votes").fetchone()[0] == 2                          # one vote each, the last one
 
 
@@ -359,6 +359,84 @@ def test_the_searches_share_the_hourly_budget_of_the_debate(answering, ingest_db
     assert check(answering) is True and len(answering.checker.searched) == 1
 
 
+# --- « Vérifier »: one click, a deeper search, the message corrected --------------------------------------------------------------------
+
+
+def test_the_button_verifier_makes_dindon_search_deeper_once_and_write_the_result_in_its_own_message(answering, ingest_db):
+    place, debate, message_id, answer_id = wrong(answering, ingest_db)
+    answering.discord.calls.clear()
+    judge(answering, DAN_ID, place, answer_id, "check")
+    assert "Vérification demandée" in answering.sent.last() and answering.sent.calls[-2][2] == {"type": 5, "data": {"flags": 64}}
+    answering.tick(seconds=6)
+    [(_, waiting)] = dindon_messages(answering, place)
+    assert [(b["label"], b.get("disabled")) for b in waiting["components"][0]["components"]] == [("Vérification en cours…", True)]               # nobody can press it twice
+    assert ingest_db.execute("SELECT search_requested_at IS NOT NULL, searched_at IS NOT NULL FROM debate_answers WHERE id = %s", (answer_id,)).fetchone() == (True, False)
+    assert check(answering) is True
+    [asked] = answering.checker.searched
+    assert (asked.claim, asked.said, asked.query) == (CLAIM, WRONG.said, WRONG.query) and answering.checker.deep == [True]                            # the neutral phrase, and the deeper search
+    answering.tick(seconds=1)
+    [(posted, message)] = dindon_messages(answering, place)
+    embed = message["embeds"][0]
+    assert embed["title"] == "🔎 Dindon a cherché sur Internet" and "contredisent" in embed["description"] and QUOTE in embed["description"]
+    assert [b["style"] for b in message["components"][0]["components"]] == [5] and row(ingest_db, answer_id)[2:] == (True, True, True)                  # links only: no button « Vérifier » any more
+    assert [c[0] for c in answering.discord.calls if c[0] == "POST"] == []
+    answering.tick(minutes=5)
+    assert check(answering) is False and len(answering.checker.searched) == 1
+
+
+def test_a_second_click_on_verifier_is_told_that_the_check_is_on_its_way_and_does_not_search_again(answering, ingest_db):
+    place, debate, _, answer_id = wrong(answering, ingest_db)
+    judge(answering, DAN_ID, place, answer_id, "check")
+    judge(answering, EVE_ID, place, answer_id, "check")
+    assert "déjà en cours" in answering.sent.last()
+    assert check(answering) is True and check(answering) is False and len(answering.checker.searched) == 1
+    answering.tick(seconds=1)
+    judge(answering, CAROL_ID, place, answer_id, "check")
+    assert "a déjà cherché sur Internet" in answering.sent.last()
+
+
+def test_verifier_is_refused_when_the_answer_is_gone_the_debate_is_over_or_the_person_asked_not_to_be_recorded(answering, ingest_db):
+    place, debate, _, answer_id = wrong(answering, ingest_db)
+    judge(answering, DAN_ID, place, answer_id + 999, "check")
+    assert "n'existe plus" in answering.sent.last()
+    privacy.stop_recording(ingest_db, CAROL_ID)
+    judge(answering, CAROL_ID, place, answer_id, "check")
+    assert "ne pas être enregistré" in answering.sent.last() and check(answering) is False and answering.checker.searched == []
+    answering.click(ALICE_ID, place, debate.id, "end", "now", permissions=8)
+    judge(answering, EVE_ID, place, answer_id, "check")
+    assert "Ce débat est terminé" in answering.sent.last() and answering.checker.searched == []
+
+
+def test_a_check_that_somebody_asked_for_survives_a_restart(answering, ingest_db):
+    place, debate, _, answer_id = wrong(answering, ingest_db)
+    judge(answering, DAN_ID, place, answer_id, "check")
+    answering.restart()
+    run(answering.debates.tick())
+    assert check(answering) is True and len(answering.checker.searched) == 1
+
+
+def test_an_answer_that_rests_on_pages_shows_them_as_not_official_and_says_that_it_is_a_first_opinion(answering, ingest_db):
+    pages = dataclasses.replace(RESULT, verdict="likely_false", evidence=(dataclasses.replace(EVIDENCE, tier="other", url="https://blog.example/chomage"),))
+    answering.checker.local = lambda text: [dataclasses.replace(WRONG, answer="D'après une page qui n'est pas une source de confiance : « 7,3 % »", basis="pages", result=pages)]
+    place, debate, _, answer_id = wrong(answering, ingest_db)
+    assert ingest_db.execute("SELECT basis, claim_id IS NOT NULL, searched_at IS NOT NULL FROM debate_answers WHERE id = %s", (answer_id,)).fetchone() == ("pages", True, False)
+    assert ingest_db.execute("SELECT verdict FROM debate_claims").fetchall() == [("likely_false",)] and answering.discord.posted(place, "Vérification") == []   # provisional: never a correction
+    [(_, message)] = dindon_messages(answering, place)
+    description = message["embeds"][0]["description"]
+    assert "Non fiable" in description and "Premier avis" in description and "pas une source de confiance" in description
+    assert [b["label"] for b in message["components"][0]["components"]] == ["Vérifier"]
+
+
+def test_an_answer_of_the_model_shows_the_pages_that_the_first_search_found_against_the_claim_marked_as_not_official(answering, ingest_db):
+    pages = dataclasses.replace(RESULT, verdict="likely_false", evidence=(dataclasses.replace(EVIDENCE, tier="other", url="https://blog.example/chomage"),))
+    answering.checker.local = lambda text: [dataclasses.replace(WRONG, result=pages)]
+    place, debate, _, answer_id = wrong(answering, ingest_db)
+    [(_, message)] = dindon_messages(answering, place)
+    description = message["embeds"][0]["description"]
+    assert WRONG.answer in description and "non officielles" in description and QUOTE in description and "blog.example" in description
+    assert [b.get("url") for row_ in message["components"] for b in row_["components"]] == [None, "https://blog.example/chomage"]
+
+
 # --- what the search found, whatever it is -----------------------------------------------------------------------------------
 
 
@@ -367,7 +445,7 @@ def test_the_searches_share_the_hourly_budget_of_the_debate(answering, ingest_db
     (dataclasses.replace(RESULT, verdict="confirmed", evidence=(SUPPORTS,)), ["confirment", "ma réponse était fausse"], SUPPORTS.quote),
     (dataclasses.replace(RESULT, verdict="partly", evidence=(dataclasses.replace(EVIDENCE, stance="partly"),)), ["en partie", "trop catégorique"], QUOTE),
     (dataclasses.replace(RESULT, verdict="disputed", evidence=(EVIDENCE, SUPPORTS)), ["se contredisent", "ne peux pas trancher"], SUPPORTS.quote),
-    (dataclasses.replace(RESULT, verdict="unverifiable", reason="no_source", evidence=()), ["pas trouvé de source de confiance", "sans source"], None),
+    (dataclasses.replace(RESULT, verdict="unverifiable", reason="no_source", evidence=()), ["pas trouvé de source de confiance", "non fiable"], None),
 ])
 def test_whatever_the_search_finds_dindon_says_it_in_its_own_message_even_that_it_was_wrong(answering, ingest_db, found, words, source):
     answering.checker.search_result = found
@@ -513,13 +591,14 @@ def test_the_members_are_told_what_dindon_does_in_each_mode(answering, ingest_db
     first, second = info(answering)
     assert second[2]["content"] == f"**{texts.NOTICE_TITLE}.** {texts.NOTICE_ANSWER}" and len(second[2]["content"]) < 2000
     for notice in (texts.NOTICE_ANSWER, texts.NOTICE_LOCAL):
-        assert len(notice) <= 1024 and "Valide" in notice and "Invalide" in notice and "il peut se tromper" in notice and "ne prend pas parti" in notice      # (a field of an embed holds 1024)
+        assert len(notice) <= 1024 and "non fiable" in notice and "ne prend pas parti" in notice                                                     # (a field of an embed holds 1024)
+    assert "Vérifier" in texts.NOTICE_ANSWER and "il peut se tromper" in texts.NOTICE_LOCAL
     assert "sur Internet" in texts.NOTICE_ANSWER and "Dindon ne cherche rien sur Internet" in texts.NOTICE_LOCAL and "phrase neutre" in texts.NOTICE_ANSWER and "phrase neutre" not in texts.NOTICE_LOCAL
     assert texts.notice("answer") == texts.NOTICE_ANSWER and texts.notice("local") == texts.NOTICE_LOCAL and texts.notice("live") == texts.NOTICE_LIVE and texts.notice("observe") == texts.NOTICE
     assert texts.notice(True) == texts.NOTICE_LIVE and texts.notice(False) == texts.NOTICE and texts.notice("anything") == texts.NOTICE
 
 
-@pytest.mark.parametrize(("mode", "must_say"), [("observe", "phrase neutre"), ("answer", "sans source"), ("local", "ne cherche rien sur Internet"), ("live", "sources de confiance")])
+@pytest.mark.parametrize(("mode", "must_say"), [("observe", "phrase neutre"), ("answer", "non fiable"), ("local", "ne cherche rien sur Internet"), ("live", "source de confiance")])
 def test_the_launch_message_says_in_one_line_what_dindon_does_and_the_whole_text_is_in_dindon_info(ingest_db, mode, must_say):
     debate = store.start(ingest_db, guild_id=1, channel_id=2, topic="Un sujet de débat", created_by=ALICE_ID, now=None)
     description = texts.question(debate, {"for": 0, "unsure": 0, "against": 0}, verifying=True, live=mode)["embeds"][0]["description"]
@@ -535,14 +614,15 @@ def test_the_launch_message_says_in_one_line_what_dindon_does_and_the_whole_text
 
 def test_what_dindon_says_fits_discord_whatever_the_claim_and_never_mentions_anybody():
     long = "x" * 480
-    message = texts.local_answer(long, "y" * 400, 7, 99, valid=1234, invalid=5678)
-    assert len(message["embeds"][0]["description"]) <= 4000 and all(len(b["label"]) <= 80 for b in message["components"][0]["components"]) and message["allowed_mentions"]["parse"] == []
+    message = texts.local_answer(long, "y" * 400, 7, 99, [dataclasses.replace(EVIDENCE, quote="q" * 300)] * 5)
+    assert len(message["embeds"][0]["description"]) <= 4000 and all(len(b["label"]) <= 80 for row in message["components"] for b in row["components"]) and message["allowed_mentions"]["parse"] == []
     mention = texts.local_answer("@everyone **gras** [lien](http://x)", "<@123> a tort", 7, 99)
     assert "\\*\\*gras\\*\\*" in mention["embeds"][0]["description"] and mention["allowed_mentions"] == {"parse": [], "replied_user": False}
     after = texts.after_search("@everyone " + long, "z" * 400, "contradicted", "T2 2026", [EVIDENCE] * 5)
     assert len(after["embeds"][0]["description"]) <= 4000 and len(after["components"][0]["components"]) == 3 and after["allowed_mentions"]["parse"] == []
     assert texts.after_search("c", "r", "unverifiable", None, [EVIDENCE])["components"] == []                      # nothing settles it: no link to click
     assert texts.parse_custom_id("dindon:debat:val:12:valid") == ("val", 12, "valid") and texts.parse_custom_id("dindon:debat:val:12:for") is None
+    assert texts.parse_custom_id("dindon:debat:val:12:check") == ("val", 12, "check")
 
 
 def test_the_page_of_the_owner_lists_what_dindon_answered(ingest_url, tmp_path, answering, ingest_db):

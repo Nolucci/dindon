@@ -1,12 +1,12 @@
 """Dindon's first answer to a claim: from what its local model knows, without going on the Internet (docs/regles-du-bot.md, « Répondre d'abord, chercher ensuite »).
 
 It is **blind**, like the reading of messages: the model gets the claim, alone. Not who said it, not the debate, not the camps. It is asked for certainty, in both directions, and it is told that
-whatever changes with time, whatever it does not know precisely, and whatever needs a source is `unsure`: Dindon then does not answer, and goes on the Internet as before.
+whatever changes with time, whatever it does not know precisely, and whatever needs a source is `unsure`: it then has no answer of its own, and what the Internet says decides (debate/checker.py).
 
 **The code does not trust the model**, as everywhere else: a `false` without a clean, short, sourceless sentence to say becomes `unsure`; an address, a link or a bracket in what it says drops the
 answer. Nothing in this module reaches the network but the local model.
 
-What it says has **no source**, and the message that carries it says so. That is why the participants judge it (Valide / Invalide), and why Dindon looks on the Internet when they reject it.
+What it says has **no source**, and the message that carries it says that it is not reliable. That is why the message has the button « Vérifier », which makes Dindon look on the Internet.
 """
 from __future__ import annotations
 

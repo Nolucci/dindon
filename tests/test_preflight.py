@@ -181,6 +181,6 @@ def test_the_answer_level_says_that_dindon_speaks_without_a_source_and_works_wit
     from dindon.preflight import check_debates
 
     with_search = debate_texts(check_debates(debate_settings(settings, ollama, debate_checks="answer", searxng_url="http://x")), "warn")
-    assert "RÉPOND D'ABORD" in with_search and "sans source" in with_search and "Valide / Invalide" in with_search and "ne sont PAS actives" not in with_search
+    assert "CHERCHE sur Internet" in with_search and "non fiable" in with_search and "bouton Vérifier" in with_search and "ne sont PAS actives" not in with_search
     alone = check_debates(debate_settings(settings, ollama, debate_checks="answer"))
     assert "aucun service de recherche" in debate_texts(alone, "warn") and "La vérification n'envoie rien à Internet" in debate_texts(alone, "warn") and debate_texts(alone, "fail") == ""

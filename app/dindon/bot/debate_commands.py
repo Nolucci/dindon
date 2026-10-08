@@ -651,17 +651,25 @@ class Debates:
                 await self.db(lambda c, i=debate_id: ratings.set_results_message(c, i, 0))
 
     async def _judge(self, data: dict, answer_id: int, user_id: int, choice: str) -> None:
-        """Valide or Invalide under one of Dindon's answers. Answered privately. What it leads to (a search, if there is more Invalide) is decided by the engine, from the database."""
+        """« Vérifier » under one of Dindon's answers (it makes Dindon look on the Internet, deeper), or, on the older messages, Valide or Invalide. Answered privately. What a vote leads to (a search,
+        if there is more Invalide) is decided by the engine, from the database."""
         await self.interactions.defer(data)                    # acknowledge the click before a database lock can exhaust Discord's three seconds
         try:
-            result = await self.db(lambda c: answers.vote(c, answer_id, user_id, choice, self.clock()))
-            self._answers_dirty.add(answer_id)
-            text = {"recorded": "Vote enregistré : {c}. Merci.", "changed": "Vote changé : {c}.", "unchanged": "Vous aviez déjà voté {c}."}[result].format(c="✅ Valide" if choice == "valid" else "❌ Invalide")
+            if choice == "check":
+                result = await self.db(lambda c: answers.request_search(c, answer_id, user_id, self.clock()))
+                self._answers_dirty.add(answer_id)
+                self._owing = True
+                text = {"requested": "Vérification demandée : Dindon cherche cette phrase sur Internet. Son message sera mis à jour avec ce qu'il trouve.",
+                        "already": "La vérification est déjà en cours : le message sera mis à jour."}[result]
+            else:
+                result = await self.db(lambda c: answers.vote(c, answer_id, user_id, choice, self.clock()))
+                self._answers_dirty.add(answer_id)
+                text = {"recorded": "Vote enregistré : {c}. Merci.", "changed": "Vote changé : {c}.", "unchanged": "Vous aviez déjà voté {c}."}[result].format(c="✅ Valide" if choice == "valid" else "❌ Invalide")
         except answers.VoteRefused as refusal:
             text = {"unknown": texts.REFUSALS["answer_gone"], "not_open": texts.REFUSALS["not_open"], "searched": texts.REFUSALS["searched"],
                     "blocked": texts.REFUSALS["blocked"]}.get(refusal.code, TEXT["failed"])
         except Exception as error:
-            log.error("a vote on an answer could not be handled (%s)", type(error).__name__)
+            log.error("a click under an answer could not be handled (%s)", type(error).__name__)
             text = TEXT["failed"]
         await self.interactions.finish(data, Reply(text))
 
@@ -806,14 +814,15 @@ class Debates:
         return False
 
     async def _search_asked(self) -> bool:
-        """Looks on the Internet for ONE answer of Dindon that the participants rejected (more Invalide than Valide), with the budget of every check; or says that it cannot (no search service).
+        """Looks on the Internet, deeper than the first time, for ONE answer of Dindon that somebody asked to check (« Vérifier »; or, on the older messages, that the participants rejected: more
+        Invalide than Valide); or says that it cannot (no search service).
         True if something was done. Each answer is searched once."""
         for due in await self.db(lambda c: answers.searches_due(c, 3)):
             if await self.db(lambda c, d=due.debate_id: claims.checks_last_hour(c, d, self.clock())) >= claims.MAX_CHECKS_PER_HOUR:
                 continue
             result = None
             if getattr(self.checker, "can_search", True):
-                result = await asyncio.to_thread(self.checker.search, Reading(due.claim, due.said, due.query))
+                result = await asyncio.to_thread(self.checker.search, Reading(due.claim, due.said, due.query), True)          # deeper than the first time: 4 searches, 8 reads
             await self.db(lambda c, d=due, r=result: answers.finish_search(c, d, r, self.clock()))
             self._owing = True
             return True
@@ -910,9 +919,10 @@ class Debates:
         return attempts
 
     async def _corrections(self) -> None:
-        """Takes back the corrections whose claim is gone, and, only in `live` mode, posts the corrections that are due: one per tick, spaced, and capped per hour for each debate."""
+        """Takes back the corrections whose claim is gone, and, when Dindon answers (`answer`, `live`), posts the corrections that are due, the ones that a trusted source grounds with a quotation that is
+        really on its page: one per tick, spaced, and capped per hour for each debate."""
         await self._retract()
-        if not self.live:
+        if not self.answering:
             return
         now = self.clock()
         for due in await self.db(lambda c: claims.corrections_due(c, now)):
@@ -946,14 +956,19 @@ class Debates:
             if shown is None or shown.searched:
                 self._answers_dirty.discard(answer_id)
                 continue
+            first = await self._first_evidence(shown.claim_id)
             result = await self._rest("PATCH", f"/channels/{shown.thread_id}/messages/{shown.posted_message_id}",
-                                      texts.local_answer(shown.claim, shown.answer, shown.answer_id, shown.message_id, shown.valid, shown.invalid))
+                                      texts.local_answer(shown.claim, shown.answer, shown.answer_id, shown.message_id, first, shown.basis, shown.requested))
             if result.ok or result.status == 404:                      # (a message that was deleted on Discord is not shown again)
                 self._answers_dirty.discard(answer_id)
 
+    async def _first_evidence(self, claim_id: int | None) -> list:
+        """The pages that the first search found against a claim (with the words that were verified on them), to show under an answer that says it is not reliable."""
+        return [] if claim_id is None else await self.db(lambda c: claims.claim_evidence(c, claim_id, "contradicts"))
+
     async def _post_answer(self, due: answers.DueAnswer, key: tuple[int, str]) -> None:
         reserved = await self.db(lambda c: answers.reserve_post(c, due, self.clock()))
-        posted = await self._rest("POST", f"/channels/{due.thread_id}/messages", texts.local_answer(due.claim, due.answer, due.answer_id, due.message_id))
+        posted = await self._rest("POST", f"/channels/{due.thread_id}/messages", texts.local_answer(due.claim, due.answer, due.answer_id, due.message_id, await self._first_evidence(due.claim_id), due.basis))
         if posted.ok and posted.id is not None:
             await self.db(lambda c: claims.set_correction_posted(c, reserved, posted.id, self.clock()))
             self._succeeded(key)
@@ -976,7 +991,7 @@ class Debates:
             evidence = []
             if item.claim_id is not None:
                 evidence = [e for stance in ("contradicts", "supports", "partly") for e in await self.db(lambda c, i=item.claim_id, st=stance: claims.claim_evidence(c, i, st))]
-            result = await self._rest("PATCH", f"/channels/{item.thread_id}/messages/{item.posted_message_id}", texts.after_search(item.claim, item.answer, item.verdict, item.period, evidence))
+            result = await self._rest("PATCH", f"/channels/{item.thread_id}/messages/{item.posted_message_id}", texts.after_search(item.claim, item.answer, item.verdict, item.period, evidence, item.basis))
             if result.ok or result.status == 404:
                 await self.db(lambda c, i=item.answer_id: answers.mark_shown(c, i, self.clock()))
                 self._succeeded(key)

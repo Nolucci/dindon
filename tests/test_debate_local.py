@@ -15,7 +15,7 @@ from dindon.config import Settings
 from dindon.analysis import irony
 from dindon.debate import local
 from dindon.debate.checker import Checker, build_checker, notice_mode, resolve_mode
-from dindon.debate.claims import ClaimResult
+from dindon.debate.claims import ClaimResult, Evidence
 from dindon.debate.reading import Reading
 from synthetic import settings_for
 
@@ -53,13 +53,13 @@ class Model:
 class Searching(Checker):
     """A checker whose search is a script (the real one reads pages: tests/test_debate_verify.py)."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, found=WEB, **kwargs):
         super().__init__(*args, **kwargs)
-        self.searched = []
+        self.searched, self.found = [], found
 
-    def search(self, reading):
+    def search(self, reading, deep=False):
         self.searched.append(reading)
-        return dataclasses.replace(WEB, claim=reading.claim)
+        return dataclasses.replace(self.found, claim=reading.claim)
 
 
 def reading(claim=CLAIM) -> Reading:
@@ -139,17 +139,56 @@ def test_the_model_is_blind_it_gets_the_claim_alone_and_a_failure_is_not_hidden(
 # --- a message shared between what Dindon answers and what goes on the Internet ---------------------------------------------------
 
 
-def checker(*replies, searching=True, mode="answer"):
-    return (Searching if searching else Checker)(Model(*replies), "m", (lambda: None) if searching else None, mode=mode)
+PAGE = Evidence("https://blog.example/chomage", "Chômage", "other", "contradicts", "le taux de chômage s'établit à 7,3 % de la population active", "T2 2026", "searxng", "b" * 64)
+NOTHING = ClaimResult(CLAIM, "Le chômage est à 12 % en France", "unverifiable", "no_source", None, 2, 3, "m")
+PROVISIONAL = ClaimResult(CLAIM, "Le chômage est à 12 % en France", "likely_false", None, "T2 2026", 1, 2, "m", (PAGE,))
+CONFIRMED = ClaimResult(CLAIM, "Le chômage est à 12 % en France", "confirmed", None, None, 1, 1, "m", (dataclasses.replace(PAGE, tier="official", stance="supports"),))
+UNSURE = {"verdict": "unsure", "answer": "", "certainty": 30}
 
 
-def test_a_claim_that_dindon_is_certain_is_false_gets_an_answer_and_nothing_goes_on_the_internet():
-    c = checker(READING, FALSE)
+def checker(*replies, searching=True, mode="answer", found=WEB):
+    if searching:
+        return Searching(Model(*replies), "m", lambda: None, mode=mode, found=found)
+    return Checker(Model(*replies), "m", None, mode=mode)
+
+
+def test_a_claim_that_a_trusted_source_contradicts_is_a_result_to_be_corrected_as_certain_whatever_the_local_model_thought():
+    for replies in ((READING, FALSE), (READING, UNSURE)):
+        c = checker(*replies)
+        found = c.consider(MESSAGE)
+        assert found.answers == () and [(r.claim, r.verdict) for r in found.results] == [(CLAIM, "contradicted")] and [r.claim for r in c.searched] == [CLAIM]
+
+
+def test_when_no_trusted_source_settles_a_claim_that_the_model_is_certain_is_false_dindon_answers_and_says_it_is_not_reliable_with_what_the_search_found():
+    for found_result in (NOTHING, PROVISIONAL):
+        c = checker(READING, FALSE, found=found_result)
+        found = c.consider(MESSAGE)
+        [answer] = found.answers
+        assert (answer.claim, answer.said, answer.query, answer.verdict, answer.answer, answer.model, answer.basis) == (CLAIM, "Le chômage est à 12 % en France", "taux de chômage France", "false",
+                                                                                                                    "Le taux de chômage en France est de 7 %.", "m", "model")
+        assert answer.result.verdict == found_result.verdict and found.results == () and [r.claim for r in c.searched] == [CLAIM]
+        assert len(c.llm.calls) == 5                                                                       # the reading, the tone of the message, the answer, and the two narrow questions that read a « false » again
+
+
+def test_a_trusted_source_that_confirms_what_the_model_called_false_leaves_nothing_to_say_the_model_was_wrong():
+    c = checker(READING, FALSE, found=CONFIRMED)
     found = c.consider(MESSAGE)
-    [answer] = found.answers
-    assert (answer.claim, answer.said, answer.query, answer.verdict, answer.answer, answer.model) == (CLAIM, "Le chômage est à 12 % en France", "taux de chômage France", "false",
-                                                                                                       "Le taux de chômage en France est de 7 %.", "m")
-    assert found.results == () and c.searched == [] and len(c.llm.calls) == 5                                      # the reading, the tone of the message, the answer, and the two narrow questions that read a « false » again
+    assert found.answers == () and [r.verdict for r in found.results] == ["confirmed"]
+
+
+def test_pages_that_are_not_trusted_sources_are_enough_for_a_first_opinion_marked_as_such_when_the_model_was_not_sure():
+    c = checker(READING, UNSURE, found=PROVISIONAL)
+    [answer] = c.consider(MESSAGE).answers
+    assert (answer.verdict, answer.basis, answer.result.verdict) == ("false", "pages", "likely_false")
+    assert answer.answer.startswith("D'après une page qui n'est pas une source de confiance : « le taux de chômage s'établit à 7,3 %") and len(answer.answer) <= 600
+
+
+def test_a_claim_that_the_model_is_not_sure_of_and_that_nothing_settles_is_noted_and_nothing_is_said():
+    c = checker(READING, UNSURE, found=NOTHING)
+    found = c.consider(MESSAGE)
+    assert found.answers == () and [r.verdict for r in found.results] == ["unverifiable"]
+    likely_true = dataclasses.replace(PROVISIONAL, verdict="likely_true", evidence=(dataclasses.replace(PAGE, stance="supports"),))
+    assert checker(READING, FALSE, found=likely_true).consider(MESSAGE).answers == ()                         # pages that suggest that it is TRUE: the model's « false » is not said
 
 
 def test_a_claim_that_dindon_is_certain_is_true_is_noted_and_nothing_is_said_or_searched():
@@ -158,20 +197,17 @@ def test_a_claim_that_dindon_is_certain_is_true_is_noted_and_nothing_is_said_or_
     assert [(a.verdict, a.answer) for a in found.answers] == [("true", None)] and found.results == () and c.searched == []
 
 
-def test_a_claim_that_dindon_is_not_sure_of_goes_on_the_internet_as_before():
-    c = checker(READING, {"verdict": "unsure", "answer": "", "certainty": 30})
-    found = c.consider(MESSAGE)
-    assert found.answers == () and [r.claim for r in found.results] == [CLAIM] and [r.claim for r in c.searched] == [CLAIM]
-
-
-def test_without_a_search_service_a_claim_that_dindon_is_not_sure_of_is_left_alone():
+def test_without_a_search_service_a_claim_that_dindon_is_certain_is_false_is_still_answered_and_the_rest_is_left_alone():
+    c = checker(READING, FALSE, searching=False)
+    [answer] = c.consider(MESSAGE).answers
+    assert (answer.verdict, answer.result) == ("false", None) and c.can_search is False
     c = checker(READING, {"verdict": "unsure", "answer": ""}, searching=False)
     found = c.consider(MESSAGE)
     assert found.answers == () and found.results == () and c.can_search is False
 
 
 def test_each_claim_of_a_message_is_dealt_with_on_its_own():
-    c = checker(TWO, FALSE, {"verdict": "unsure", "answer": "", "certainty": 30})
+    c = checker(TWO, FALSE, UNSURE, found=NOTHING)
     found = c.consider("Le chômage est à 12 % en France, et la dette dépasse 110 % du PIB, c'est sûr.")
     assert [a.claim for a in found.answers] == [CLAIM] and [r.claim for r in found.results] == ["La dette publique dépasse 110 % du PIB en France"]
 

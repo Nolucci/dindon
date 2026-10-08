@@ -1,15 +1,17 @@
 """What checks the claims of a message, from the reading of the message to the verdicts (docs/regles-du-bot.md, « Vérification sur Internet »). Synchronous: the engine runs it in a thread.
 
 `Checker.check(text, context)` takes **the text of a message and, to understand it, what was said just before** (debate/context.py: anonymous authors, never a name, a position or a camp) and returns the results for the claims found in it. Each claim gets a `Lookup` of its own, so that what one claim
-found is not available to the next and the budget (2 queries, 3 pages) is per claim.
+found is not available to the next and the budget (2 queries, 5 reads) is per claim.
 
 `build_checker(settings)` returns None, and then nothing is ever read or sent, unless the owner switched the checks on (`DINDON_DEBATE_CHECKS`).
 
 * `observe`: every claim is checked on the Internet and **only written to the database** (to be read by the owner: `dindon debate-report`); nothing is published. Needs a search service.
-* `answer`: Dindon **answers first, without the Internet** (`Checker.consider`): certain that a claim is false, it says so under the message, with Valide / Invalide for the participants;
-  where they reject its answer it looks on the Internet (`Checker.search`). A claim it cannot answer is checked on the Internet and noted, not published. Works without a search service
-  (it then cannot look anything up, and says so).
-* `live`: `answer`, and in addition the corrections that trusted sources make by themselves, with no one asking. Needs a measured precision (`resolve_mode`).
+* `answer`: what the local model is not certain is true is **searched on the Internet** (`Checker.consider`), trusted sources first, and what comes of it is one of three things: a trusted
+  source, with a quotation that is really on its page, **contradicts** the claim: Dindon says so, as certain, with the quotation; no trusted source settles it, but the local model is certain that
+  the claim is false (or pages that are not trusted sources suggest it): Dindon says so too, **marked as not reliable**, with its answer and those pages, and a button « Vérifier » that makes it
+  search deeper (`Checker.search(deep=True)`); anything else: Dindon says nothing. Works without a search service (it then answers from the local model alone, as not reliable, and says that it
+  cannot look anything up).
+* `live`: the same as `answer` (the corrections by trusted sources used to need a measured precision; they are now part of `answer`: `resolve_mode` is kept for the old settings).
 """
 from __future__ import annotations
 
@@ -22,7 +24,7 @@ from dindon.config import Settings
 from dindon.debate.claims import AnswerFound, ClaimResult, Considered
 from dindon.debate.local import FALSE, TRUE, answer_claim
 from dindon.debate.reading import Chat, Reading, read_message
-from dindon.debate.scope import Lookup
+from dindon.debate.scope import DEEP_PAGES, DEEP_QUERIES, Lookup
 from dindon.debate.search import FactCheckSearch, SearxSearch
 from dindon.debate.trust import Trust
 from dindon.debate.verify import verify_claim
@@ -92,10 +94,12 @@ class Checker:
         """Whether there is a search service to look anything up with."""
         return self._make_lookup is not None
 
-    def search(self, reading: Reading) -> ClaimResult:
-        """The claim checked on the Internet, with a budget of its own (2 searches, 3 pages): the sources and the verdict. Needs a search service."""
+    def search(self, reading: Reading, deep: bool = False) -> ClaimResult:
+        """The claim checked on the Internet, with a budget of its own (2 searches, 5 reads): the sources and the verdict. Needs a search service. `deep`: a person asked for it (the button
+        « Vérifier »): 4 searches, among them the sentence itself, and 8 reads."""
         self._ready()
-        return verify_claim(self._make_lookup(), self.llm, self.model, self._trust, reading)
+        lookup = self._make_lookup(deep=True) if deep else self._make_lookup()
+        return verify_claim(lookup, self.llm, self.model, self._trust, reading, deep=deep)
 
     def check(self, text: str, context: str = "") -> list[ClaimResult]:
         """The results for the claims in one message (an empty list when it holds none), every one checked on the Internet. Raises what the local model raises when it cannot answer: the
@@ -104,19 +108,44 @@ class Checker:
         return [self.search(reading) for reading in read_message(self.llm, self.model, text, context)]
 
     def consider(self, text: str, context: str = "") -> Considered:
-        """What Dindon does with a message when it answers first: for each claim, the local model says whether it is **certain** that it is true or false, with no Internet. True: noted, nothing
-        is said. False: Dindon's answer, which the participants will judge. Not certain: the claim is checked on the Internet, if there is a search service, and noted. Raises what the model
-        raises: the message stays unread and is tried later."""
+        """What Dindon does with a message when it answers: for each claim, the local model says, with no Internet, whether it is **certain that it is true** (then nothing: nothing is said, nothing
+        is searched). Otherwise the claim is searched, trusted sources first (`search`), and:
+
+        * a trusted source contradicts it (`contradicted`, with a quotation that is really on its page): it is a result, and the correction is posted from it, as certain;
+        * no trusted source settles it, and the local model is certain that it is false, or pages that are not trusted sources suggest it (`likely_false`): an **answer** that says it is not reliable,
+          with what the search found, and the button « Vérifier »;
+        * anything else (it is confirmed, partly true, disputed, provisionally true, or nothing is known and the local model was not certain): noted, nothing is said.
+
+        Without a search service, a claim that the local model is certain is false is still answered (and says that it could not be looked up). Raises what the model raises: the message stays
+        unread and is tried later."""
         self._ready()
         answers: list[AnswerFound] = []
         results: list[ClaimResult] = []
         for reading in read_message(self.llm, self.model, text, context):
             local = answer_claim(self.llm, self.model, reading)
-            if local.verdict in (TRUE, FALSE):
-                answers.append(AnswerFound(reading.claim, reading.said, reading.query, local.verdict, local.answer, self.model))
-            elif self.can_search:
-                results.append(self.search(reading))
+            if local.verdict == TRUE:
+                answers.append(AnswerFound(reading.claim, reading.said, reading.query, TRUE, None, self.model))       # noted, nothing is said, nothing is searched
+                continue
+            if not self.can_search:
+                if local.verdict == FALSE:
+                    answers.append(AnswerFound(reading.claim, reading.said, reading.query, FALSE, local.answer, self.model))
+                continue
+            result = self.search(reading)
+            if result.verdict == "contradicted":
+                results.append(result)
+            elif local.verdict == FALSE and result.verdict in ("unverifiable", "likely_false"):
+                answers.append(AnswerFound(reading.claim, reading.said, reading.query, FALSE, local.answer, self.model, "model", result))
+            elif result.verdict == "likely_false":
+                answers.append(AnswerFound(reading.claim, reading.said, reading.query, FALSE, _from_pages(result), self.model, "pages", result))
+            else:
+                results.append(result)
         return Considered(tuple(answers), tuple(results))
+
+
+def _from_pages(result: ClaimResult) -> str:
+    """What Dindon says when only pages that are not trusted sources suggest that a claim is false: one of their quotations, nothing of its own. At most 600 characters (the database says so)."""
+    quote = next((e.quote for e in result.evidence if e.stance == "contradicts"), "")
+    return f"D'après une page qui n'est pas une source de confiance : « {quote[:400]} »"[:600]
 
 
 def notice_mode(checker: object | None) -> str:
@@ -144,7 +173,7 @@ def build_checker(settings: Settings, load_helpers: Callable[[], tuple[str, ...]
     if downgraded:
         log.warning("the corrections that sources make by themselves are NOT on (%s). Dindon answers and the participants judge, or the claims are noted", downgraded)
     log.info("the claims of the debates are checked in %s mode (%d search service(s))%s", mode, len(searchers), "; nothing is published" if mode == "observe" else "")
-    make_lookup = (lambda: Lookup(searchers, fetcher)) if searchers else None
+    make_lookup = (lambda deep=False: Lookup(searchers, fetcher, max_queries=DEEP_QUERIES, max_pages=DEEP_PAGES) if deep else Lookup(searchers, fetcher)) if searchers else None
     helpers: tuple[str, ...] = tuple(settings.analysis_workers or ())
     if load_helpers is not None:
         try:

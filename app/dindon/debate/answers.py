@@ -1,11 +1,12 @@
-"""Dindon's first answers, without the Internet, and what the participants say of them (docs/regles-du-bot.md, « Répondre d'abord, chercher ensuite »).
+"""Dindon's answers when no trusted source settles a claim, and what a participant can do (docs/regles-du-bot.md, « Répondre d'abord, chercher ensuite »).
 
-* A claim that Dindon is **certain** is false gets an answer under the message (`debate_answers`, written with the reading, see claims.finish_reading). The answer comes from the local model
-  alone, has **no source**, and says so. A claim that it is certain is true is noted and nothing is said. A claim that it is not sure of goes on the Internet, as before.
-* Under the answer, any participant presses **Valide** or **Invalide** (one vote each, changeable). **More Invalide than Valide**: Dindon looks on the Internet, once (`searches_due`), with the
-  budget and the trusted sources of every check, and writes the result in its own message, whatever it is. **More Valide, or as many**: nothing more is searched.
+* A claim that the local model is **certain** is true is noted and nothing is said or searched. Any other claim is searched on the Internet (debate/checker.py). Where a trusted source contradicts it,
+  that is a correction (debate/claims.py), not an answer. Where **no trusted source settles it** but the model is certain that it is false, or pages that are not trusted sources suggest it, Dindon
+  **answers** (`debate_answers`, written with the reading): the message says that it is **not reliable**, shows the pages that the first search found, and has one button, **Vérifier**.
+* Pressing **Vérifier** (`request_search`) makes Dindon look on the Internet once more (`searches_due`), deeper (4 searches, 8 reads), and write the result in its own message, whatever it is.
+  (The messages posted before had **Valide** and **Invalide**: with more Invalide than Valide they still make Dindon search, and `vote` still counts them.)
 * The message that Dindon posts is a row of `debate_corrections` (posted once, tried again if it failed, taken back when the answer goes, and counted in the same hourly limit).
-* Never a person who asked not to be recorded: their votes are not counted, their claims are not answered.
+* Never a person who asked not to be recorded: their clicks are not counted, their claims are not answered.
 """
 from __future__ import annotations
 
@@ -22,6 +23,7 @@ CHOICES = ("valid", "invalid")
 ANSWER_MAX_AGE_MINUTES = 30        # an answer that was not posted within this long of being found is not posted any more: the conversation has moved on
 ANSWER_ATTEMPTS = claims_mod.CORRECTION_ATTEMPTS
 VOTE_REFUSALS = ("unknown", "not_open", "blocked", "choice", "searched")
+BASES = ("model", "pages")
 
 
 class VoteRefused(Exception):
@@ -39,6 +41,8 @@ class DueAnswer:
     claim: str
     answer: str
     correction_id: int | None        # the row that reserved it, if a first attempt failed
+    claim_id: int | None = None      # what the first search found, with its sources (it is shown: the answer says that it is not reliable)
+    basis: str = "model"
 
 
 @dataclass(frozen=True)
@@ -67,6 +71,8 @@ class AnswerView:
     invalid: int
     searched: bool
     claim_id: int | None
+    basis: str = "model"
+    requested: bool = False          # somebody pressed « Vérifier »: the search is on its way
 
 
 _NOT_BLOCKED = "NOT EXISTS (SELECT 1 FROM privacy_subjects s WHERE s.user_id = {col})"
@@ -77,7 +83,7 @@ def posts_due(conn: psycopg.Connection, now: datetime | None = None, limit: int 
     now = now or utc_now()
     with conn.cursor(row_factory=tuple_row) as cur:
         return [DueAnswer(*r) for r in cur.execute(
-            f"""SELECT a.id, a.debate_id, d.thread_id, a.message_id, a.claim, a.answer, k.id
+            f"""SELECT a.id, a.debate_id, d.thread_id, a.message_id, a.claim, a.answer, k.id, a.claim_id, a.basis
                 FROM debate_answers a
                 JOIN debates d ON d.id = a.debate_id AND d.status = 'open' AND d.verify AND d.thread_id IS NOT NULL
                 LEFT JOIN debate_corrections k ON k.answer_id = a.id
@@ -110,14 +116,15 @@ def view(conn: psycopg.Connection, answer_id: int) -> AnswerView | None:
     """The answer as it stands on Discord: None if it is gone, or was never posted."""
     with conn.cursor(row_factory=tuple_row) as cur:
         row = cur.execute(
-            """SELECT a.id, a.debate_id, d.status = 'open', k.thread_id, a.message_id, k.posted_message_id, a.claim, a.answer, a.searched_at IS NOT NULL, a.claim_id
+            """SELECT a.id, a.debate_id, d.status = 'open', k.thread_id, a.message_id, k.posted_message_id, a.claim, a.answer, a.searched_at IS NOT NULL, a.claim_id, a.basis,
+                      a.search_requested_at IS NOT NULL
                FROM debate_answers a JOIN debates d ON d.id = a.debate_id
                JOIN debate_corrections k ON k.answer_id = a.id AND k.posted_message_id IS NOT NULL AND k.retracted_at IS NULL
                WHERE a.id = %s AND a.verdict = 'false'""", (answer_id,)).fetchone()
         if row is None:
             return None
     valid, invalid = counts(conn, answer_id)
-    return AnswerView(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], valid, invalid, row[8], row[9])
+    return AnswerView(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], valid, invalid, row[8], row[9], row[10], row[11])
 
 
 def vote(conn: psycopg.Connection, answer_id: int, user_id: int, choice: str, now: datetime | None = None) -> str:
@@ -147,16 +154,41 @@ def vote(conn: psycopg.Connection, answer_id: int, user_id: int, choice: str, no
         return "recorded" if before is None else "changed"
 
 
+def request_search(conn: psycopg.Connection, answer_id: int, user_id: int, now: datetime | None = None) -> str:
+    """Somebody pressed « Vérifier » under an answer: 'requested' (the first time) or 'already' (somebody did, the search is on its way). Anybody may, the author too: it judges nothing and
+    asks for what the answer lacks, a source. Refused: 'unknown' (gone, or not posted), 'not_open' (the debate is over), 'searched' (Dindon already looked), 'blocked' (asked not to be recorded)."""
+    now = now or utc_now()
+    with conn.transaction(), conn.cursor(row_factory=tuple_row) as cur:
+        found = cur.execute(
+            """SELECT d.status, a.searched_at IS NOT NULL, a.search_requested_at IS NOT NULL FROM debate_answers a JOIN debates d ON d.id = a.debate_id
+               JOIN debate_corrections k ON k.answer_id = a.id AND k.posted_message_id IS NOT NULL AND k.retracted_at IS NULL
+               WHERE a.id = %s AND a.verdict = 'false' FOR UPDATE OF a""", (answer_id,)).fetchone()
+        if found is None:
+            raise VoteRefused("unknown")
+        if found[0] != "open":
+            raise VoteRefused("not_open")
+        if found[1]:
+            raise VoteRefused("searched")
+        if cur.execute("SELECT 1 FROM privacy_subjects WHERE user_id = %s", (user_id,)).fetchone():
+            raise VoteRefused("blocked")
+        if found[2]:
+            return "already"
+        cur.execute("UPDATE debate_answers SET search_requested_at = %s WHERE id = %s", (now, answer_id))
+        return "requested"
+
+
 def searches_due(conn: psycopg.Connection, limit: int = 3) -> list[DueSearch]:
-    """The answers that the participants rejected: more **Invalide** than **Valide** (people who are still recorded), in a running debate, not searched yet. Equal, or more Valide: nothing."""
+    """The answers that somebody asked to be checked (« Vérifier »), or that the participants rejected in the old way (more **Invalide** than **Valide**, people who are still recorded), in a running
+    debate, not searched yet. Equal, or more Valide: nothing."""
     with conn.cursor(row_factory=tuple_row) as cur:
         return [DueSearch(*r) for r in cur.execute(
             f"""SELECT a.id, a.debate_id, a.message_id, a.author_id, a.claim, a.said, a.query
                 FROM debate_answers a JOIN debates d ON d.id = a.debate_id AND d.status = 'open'
                 JOIN debate_corrections k ON k.answer_id = a.id AND k.posted_message_id IS NOT NULL AND k.retracted_at IS NULL
                 WHERE a.verdict = 'false' AND a.searched_at IS NULL AND {_NOT_BLOCKED.format(col='a.author_id')}
-                  AND (SELECT count(*) FROM debate_answer_votes v WHERE v.answer_id = a.id AND v.choice = 'invalid' AND {_NOT_BLOCKED.format(col='v.user_id')})
-                    > (SELECT count(*) FROM debate_answer_votes v WHERE v.answer_id = a.id AND v.choice = 'valid' AND {_NOT_BLOCKED.format(col='v.user_id')})
+                  AND (a.search_requested_at IS NOT NULL
+                       OR (SELECT count(*) FROM debate_answer_votes v WHERE v.answer_id = a.id AND v.choice = 'invalid' AND {_NOT_BLOCKED.format(col='v.user_id')})
+                        > (SELECT count(*) FROM debate_answer_votes v WHERE v.answer_id = a.id AND v.choice = 'valid' AND {_NOT_BLOCKED.format(col='v.user_id')}))
                 ORDER BY a.id LIMIT %s""", (limit,)).fetchall()]
 
 
@@ -185,12 +217,13 @@ class ToShow:
     verdict: str | None              # what the search found: confirmed / contradicted / ... ; None: no search could be made
     period: str | None
     claim_id: int | None
+    basis: str = "model"
 
 
 def to_show(conn: psycopg.Connection, limit: int = 5) -> list[ToShow]:
     with conn.cursor(row_factory=tuple_row) as cur:
         return [ToShow(*r) for r in cur.execute(
-            """SELECT a.id, a.debate_id, k.thread_id, k.posted_message_id, a.message_id, a.claim, a.answer, c.verdict, c.period, c.id
+            """SELECT a.id, a.debate_id, k.thread_id, k.posted_message_id, a.message_id, a.claim, a.answer, c.verdict, c.period, c.id, a.basis
                FROM debate_answers a JOIN debate_corrections k ON k.answer_id = a.id AND k.posted_message_id IS NOT NULL AND k.retracted_at IS NULL
                LEFT JOIN debate_claims c ON c.id = a.claim_id
                WHERE a.searched_at IS NOT NULL AND a.shown_at IS NULL ORDER BY a.id LIMIT %s""", (limit,)).fetchall()]
@@ -205,12 +238,12 @@ def of_debate(conn: psycopg.Connection, debate_id: int) -> list[dict]:
     """What Dindon answered in a debate, for its statistics and the interface: each answer with the judgement of the participants. Never people who asked not to be recorded."""
     with conn.cursor(row_factory=tuple_row) as cur:
         rows = cur.execute(
-            f"""SELECT a.id, a.message_id, a.author_id, a.claim, a.verdict, a.answer, a.searched_at IS NOT NULL, c.verdict, k.posted_message_id IS NOT NULL
+            f"""SELECT a.id, a.message_id, a.author_id, a.claim, a.verdict, a.answer, a.searched_at IS NOT NULL, c.verdict, k.posted_message_id IS NOT NULL, a.basis, a.search_requested_at IS NOT NULL
                 FROM debate_answers a LEFT JOIN debate_claims c ON c.id = a.claim_id LEFT JOIN debate_corrections k ON k.answer_id = a.id AND k.retracted_at IS NULL
                 WHERE a.debate_id = %s AND {_NOT_BLOCKED.format(col='a.author_id')} ORDER BY a.id""", (debate_id,)).fetchall()
     found = []
-    for answer_id, message_id, author_id, claim, verdict, answer, searched, found_verdict, posted in rows:
+    for answer_id, message_id, author_id, claim, verdict, answer, searched, found_verdict, posted, basis, requested in rows:
         valid, invalid = counts(conn, answer_id)
         found.append({"id": answer_id, "message_id": str(message_id), "author_id": str(author_id), "claim": claim, "verdict": verdict, "answer": answer, "posted": bool(posted),
-                      "valid": valid, "invalid": invalid, "searched": searched, "found": found_verdict})
+                      "valid": valid, "invalid": invalid, "searched": searched, "found": found_verdict, "basis": basis, "requested": bool(requested)})
     return found

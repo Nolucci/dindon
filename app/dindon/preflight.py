@@ -256,8 +256,9 @@ def check_debates(settings: Settings) -> list[Check]:
         found.append(_warn(area, f"Les CORRECTIONS PUBLIQUES sont actives (précision mesurée {settings.debate_precision:.2f}, seuil {settings.debate_min_precision:.2f}) : Dindon répond en public quand des sources de confiance "
                                  "contredisent une affirmation, en plus de ses réponses sans Internet."))
     elif mode == "answer":
-        found.append(_warn(area, "Dindon RÉPOND D'ABORD, sans Internet, quand il est certain qu'une affirmation est fausse : sa réponse est publique, sans source, et peut être fausse ; les participants la jugent "
-                                 "(Valide / Invalide) et il ne cherche sur Internet que s'il y a plus d'Invalide." + (f" Les corrections par les sources seules ne sont PAS actives : {why}." if why else "")))
+        found.append(_warn(area, "Dindon CHERCHE sur Internet ce dont son IA locale n'est pas sûre qu'il soit vrai : quand une source de confiance contredit (citation vérifiée), il le dit en public comme sûr ; "
+                                 "sinon il répond en public, marqué non fiable et sans source (il peut se tromper), avec un bouton Vérifier qui lance une recherche plus profonde ; sinon il ne dit rien."
+                                 + (f" (DINDON_DEBATE_CHECKS=live demandait une précision mesurée, qui manque : {why} ; ce réglage est maintenant équivalent à `answer`.)" if why else "")))
     else:
         found.append(_ok(area, "Mode observation : les vérifications sont notées dans la base (`dindon debate-report`), rien n'est publié."))
     return found

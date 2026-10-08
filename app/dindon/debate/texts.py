@@ -39,7 +39,7 @@ THREAD_PREFIX = "Débat · "
 # « dans les débats », since a debate can now take place in a channel. To be confirmed by the owner.)
 NOTICE_TITLE = "Vérification des affirmations"
 NOTICE = ("Pour vérifier ce qu'une personne affirme dans un débat, Dindon envoie à un moteur de recherche une phrase neutre qui décrit l'affirmation — sans votre nom, sans votre message — "
-          "et lit au plus trois des pages trouvées. Il ne cherche rien d'autre, ne vérifie rien de ce qui concerne une personne privée, n'ouvre pas les liens que vous écrivez, et ne prend pas "
+          "et lit au plus cinq des pages trouvées. Il ne cherche rien d'autre, ne vérifie rien de ce qui concerne une personne privée, n'ouvre pas les liens que vous écrivez, et ne prend pas "
           "parti : il dit ce que des sources de confiance établissent, ou qu'il ne peut pas trancher. Rien d'autre ne quitte cet ordinateur, à part ce que Dindon écrit dans les débats "
           "de ce serveur. Pour l'instant, il note ses vérifications sans rien publier.")
 
@@ -72,27 +72,24 @@ REFUSALS = {                                    # what a person is told when a r
     "answer_gone": "Cette réponse n'existe plus.",
 }
 
-NOTICE_LIVE = NOTICE.replace("Pour l'instant, il note ses vérifications sans rien publier.",
-                             "Quand des sources de confiance contredisent une affirmation, il le dit dans le fil, avec ces sources (sur lesquelles vous pouvez cliquer pour vérifier) ; sinon il ne dit rien.")
-
-
-# When Dindon answers first (DINDON_DEBATE_CHECKS=answer or live): what it says, what the participants can do, and what leaves the machine. (Written 2026-10-06 for the owner to confirm.)
-NOTICE_ANSWER = ("Pour vérifier ce qu'une personne affirme dans un débat, Dindon répond d'abord avec son IA locale, sans rien chercher sur Internet : quand il est certain qu'une affirmation est fausse, "
-                 "il le dit sous le message, en précisant qu'il n'a pas de source et qu'il peut se tromper. Chacun peut alors appuyer sur Valide ou Invalide : s'il y a plus d'Invalide, Dindon cherche "
-                 "sur Internet (il envoie à un moteur de recherche une phrase neutre qui décrit l'affirmation — sans votre nom, sans votre message — et lit au plus trois des pages trouvées) et corrige "
-                 "sa réponse avec ce que disent des sources de confiance, quel que soit le résultat. Il ne vérifie rien de ce qui concerne une personne privée, n'ouvre pas les liens que vous écrivez "
-                 "et ne prend pas parti. Rien d'autre ne quitte cet ordinateur, à part ce que Dindon écrit dans les débats de ce serveur.")
-NOTICE_LOCAL = ("Pour vérifier ce qu'une personne affirme dans un débat, Dindon répond d'abord avec son IA locale : quand il est certain qu'une affirmation est fausse, il le dit sous le message, "
-                "en précisant qu'il n'a pas de source et qu'il peut se tromper. Chacun peut appuyer sur Valide ou Invalide sous sa réponse. Dindon ne cherche rien sur Internet : rien ne quitte "
-                "cet ordinateur, à part ce que Dindon écrit dans les débats de ce serveur. Il ne vérifie rien de ce qui concerne une personne privée et ne prend pas parti.")
+# When Dindon answers (DINDON_DEBATE_CHECKS=answer or live): what it says, what a participant can do, and what leaves the machine. (Rewritten 2026-10-08 for the owner to confirm.)
+NOTICE_ANSWER = ("Pour vérifier ce qu'une personne affirme dans un débat, Dindon demande à son IA locale si l'affirmation est sûrement vraie : alors il ne fait rien. Sinon il cherche sur Internet "
+                 "(il envoie à un moteur de recherche une phrase neutre — sans votre nom, sans votre message — et lit au plus cinq des pages trouvées). Si une source de confiance contredit l'affirmation, "
+                 "avec une citation vérifiée sur sa page, il le dit comme sûr, avec la source. Si aucune source de confiance ne tranche, il peut donner sa réponse en la marquant non fiable, "
+                 "avec un bouton Vérifier qui lance une recherche plus profonde (huit pages au plus) ; sinon il ne dit rien. Il ne vérifie rien de ce qui concerne une personne privée, n'ouvre pas "
+                 "les liens que vous écrivez et ne prend pas parti. Rien d'autre ne quitte cet ordinateur, à part ce que Dindon écrit dans les débats de ce serveur.")
+NOTICE_LIVE = NOTICE_ANSWER                       # `live` used to add the corrections by trusted sources, which are now part of `answer`
+NOTICE_LOCAL = ("Pour vérifier ce qu'une personne affirme dans un débat, Dindon demande à son IA locale : quand elle est certaine qu'une affirmation est fausse, il le dit sous le message, "
+                "en la marquant non fiable : sans source, il peut se tromper. Dindon ne cherche rien sur Internet : rien ne quitte cet ordinateur, à part ce que Dindon écrit dans les débats "
+                "de ce serveur. Il ne vérifie rien de ce qui concerne une personne privée et ne prend pas parti.")
 
 
 # The same, in one line, for the launch message of every debate (the whole text is in `/dindon info`): what Dindon does, and what leaves the machine.
 NOTICE_SHORT = {
     "observe": "🔎 Dindon note les affirmations de fait en les cherchant sur Internet (phrase neutre, sans votre nom), sans rien publier. Détails : `/dindon info`.",
-    "answer": "🔎 Sûr qu'une affirmation est fausse, Dindon répond sans source (il peut se tromper) : ✅ Valide / ❌ Invalide ; plus d'Invalide, il cherche sur Internet (phrase neutre, sans votre nom). Détails : `/dindon info`.",
-    "local": "🔎 Sûr qu'une affirmation est fausse, Dindon répond sans source (il peut se tromper) : ✅ Valide / ❌ Invalide. Il ne cherche rien sur Internet. Détails : `/dindon info`.",
-    "live": "🔎 Dindon répond sans source quand il est sûr qu'une affirmation est fausse (✅ Valide / ❌ Invalide ; plus d'Invalide, il cherche sur Internet) ; des sources de confiance peuvent aussi le corriger. Détails : `/dindon info`.",
+    "answer": "🔎 Dindon cherche sur Internet ce qui n'est pas sûr (phrase neutre, sans votre nom) : sûr si une source de confiance contredit, ⚠️ non fiable sinon, avec un bouton Vérifier. Détails : `/dindon info`.",
+    "local": "🔎 Sûr qu'une affirmation est fausse, Dindon répond ⚠️ sans source (il peut se tromper). Il ne cherche rien sur Internet. Détails : `/dindon info`.",
+    "live": "🔎 Dindon cherche sur Internet ce qui n'est pas sûr (phrase neutre, sans votre nom) : sûr si une source de confiance contredit, ⚠️ non fiable sinon, avec un bouton Vérifier. Détails : `/dindon info`.",
 }
 
 
@@ -125,7 +122,8 @@ def correction(claim: str, period: str | None, evidence: list, reply_to: int) ->
     """What Dindon posts when trusted sources contradict a claim. The same words for everybody and whatever the subject: what was checked, what the sources say with their exact words, and links to
     click. It names nobody, mentions nobody (it answers the message), gives no opinion and says nothing of who is right in the debate."""
     shown = evidence[:3]
-    lines = [f"**Affirmation vérifiée** : « {_plain(claim)} »", "", "**Ce que disent les sources**" + (f" ({_plain(period)})" if period else "") + " :"]
+    lines = [f"**Affirmation vérifiée** : « {_plain(claim)} »", "", "✅ **Sûr : des sources de confiance contredisent cette affirmation.**", "",
+             "**Ce que disent les sources**" + (f" ({_plain(period)})" if period else "") + " :"]
     for e in shown:
         link = e.url.replace("(", "%28").replace(")", "%29")
         lines.append(f"• [{_plain(_source_name(e.url))}]({link}) : « {_plain(e.quote)} »")
@@ -139,18 +137,32 @@ def correction(claim: str, period: str | None, evidence: list, reply_to: int) ->
     return payload
 
 
-def answer_buttons(answer_id: int, valid: int, invalid: int) -> list[dict]:
-    return _row([{"type": 2, "style": SECONDARY, "label": f"Valide · {valid}", "emoji": {"name": "✅"}, "custom_id": custom_id("val", answer_id, "valid")},
-                 {"type": 2, "style": SECONDARY, "label": f"Invalide · {invalid}", "emoji": {"name": "❌"}, "custom_id": custom_id("val", answer_id, "invalid")}])
+def answer_buttons(answer_id: int, requested: bool = False) -> list[dict]:
+    """The one button under an answer: « Vérifier ». Pressed, Dindon looks on the Internet, deeper (it says so on the button once somebody did)."""
+    return _row([{"type": 2, "style": SECONDARY, "label": "Vérification en cours…" if requested else "Vérifier", "emoji": {"name": "🔎"}, "disabled": requested,
+                  "custom_id": custom_id("val", answer_id, "check")}])
 
 
-def local_answer(claim: str, answer: str, answer_id: int, reply_to: int, valid: int = 0, invalid: int = 0) -> dict:
-    """What Dindon says under a message when it is certain that a claim is false, from its local model alone: the claim, what it knows, and that it has **no source**. Under it, Valide and
-    Invalide for the participants. It answers the message, names nobody, mentions nobody."""
-    lines = [f"**Affirmation** : « {_plain(claim)} »", "", _plain(answer), "",
-             "*Réponse de l'IA locale de Dindon, **sans recherche sur Internet et sans source** : elle peut se tromper. Valide ou invalide ? S'il y a plus d'invalide que de valide, Dindon cherchera sur Internet.*"]
-    embed = {"title": "💬 Réponse de Dindon", "description": "\n".join(lines)[:4000], "color": GREY, "footer": {"text": "Dindon ne prend pas parti. Votre vote juge cette réponse, pas la personne."}}
-    return {"content": "", "embeds": [embed], "components": answer_buttons(answer_id, valid, invalid), "allowed_mentions": {"parse": [], "replied_user": False},
+def local_answer(claim: str, answer: str, answer_id: int, reply_to: int, evidence: list | tuple = (), basis: str = "model", requested: bool = False) -> dict:
+    """What Dindon says under a message when no trusted source settled a claim but it has something to say: the claim, what it knows, and, first of all, that **this is not reliable**. `basis`
+    `model`: its local model alone, without a source; `pages`: a page that is not a trusted source. `evidence`: the pages that the first search found against the claim, to click. Under it, the
+    button « Vérifier ». It answers the message, names nobody, mentions nobody."""
+    lines = [f"**Affirmation** : « {_plain(claim)} »", "", "⚠️ **Non fiable : aucune source de confiance n'a pu confirmer ou contredire cette affirmation.**", "", _plain(answer), ""]
+    lines.append("*Premier avis tiré de pages qui ne sont pas des sources de confiance : à vérifier vous-même.*" if basis == "pages"
+                 else "*Réponse de l'IA locale de Dindon, **sans source** : elle peut se tromper.*")
+    shown = [e for e in evidence if e.stance == "contradicts"][:3]
+    buttons = [{"type": 2, "style": LINK, "label": _source_name(e.url)[:80], "url": e.url} for e in shown if len(e.url) <= 512]
+    if shown and basis != "pages":
+        lines += ["", "**Pages trouvées qui vont dans ce sens (non officielles, à vérifier)** :"]
+        for e in shown:
+            link = e.url.replace("(", "%28").replace(")", "%29")
+            lines.append(f"• [{_plain(_source_name(e.url))}]({link}) : « {_plain(e.quote)} »")
+    lines += ["", "Appuyez sur 🔎 **Vérifier** : Dindon cherchera cette phrase sur Internet, plus en profondeur."]
+    embed = {"title": "⚠️ Réponse de Dindon (non fiable)", "description": "\n".join(lines)[:4000], "color": GREY, "footer": {"text": "Dindon ne prend pas parti. Cette réponse n'est pas une vérification."}}
+    rows = answer_buttons(answer_id, requested)
+    if buttons:
+        rows = rows + _row(buttons)
+    return {"content": "", "embeds": [embed], "components": rows, "allowed_mentions": {"parse": [], "replied_user": False},
             "message_reference": {"message_id": str(reply_to), "fail_if_not_exists": False}}
 
 
@@ -161,13 +173,13 @@ SEARCH_RESULT = {                                # what Dindon says of its own a
     "disputed": "Des sources de confiance **se contredisent** : je ne peux pas trancher.",
     "likely_false": "Aucune source de confiance ne tranche, mais d'**autres sources** laissent penser que l'affirmation est **fausse**. **Avis provisoire** : à vérifier vous-même.",
     "likely_true": "Aucune source de confiance ne tranche, mais d'**autres sources** laissent penser que l'affirmation est **vraie**. **Avis provisoire** : à vérifier vous-même.",
-    "unverifiable": "Je n'ai **pas trouvé de source de confiance** qui tranche : ma réponse reste sans source, à prendre avec prudence.",
+    "unverifiable": "Même en cherchant plus loin, je n'ai **pas trouvé de source de confiance** qui tranche : ma réponse reste **non fiable**, à prendre avec prudence.",
     None: "Je **ne peux pas chercher sur Internet** (aucun service de recherche n'est réglé) : ma réponse reste sans source, à prendre avec prudence.",
 }
 SEARCH_STANCE = {"contradicted": ("contradicts",), "confirmed": ("supports",), "partly": ("partly",), "disputed": ("supports", "contradicts"), "likely_false": ("contradicts",), "likely_true": ("supports",), "unverifiable": (), None: ()}
 
 
-def after_search(claim: str, answer: str, verdict: str | None, period: str | None, evidence: list) -> dict:
+def after_search(claim: str, answer: str, verdict: str | None, period: str | None, evidence: list, basis: str = "model") -> dict:
     """Dindon's own message, written again once the participants rejected its answer and it looked on the Internet: what it found, whatever it is, with the sources to click and their exact
     words. The buttons are gone: the answer has been checked. It says plainly when the first answer was wrong."""
     wanted = SEARCH_STANCE.get(verdict, ())
@@ -178,7 +190,7 @@ def after_search(claim: str, answer: str, verdict: str | None, period: str | Non
         for e in shown:
             link = e.url.replace("(", "%28").replace(")", "%29")
             lines.append(f"• [{_plain(_source_name(e.url))}]({link}) : « {_plain(e.quote)} »")
-    lines += ["", f"*Ma première réponse, sans recherche : {_plain(answer)}*"]
+    lines += ["", f"*Mon premier avis, d'après une page non officielle : {_plain(answer)}*" if basis == "pages" else f"*Ma première réponse, sans recherche : {_plain(answer)}*"]
     title = "🔎 Recherche impossible" if verdict is None else "🔎 Dindon a cherché sur Internet"
     footer = ("Dindon ne prend pas parti : ces sources ne sont pas dans sa liste de confiance, l'avis est provisoire. Cliquez pour vérifier par vous-même."
               if shown and verdict in ("likely_true", "likely_false") else
@@ -203,8 +215,8 @@ def parse_custom_id(raw: object) -> tuple[str, int, str] | None:
     parts = str(raw).split(":")
     if len(parts) != 5 or parts[:2] != ["dindon", "debat"] or parts[2] not in ("pos", "end", "stats", "val", "rate", "pick") or not parts[3].isdigit():
         return None
-    if parts[2] == "val":                                     # Valide / Invalide under an answer of Dindon (the number is the answer's, not the debate's)
-        return ("val", int(parts[3]), parts[4]) if parts[4] in ("valid", "invalid") else None
+    if parts[2] == "val":                                     # « Vérifier » under an answer of Dindon (and, on the older messages, Valide / Invalide): the number is the answer's, not the debate's
+        return ("val", int(parts[3]), parts[4]) if parts[4] in ("valid", "invalid", "check") else None
     if parts[2] == "stats":                                   # the page of the statistics to show
         return ("stats", int(parts[3]), parts[4]) if parts[4].isdigit() and len(parts[4]) <= 3 else None
     if parts[2] == "end":

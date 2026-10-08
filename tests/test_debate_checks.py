@@ -35,7 +35,7 @@ class FakeChecker:
 
     def __init__(self, results=(RESULT,), error=None, local=None, can_search=True):
         self.texts, self.contexts, self.results, self.error, self.local, self.can_search = [], [], results, error, local, can_search
-        self.searched, self.search_result = [], RESULT                # the claims that the participants asked to be searched, and what the search finds
+        self.searched, self.search_result, self.deep = [], RESULT, []   # the claims that somebody asked to be searched (« Vérifier »), what the search finds, and whether each was the deeper search
 
     def check(self, text, context=""):
         self.texts.append(text)
@@ -53,8 +53,9 @@ class FakeChecker:
         results = () if answers or not self.can_search else tuple(self.results(text) if callable(self.results) else self.results)
         return Considered(answers, results)
 
-    def search(self, reading):
+    def search(self, reading, deep=False):
         self.searched.append(reading)
+        self.deep.append(deep)
         return self.search_result(reading) if callable(self.search_result) else self.search_result
 
 
@@ -101,7 +102,7 @@ def test_with_the_checks_on_every_debate_thread_says_what_leaves_the_machine_and
     assert "fields" not in question["embeds"][0] and texts.notice_short("observe") in question["embeds"][0]["description"]                  # one line in the launch message…
     first, second = info(checked)
     assert second[2]["content"] == f"**{texts.NOTICE_TITLE}.** {texts.NOTICE}"                                                            # …and the whole text in /dindon info
-    for needed in ("phrase neutre", "sans votre nom, sans votre message", "au plus trois des pages", "personne privée", "n'ouvre pas les liens que vous écrivez", "ne prend pas parti",
+    for needed in ("phrase neutre", "sans votre nom, sans votre message", "au plus cinq des pages", "personne privée", "n'ouvre pas les liens que vous écrivez", "ne prend pas parti",
                    "Rien d'autre ne quitte cet ordinateur", "sans rien publier"):
         assert needed in texts.NOTICE
     assert len(texts.NOTICE) <= 1024                                                                       # the limit of an embed field

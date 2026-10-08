@@ -301,6 +301,27 @@ def test_official_pages_come_before_fact_checkers_and_no_more_than_three_pages_a
     assert web.read == [OFFICIAL, "https://factuel.afp.com/doc.1"] and result.pages == 2
 
 
+def test_a_page_with_nothing_to_read_costs_a_read_but_not_one_of_the_three_pages_that_one_claim_may_use():
+    near = [Hit(u, "Taux de chômage", "Le taux de chômage en France est de 12 % de la population active", "searxng") for u in ("https://www.insee.fr/fr/1", "https://www.economie.gouv.fr/2")]
+    portals = [Hit(u, "Accueil", "Bienvenue", "searxng") for u in ("https://www.service-public.fr/", "https://www.vie-publique.fr/")]       # trusted pages whose text has nothing of the claim
+    late = [Hit(u, "Accueil", "Bienvenue", "searxng") for u in ("https://ec.europa.eu/3", "https://www.oecd.org/4")]
+    web = Pages({**{h.url: PAGE for h in near + late}, **{h.url: "Bienvenue." for h in portals}})
+    result = verify_claim(Lookup([Service(near + portals + late)], web), Model(says("supports")), "m", Trust(), CLAIM)
+    assert len(web.read) == 5 and result.pages == 5 and "https://www.oecd.org/4" not in web.read                # five reads at most
+    assert len(result.evidence) == 3 and result.verdict == "confirmed"                                          # the two portals did not count: three pages with something to read were used
+
+
+def test_the_deeper_check_searches_the_sentence_itself_too_and_may_use_more_pages():
+    urls = [f"https://www.insee.fr/fr/{n}" for n in range(1, 9)]
+    service = Service([Hit(u, "Taux de chômage", "Le taux de chômage en France est de 12 % de la population active", "searxng") for u in urls])
+    web = Pages({u: PAGE for u in urls})
+    result = verify_claim(Lookup([service], web, max_queries=4, max_pages=8), Model(says("supports")), "m", Trust(), CLAIM, deep=True)
+    assert service.asked == [CLAIM.query, CLAIM.claim] and result.queries == 2 and len(web.read) <= 8          # the sentence of the claim is searched, with the neutral query
+    shallow = Service([Hit(u, "Taux de chômage", "Le taux de chômage en France est de 12 % de la population active", "searxng") for u in urls])
+    verify_claim(Lookup([shallow], Pages({u: PAGE for u in urls})), Model(says("supports")), "m", Trust(), CLAIM)
+    assert shallow.asked == [CLAIM.query]                                                                      # the first check does not
+
+
 def test_the_pages_that_are_read_are_those_whose_title_and_extract_look_most_like_the_claim():
     far = Hit("https://www.insee.fr/fr/accueil", "Accueil", "Bienvenue sur le site de l'institut", "searxng")
     near = Hit("https://www.insee.fr/fr/near", "Taux de chômage", "Le taux de chômage en France est de 12 % de la population active", "searxng")

@@ -4,8 +4,8 @@ The rule given by the owner: the AI goes out on the Internet **only to check wha
 shape of the code instead of being promised in a text. Whatever reads the claim (the model, the code around it) reaches the Internet only through a `Lookup`, and a `Lookup`:
 
 * answers **one claim**: it is made for it and thrown away after;
-* sends **at most `max_queries` queries** (2), each to every search service, a failed query included (no hidden retries);
-* reads **at most `max_pages` pages** (3), and **only pages that the search itself returned**: never an address that a member wrote in a message, never a link found inside a
+* sends **at most `max_queries` queries** (2; a deeper check that a person asked for: 4), each to every search service, a failed query included (no hidden retries);
+* reads **at most `max_pages` pages** (5; a deeper check that a person asked for: 8), and **only pages that the search itself returned**: never an address that a member wrote in a message, never a link found inside a
   page, never an address the model made up. Nothing is crawled, nothing is followed from page to page;
 * refuses an empty query (nothing is sent for it);
 * **counts** what it did (`spent`), so that it can be shown and audited: how many queries, how many pages. Never what they contained.
@@ -22,7 +22,9 @@ from dindon.debate.search import Hit, Searcher, SearchError, scrub_query
 from dindon.debate.web import Fetcher, Page
 
 MAX_QUERIES = 2
-MAX_PAGES = 3
+MAX_PAGES = 5                  # reads, an unreadable or empty page included; `verify` stops sooner, at USEFUL_PAGES pages that had something to read
+DEEP_QUERIES = 4               # a check that a person asked for (the button « Vérifier »): the claim itself is searched too
+DEEP_PAGES = 8
 
 
 class OutOfScope(Exception):

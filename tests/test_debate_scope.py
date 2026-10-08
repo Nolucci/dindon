@@ -4,6 +4,7 @@ Level of proof: SIMULATED. In-memory search services and fetcher: nothing is sen
 """
 import pytest
 
+from dindon.debate import scope
 from dindon.debate.scope import Lookup, OutOfScope
 from dindon.debate.search import Hit, SearchError
 from dindon.debate.web import Page, WebError
@@ -35,7 +36,7 @@ def hit(url, via="searxng"):
     return Hit(url, "titre", "extrait", via)
 
 
-A, B, C, D = (hit(f"https://www.insee.fr/{x}") for x in "abcd")
+A, B, C, D, E, F = (hit(f"https://www.insee.fr/{x}") for x in "abcdef")
 
 
 def test_a_query_goes_to_every_service_in_the_same_cleaned_form_and_the_hits_are_merged_without_duplicates():
@@ -97,16 +98,25 @@ def test_an_address_is_the_same_whatever_its_fragment_or_the_case_of_the_host():
     assert reader.read == [A.url]
 
 
-def test_only_three_pages_are_read_for_one_claim_and_an_unreadable_one_counts():
+def test_only_five_pages_are_read_for_one_claim_and_an_unreadable_one_counts():
     reader = Reader(fail=WebError("status", "404"))
-    lookup = Lookup([Service([A, B, C, D])], reader)
+    lookup = Lookup([Service([A, B, C, D, E, F])], reader)
     lookup.search("chômage")
-    for page in (A, B, C):
+    for page in (A, B, C, D, E):
         with pytest.raises(WebError):
             lookup.read(page.url)
     with pytest.raises(OutOfScope) as error:
-        lookup.read(D.url)
-    assert error.value.code == "pages" and reader.read == [A.url, B.url, C.url] and lookup.spent() == {"queries": 1, "pages": 3}
+        lookup.read(F.url)
+    assert error.value.code == "pages" and reader.read == [A.url, B.url, C.url, D.url, E.url] and lookup.spent() == {"queries": 1, "pages": 5}
+
+
+def test_a_check_that_a_person_asked_for_may_search_and_read_more_but_never_without_a_limit():
+    lookup = Lookup([Service([A, B, C, D, E, F])], Reader(), max_queries=scope.DEEP_QUERIES, max_pages=scope.DEEP_PAGES)
+    for query in ("a b", "c d", "e f", "g h"):
+        lookup.search(query)
+    with pytest.raises(OutOfScope):
+        lookup.search("i j")
+    assert (scope.DEEP_QUERIES, scope.DEEP_PAGES) == (4, 8)
 
 
 def test_the_limits_can_be_made_stricter_never_looser_by_accident():
@@ -117,7 +127,7 @@ def test_the_limits_can_be_made_stricter_never_looser_by_accident():
     lookup.read(A.url)
     with pytest.raises(OutOfScope):
         lookup.read(B.url)
-    assert (Lookup([], Reader())._max_queries, Lookup([], Reader())._max_pages) == (2, 3)
+    assert (Lookup([], Reader())._max_queries, Lookup([], Reader())._max_pages) == (2, 5)
 
 
 def test_a_lookup_remembers_nothing_beyond_its_claim():

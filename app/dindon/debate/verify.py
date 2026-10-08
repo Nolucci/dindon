@@ -2,8 +2,9 @@
 
 The path of a claim, with what each step is allowed to do:
 
-1. **Search** through a `scope.Lookup` only (2 queries and 3 pages at most for this claim, only pages that the search returned). One query; a second, the claim itself, only if the first
-   returned no trusted page.
+1. **Search** through a `scope.Lookup` only (2 queries and 5 reads at most for this claim, only pages that the search returned; 4 and 8 for the deeper check that a person asked for).
+   One query; a second, the claim itself, only if the first returned no trusted page (the deeper check always searches the claim itself too). Only 3 pages with passages that look like the claim are
+   used: the others cost a read and nothing else.
 2. **Choose** the pages: only those whose source may ground a verdict (`trust.py`: official bodies and press fact-checkers), official first. **A page of any other source is never read**:
    whatever it says, it cannot decide anything, and a hostile page then has nothing to act on. A page that redirected somewhere untrusted is dropped too.
 3. **Read** each page through the model, on the passages that look like the claim only (a few hundred words, chosen by the program), and ask a narrow question: does this support the claim,
@@ -35,6 +36,8 @@ from dindon.debate.web import WebError, contains_quote
 PROMPT_VERSION = "verify-3"
 PASSAGE_CHARS = 700
 MAX_PASSAGES = 4
+USEFUL_PAGES = 3                  # pages with passages that look like the claim, which one claim may use (a portal, a page drawn by a script, a refusal or an error costs a read, not one of these)
+DEEP_USEFUL_PAGES = 6             # when a person asked for the deeper check
 STANCES = ("supports", "contradicts", "partly", "irrelevant")
 _STOP = """le la les un une des de du d l et ou en au aux à a est sont été être ce cette ces se sa son ses leur leurs que qui quoi dont où pour par sur sous dans avec sans
 plus moins très aussi mais donc or ni car il elle ils elles on nous vous je tu y ne pas entre vers chez comme depuis pendant avant après"""
@@ -130,14 +133,19 @@ def decide(evidence: list[Evidence]) -> tuple[str, str | None]:
 class _Run:
     evidence: list[Evidence]
     errors: int = 0
+    useful: int = 0                                                                     # pages read that had something to read: the ones that count against USEFUL_PAGES
+    limit: int = USEFUL_PAGES
 
 
-def verify_claim(lookup: Lookup, llm: Chat, model: str, trust: Trust, reading: Reading, *, read_page: Callable | None = None) -> ClaimResult:
+def verify_claim(lookup: Lookup, llm: Chat, model: str, trust: Trust, reading: Reading, *, read_page: Callable | None = None, deep: bool = False) -> ClaimResult:
     """The verdict on one claim, with its verified evidence and what it cost on the Internet. Never raises for something that goes wrong in the world (the search is down, a page cannot
     be read, the model fails): the claim is then *unverifiable*, for the reason `error`."""
-    run = _Run([])
+    run = _Run([], limit=DEEP_USEFUL_PAGES if deep else USEFUL_PAGES)
     try:
         lookup.search(reading.query)
+        if deep and reading.claim != reading.query:
+            with contextlib.suppress(OutOfScope):
+                lookup.search(reading.claim)                                         # the deeper check searches the sentence itself too
         if not any(trust.can_condemn(hit.url) for hit in lookup.offered):
             with contextlib.suppress(OutOfScope):
                 lookup.search(_fallback_query(reading.claim))                         # search the entity without repeating a possibly false predicate
@@ -154,13 +162,15 @@ def verify_claim(lookup: Lookup, llm: Chat, model: str, trust: Trust, reading: R
     seen: set[str] = set()
     proven_sources: set[str] = set()
     for hit in ranked:
+        if run.useful >= run.limit:
+            break                                                                       # enough pages with something to read: the rest is not read
         source_key = trust.source_key(hit.url)
         if source_key in proven_sources:
             continue                                                              # a second page of the same source adds latency, not independent evidence
         try:
             page = lookup.read(hit.url)
         except OutOfScope:
-            break                                                                       # the page budget is used
+            break                                                                       # the budget of reads is used
         except WebError:
             continue
         if page.url in seen or not trust.can_condemn(page.url):                          # a redirect may lead somewhere that is not a trusted source
@@ -168,7 +178,8 @@ def verify_claim(lookup: Lookup, llm: Chat, model: str, trust: Trust, reading: R
         seen.add(page.url)
         shown = passages(page.text, reading.claim)
         if not shown:
-            continue
+            continue                                                                    # nothing on it looks like the claim (a portal, a page drawn by a script): it costs a read, not one of the pages used
+        run.useful += 1
         try:
             answer = (read_page or _read_page)(llm, model, reading.claim, shown)
         except OllamaError:
@@ -191,9 +202,11 @@ def verify_claim(lookup: Lookup, llm: Chat, model: str, trust: Trust, reading: R
 def _provisional(lookup: Lookup, llm: Chat, model: str, trust: Trust, reading: Reading, run: _Run, resemblance: Callable, read_page: Callable | None, seen: set[str]) -> tuple[str, str | None]:
     """When no trusted source settled the claim: the pages of the other sources that the search returned (never one it did not return, and the same page budget) may give an opinion, which is
     **provisional** (`likely_true` / `likely_false`). It needs a verified quotation like any other stance; sources that disagree, or only a partial one, give no opinion. It is never a correction."""
-    others = sorted((h for h in lookup.offered if not trust.can_condemn(h.url)), key=lambda h: -resemblance(h))
+    others = sorted((h for h in lookup.offered if not trust.can_condemn(h.url)), key=lambda h: -resemblance(h))   # the ones that look most like the claim first
     found: list[Evidence] = []
     for hit in others:
+        if run.useful >= run.limit:
+            break
         try:
             page = lookup.read(hit.url)
         except OutOfScope:
@@ -206,6 +219,7 @@ def _provisional(lookup: Lookup, llm: Chat, model: str, trust: Trust, reading: R
         shown = passages(page.text, reading.claim)
         if not shown:
             continue
+        run.useful += 1
         try:
             answer = (read_page or _read_page)(llm, model, reading.claim, shown)
         except OllamaError:

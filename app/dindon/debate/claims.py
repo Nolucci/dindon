@@ -52,19 +52,21 @@ class ClaimResult:
 
 @dataclass(frozen=True)
 class AnswerFound:
-    """Dindon's own answer to a claim, from its local model and without the Internet (debate/local.py): `true` (it is certain that the claim is exact: nothing is said) or `false` (certain
-    that it is not: `answer` is what it says). `query` is the neutral phrase that is searched if the participants judge the answer invalid."""
+    """Dindon's own answer to a claim: `true` (its local model is certain that the claim is exact, with no Internet: nothing is said) or `false` (no trusted source settled it, and either the model is
+    certain that it is not exact or pages that are not trusted sources suggest it: `answer` is what it says, marked as not reliable). `query` is the neutral phrase that is searched when somebody presses « Vérifier »."""
     claim: str
     said: str
     query: str
     verdict: str
     answer: str | None = None
     model: str | None = None
+    basis: str = "model"            # what the answer rests on: `model` (what the local model knows) or `pages` (what pages that are not trusted sources say: nothing certain, only a first opinion)
+    result: ClaimResult | None = None   # what the first search found before the answer was posted, with its sources: the answer says that it is not reliable, and shows them
 
 
 @dataclass(frozen=True)
 class Considered:
-    """What came of one message when Dindon answers first: the claims that it answered itself, and the claims that it could not answer and checked on the Internet."""
+    """What came of one message when Dindon answers: the claims that it answers (not reliable) or notes as true, and the claims that were checked on the Internet and are only noted or corrected."""
     answers: tuple[AnswerFound, ...] = ()
     results: tuple[ClaimResult, ...] = ()
 
@@ -150,9 +152,10 @@ def finish_reading(conn: psycopg.Connection, unread: Unread, claims: list[ClaimR
         for result in claims:
             insert_result(cur, unread.debate_id, unread.message_id, unread.author_id, result, now)
         for found in answers:
+            first_search = insert_result(cur, unread.debate_id, unread.message_id, unread.author_id, found.result, now) if found.result is not None else None
             cur.execute(
-                """INSERT INTO debate_answers (debate_id, message_id, author_id, claim, said, query, verdict, answer, model, created_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                (unread.debate_id, unread.message_id, unread.author_id, found.claim, found.said, found.query, found.verdict, found.answer, found.model, now))
+                """INSERT INTO debate_answers (debate_id, message_id, author_id, claim, said, query, verdict, answer, model, created_at, claim_id, basis) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (unread.debate_id, unread.message_id, unread.author_id, found.claim, found.said, found.query, found.verdict, found.answer, found.model, now, first_search, found.basis))
     return True
 
 

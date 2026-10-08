@@ -207,7 +207,7 @@
                     </p>
                     {#if a.answer}<p class="source">{a.answer}</p>{/if}
                     {#if a.verdict === 'false'}
-                      <p class="muted small">✅ Valide {a.valid} · ❌ Invalide {a.invalid}{a.searched ? ` · Dindon a cherché sur Internet${a.found ? ` : ${VERDICT[a.found][1]}` : ' (impossible)'}` : ''}</p>
+                      <p class="muted small">⚠️ Non fiable · {a.basis === 'pages' ? 'premier avis d’après des pages non officielles' : 'réponse du modèle, sans source'}{a.valid + a.invalid ? ` · ✅ Valide ${a.valid} · ❌ Invalide ${a.invalid}` : ''}{a.searched ? ` · Dindon a cherché sur Internet${a.found ? ` : ${VERDICT[a.found][1]}` : ' (impossible)'}` : a.requested ? ' · vérification demandée' : ''}</p>
                     {/if}
                   </li>
                 {/each}
