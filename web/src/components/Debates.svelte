@@ -34,6 +34,8 @@
   const duration = (seconds) => seconds == null ? '—' : seconds < 60 ? `${Math.round(seconds)} s` : `${Math.floor(seconds / 60)} min`;
   const machineName = (machine) => { if (machine.local) return 'Serveur'; try { return new URL(machine.url).host; } catch { return machine.url; } };
   const machineState = (machine) => fleetError || !fleet?.fresh ? 'État ancien' : !machine.online ? 'Hors ligne' : !machine.has_model ? 'Modèle absent' : machine.active ? 'En cours' : 'Disponible';
+  const fleetCalls = $derived((fleet?.computers ?? []).reduce((sum, machine) => sum + (machine.calls || 0), 0));
+  const share = (machine) => (fleetCalls ? Math.round(100 * (machine.calls || 0) / fleetCalls) : 0);
   async function loadFleet() {
     if (fleetBusy) return;
     fleetBusy = true;
@@ -115,10 +117,16 @@
     <header class="cardHead"><h2 class="eyebrow">Ordinateurs des débats</h2><span class="muted small">{fleetError ? 'Connexion interrompue' : fleet?.fresh ? 'En direct' : fleet ? 'Dernier état connu' : 'Chargement…'}</span></header>
     {#if fleet?.computers?.length}
       <ul class="machines">{#each fleet.computers as machine (machine.url)}
-        <li class:working={!fleetError && fleet.fresh && machine.active && machine.online && machine.has_model}>
-          <strong title={machine.url}>{machineName(machine)}</strong><span class="badge small">{machineState(machine)}</span>
-          {#if fleet.fresh && !fleetError && machine.active}<span class="muted small">{duration(machine.running_for)}</span>{/if}
-          <details><summary>Détails</summary><p class="muted small">{machine.calls} vérifications · {duration(machine.average)} en moyenne · {machine.errors} erreurs</p>{#if machine.last_error}<p class="banner">{machine.last_error}</p>{/if}</details>
+        {@const live = !fleetError && fleet.fresh}
+        {@const working = live && machine.active && machine.online && machine.has_model}
+        <li class:working class:down={!machine.online || !machine.has_model}>
+          <span class="dot" aria-hidden="true"></span>
+          <strong title={machine.url}>{machineName(machine)}</strong>
+          <span class="share" title="Part des vérifications faites par cet ordinateur">{share(machine)} %</span>
+          <span class="state">{machineState(machine)}{#if live && machine.active} · depuis {duration(machine.running_for)}{/if}</span>
+          <progress max="100" value={share(machine)} aria-label="Part des vérifications faites"></progress>
+          <span class="numbers">{machine.calls} vérification{machine.calls > 1 ? 's' : ''}{machine.average != null ? ` · ${duration(machine.average)} en moyenne` : ''}</span>
+          {#if machine.errors}<span class="err">{machine.errors} erreur{machine.errors > 1 ? 's' : ''}{machine.last_error ? ` · ${machine.last_error}` : ''}</span>{/if}
         </li>
       {/each}</ul>
     {:else if fleet}<p class="muted small">Aucun ordinateur disponible.</p>{/if}
@@ -279,11 +287,20 @@
   .source { overflow-wrap: anywhere; }
 
   .fleet { display: flex; flex-direction: column; gap: .75rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-subtle); }
-  .machines { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: .75rem 1.5rem; }
-  .machines > li { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .5rem 0; }
-  .machines > li > strong { flex: 1 1 8rem; min-width: 0; overflow-wrap: anywhere; }
-  .machines details { flex-basis: 100%; font-size: .75rem; }
-  .machines .working > strong::before { content: ''; display: inline-block; width: .5rem; height: .5rem; margin-right: .5rem; border-radius: 50%; background: var(--success); }
+  .machines { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: .6rem; }
+  .machines > li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .3rem .6rem; padding: .85rem .95rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--bg-secondary); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+  .machines > li.working { border-color: var(--accent, #8b6cff); box-shadow: inset 0 0 0 1px var(--accent, #8b6cff); }
+  .machines > li.down { opacity: .7; }
+  .machines .dot { width: .65rem; height: .65rem; border-radius: 50%; background: var(--text-muted); }
+  .machines .working .dot { background: var(--accent, #8b6cff); animation: machine-pulse 1.1s ease-in-out infinite; }
+  .machines .down .dot { background: var(--danger, #d9534f); }
+  .machines strong { color: var(--text-primary); min-width: 0; overflow-wrap: anywhere; }
+  .machines .share { color: var(--text-primary); font-weight: 600; }
+  .machines .state, .machines .numbers, .machines .err { grid-column: 1 / -1; color: var(--text-secondary); }
+  .machines .err { color: var(--danger, #d9534f); overflow-wrap: anywhere; }
+  .machines progress { grid-column: 1 / -1; width: 100%; height: .5rem; accent-color: var(--accent, #8b6cff); }
+  @keyframes machine-pulse { 50% { opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) { .machines .working .dot { animation: none; } }
   .digest { position: sticky; top: 0; min-width: 0; display: flex; flex-direction: column; gap: 1rem; padding: 1rem 0; max-height: calc(100dvh - 8rem); overflow-y: auto; }
   .digest h2 { font-size: 1rem; }
   .digest .bars { flex-direction: column; gap: .5rem; }
