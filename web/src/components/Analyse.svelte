@@ -5,6 +5,7 @@
   import Positions from './Positions.svelte';
   import Coherence from './Coherence.svelte';
   import Reread from './Reread.svelte';
+  import Live from './Live.svelte';
 
   let { guild, section = $bindable('themes'), onAuthLost, onAutomate, onPerson } = $props();
 
@@ -111,6 +112,7 @@
         <button type="button" class:active={section === 'positions'} aria-current={section === 'positions' ? 'page' : undefined} onclick={() => select('positions')}>Positions</button>
         <button type="button" class:active={section === 'coherence'} aria-current={section === 'coherence' ? 'page' : undefined} onclick={() => select('coherence')}>Contradictions</button>
         <button type="button" class:active={section === 'reread'} aria-current={section === 'reread' ? 'page' : undefined} onclick={() => select('reread')}>Relecture</button>
+        <button type="button" class:active={section === 'live'} aria-current={section === 'live' ? 'page' : undefined} onclick={() => select('live')}>Temps réel</button>
       </nav>
       {#if active && job?.guild === String(guild)}
         <div class="live" role="status" aria-live="polite">
@@ -123,7 +125,7 @@
         <p class="banner" role="alert">Analyse interrompue : {job.error}</p>
       {/if}
 
-      <section class="detail" aria-label={section === 'themes' ? 'Thèmes' : section === 'positions' ? 'Positions' : section === 'reread' ? 'Relecture' : 'Contradictions'}>
+      <section class="detail" aria-label={section === 'themes' ? 'Thèmes' : section === 'positions' ? 'Positions' : section === 'reread' ? 'Relecture' : section === 'live' ? 'Temps réel' : 'Contradictions'}>
         <div class="detailIntro">
           {#if section === 'themes'}
             <h2>Thèmes</h2>
@@ -131,10 +133,12 @@
             <h2>Positions</h2>
           {:else if section === 'reread'}
             <h2>Relecture</h2>
+          {:else if section === 'live'}
+            <h2>Temps réel</h2>
           {:else}
             <h2>Contradictions</h2>
           {/if}
-          {#if section !== 'reread'}<Help label="Comprendre cette section">{section === 'themes' ? 'Regroupe les conversations par sujet. Validez les thèmes qui vous semblent pertinents.' : section === 'positions' ? 'Ouvrez une proposition pour voir les positions et leurs citations.' : 'Compare les rôles déclarés aux propos disponibles. Une contradiction reste à vérifier dans les citations.'}</Help>{/if}
+          {#if section !== 'reread' && section !== 'live'}<Help label="Comprendre cette section">{section === 'themes' ? 'Regroupe les conversations par sujet. Validez les thèmes qui vous semblent pertinents.' : section === 'positions' ? 'Ouvrez une proposition pour voir les positions et leurs citations.' : 'Compare les rôles déclarés aux propos disponibles. Une contradiction reste à vérifier dans les citations.'}</Help>{/if}
         </div>
         {#if section === 'themes'}
           <Themes {guild} {onAuthLost} {onAutomate} embedded onUpdate={loadSummary} />
@@ -142,6 +146,8 @@
           <Positions {guild} {onAuthLost} {onAutomate} embedded onUpdate={loadSummary} />
         {:else if section === 'reread'}
           <Reread {guild} {onAuthLost} {onPerson} embedded />
+        {:else if section === 'live'}
+          <Live {guild} {onAuthLost} />
         {:else}
           <Coherence {guild} {onAuthLost} {onPerson} embedded />
         {/if}
@@ -155,39 +161,6 @@
           </button>
         {/each}
       </div>
-      {#if job?.computers?.length > 1 && job.guild === String(guild)}
-        <section class="machines" aria-label="Activité de chaque ordinateur">
-          <h2>Ordinateurs</h2>
-          <ul>
-            {#each job.computers as machine}
-              <li class:busy={machine.active > 0} class:down={machine.failed}>
-                <span class="dot" aria-hidden="true"></span>
-                <strong>{machine.local ? 'Serveur' : machine.url.replace('http://', '')}</strong>
-                <span class="state">
-                  {#if machine.failed}Hors service pour cette analyse
-                  {:else if machine.active > 0}Calcule : {machine.kind}{machine.running_for !== null ? ` · depuis ${Math.round(machine.running_for)} s` : ''}
-                  {:else if machine.calls > 0}En attente
-                  {:else}Rien reçu pour l’instant{/if}
-                </span>
-                <span class="numbers">
-                  {fmt.format(machine.calls)} appels · {fmt.format(machine.items)} éléments{machine.average !== null ? ` · ${String(machine.average).replace('.', ',')} s en moyenne` : ''}
-                </span>
-                <span class="share" title="Part des calculs effectués et objectif de répartition">
-                  {machine.observed} %{machine.share !== null ? ` / ${machine.share} % visés` : ''}
-                </span>
-                <progress max="100" value={machine.observed} aria-label="Part des appels reçus"></progress>
-                {#if machine.round}
-                  <span class="numbers">Étape {machine.round.number} : {fmt.format(machine.round.calls)} calculs{machine.round.average !== null ? ` · ${String(machine.round.average).replace('.', ',')} s en moyenne` : ''}</span>
-                {/if}
-                {#if machine.errors}<span class="err">{machine.errors} erreur{machine.errors > 1 ? 's' : ''}{machine.last_error ? ` · ${machine.last_error}` : ''}</span>{/if}
-              </li>
-            {/each}
-          </ul>
-        </section>
-      {/if}
-
-
-
       </details>
     {/if}
   </div>
@@ -212,21 +185,6 @@
   .stepDetail { color: var(--text-secondary); font-size: .78rem; font-variant-numeric: tabular-nums; }
   .live { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; padding: .75rem 1rem; border-radius: var(--radius-lg); background: var(--bg-secondary); font-size: .8rem; font-variant-numeric: tabular-nums; }
   .live progress { flex: 1 1 10rem; height: .65rem; accent-color: var(--accent, #8b6cff); }
-  .machines h2 { margin: 0 0 .5rem; font-size: 1rem; color: var(--text-primary); }
-  .machines ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: .55rem; }
-  .machines li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .25rem .5rem; padding: .75rem .85rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--bg-secondary); font-size: .78rem; font-variant-numeric: tabular-nums; }
-  .machines li.busy { border-color: var(--accent, #8b6cff); }
-  .machines li.down { opacity: .7; }
-  .machines .dot { width: .6rem; height: .6rem; border-radius: 50%; background: var(--text-muted); }
-  .machines li.busy .dot { background: var(--accent, #8b6cff); animation: machine-pulse 1.1s ease-in-out infinite; }
-  .machines li.down .dot { background: var(--danger, #d9534f); }
-  .machines strong { color: var(--text-primary); overflow-wrap: anywhere; }
-  .machines .state, .machines .numbers { grid-column: 1 / -1; color: var(--text-secondary); }
-  .machines .share { color: var(--text-primary); }
-  .machines progress { grid-column: 1 / -1; width: 100%; height: .45rem; accent-color: var(--accent, #8b6cff); }
-  .machines .err { grid-column: 1 / -1; color: var(--danger, #d9534f); overflow-wrap: anywhere; }
-  @keyframes machine-pulse { 50% { opacity: .35; } }
-  @media (prefers-reduced-motion: reduce) { .machines li.busy .dot { animation: none; } }
   .sections { position: sticky; top: 0; z-index: 2; display: flex; gap: .3rem; padding: .35rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--bg-primary); }
   .sections button { flex: 1; min-width: 0; padding: .65rem .75rem; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); font: inherit; font-weight: 600; cursor: pointer; }
   .sections button:hover, .sections button:focus-visible { color: var(--text-primary); background: var(--bg-secondary); }

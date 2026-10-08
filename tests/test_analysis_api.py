@@ -264,3 +264,23 @@ def test_the_positions_are_read_in_batches_and_checked_after_each(me):
     until = analyze(me, stages=["claims"], limit=2000, rounds=None)                              # until the end: a batch bigger than what is left is the last one
     assert until["state"] == "done" and until["rounds"] is None and "étape 1 : 2000" in "\n".join(until["lines"]) and "étape 2" not in "\n".join(until["lines"])
     assert me.post("/api/analysis", json={"stages": ["claims"], "rounds": 0}).status_code == 422
+
+
+def test_the_live_page_says_what_runs_and_what_each_computer_does_without_any_text(me, ollama):
+    live = me.get("/api/analysis/live").json()
+    assert live["analysis"]["state"] == "idle" and live["reread"]["state"] == "idle" and live["pool"] is False and live["computers"] == []      # one computer: nothing is shared
+    analyze(me, topics=6)
+    done = me.get("/api/analysis/live").json()
+    assert done["analysis"]["state"] == "done" and "computers" not in done["analysis"]
+    assert me.app.state.settings and "lines" in done["analysis"]
+
+
+def test_the_live_page_lists_every_computer_of_the_pool(me, ollama):
+    from dindon.analysis.ollama import OllamaPool
+
+    state = me.app.state.analysis
+    state.client = OllamaPool(state.client.base_url if hasattr(state.client, "base_url") else ollama.url, ("http://100.64.0.9:11434",))
+    rows = me.get("/api/analysis/live").json()
+    assert rows["pool"] is True and len(rows["computers"]) == 2 and {"url", "local", "failed", "active", "calls", "observed", "share"} <= set(rows["computers"][0])
+    assert any(c["local"] for c in rows["computers"])
+    assert me.get("/api/analysis/live").status_code == 200 and "text" not in str(rows["computers"]).lower().replace("last_error", "")

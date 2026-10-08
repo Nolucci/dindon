@@ -69,6 +69,7 @@ export const api = {
     request(`/api/positions/only-validated${query({ guild })}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value }) }),
   positionsPerson: (id, guild) => request(`/api/positions/person/${id}${query({ guild })}`),
   analysis: (guild) => request(`/api/analysis${query({ guild })}`),
+  analysisLive: () => request('/api/analysis/live'),
   analysisWorkers: () => request('/api/performance/workers'),
   analysisSharesSave: (shares) => request('/api/performance/workers/shares', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shares }) }),
   analysisWorkersSave: (urls) => request('/api/performance/workers', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ urls }) }),

@@ -113,3 +113,25 @@ def test_reread_layout_and_help_fit_with_long_results(base, ingest_db):
                 folder = Path(os.environ['DINDON_SHOTS']); folder.mkdir(parents=True, exist_ok=True)
                 page.screenshot(path=str(folder / f'{width}-reread-review.png'))
         browser.close()
+
+
+def test_the_live_page_is_a_page_of_its_own_in_the_analysis(base):
+    errors = []
+    with sync_api.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 1440, "height": 1000})
+        page.on("pageerror", lambda e: errors.append(str(e)[:200]))
+        page.goto(base)
+        page.fill("#password", PASSWORD)
+        page.click("button[type=submit]")
+        page.wait_for_selector("nav", timeout=20000)
+        page.get_by_role("button", name="Analyse", exact=True).click()
+        page.get_by_role("button", name="Temps réel", exact=True).click()
+        page.get_by_role("heading", name="Temps réel", exact=True).wait_for()
+        task = page.locator("section[aria-label='Tâche en cours']")
+        task.get_by_text("Aucune analyse ni relecture en cours").wait_for()
+        machines = page.locator("section[aria-label='Répartition entre les ordinateurs']")
+        machines.get_by_text("Un seul ordinateur travaille").wait_for()
+        assert page.url.endswith("/live")
+        browser.close()
+    assert errors == []

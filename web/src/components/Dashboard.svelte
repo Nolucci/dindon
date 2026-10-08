@@ -340,7 +340,7 @@
     const [page, part] = location.hash.slice(2).split('/');
     const name = Object.keys(routes).find((key) => routes[key] === page);
     if (!name) return;
-    if (name === 'analyse' && ['themes', 'positions', 'coherence', 'reread'].includes(part)) analysisSection = part;
+    if (name === 'analyse' && ['themes', 'positions', 'coherence', 'reread', 'live'].includes(part)) analysisSection = part;
     if (name === 'system' && ['status', 'automation', 'discord', 'performance', 'maintenance'].includes(part)) systemSection = part;
     showView(name);
   }

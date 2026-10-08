@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from dindon import digest as digest_of
 from dindon.analysis.embeddings import conversation_texts
 from dindon.analysis.job import STAGES, AnalysisBusy, NotReady
+from dindon.analysis.ollama import OllamaPool
 from dindon.api.auth import require_session
 from dindon.api.common import resolve_guild
 
@@ -71,6 +72,20 @@ def analysis(request: Request, guild: int | None = None) -> dict:
         "last_run": None if run is None else {"id": run["id"], "model": run["model"], "at": run["created_at"].isoformat(),
                                               "k": run["parameters"].get("k"), "chosen_by": run["parameters"].get("chosen_by")},
     }
+
+
+@router.get("/analysis/live")
+def live(request: Request) -> dict:
+    """What is being done right now, and by which computer: the analysis and the reread (they never run together), and for each computer of the pool what it is computing, how much it has done,
+    its share of the work and the share that was aimed at. Counts and durations only, never a text. `computers` is empty when there is a single computer (nothing is shared)."""
+    import time
+
+    state = request.app.state
+    analysis, reread = state.analysis.status(), state.reread.status()
+    client = state.analysis.client
+    return {"now": time.time(), "analysis": {k: v for k, v in analysis.items() if k != "computers"}, "reread": reread,
+            "pool": isinstance(client, OllamaPool) and len(client.clients) > 1,
+            "computers": client.activity() if isinstance(client, OllamaPool) and len(client.clients) > 1 else []}
 
 
 @router.post("/analysis")
