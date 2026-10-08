@@ -1,4 +1,5 @@
 <script>
+  import DebateParticipant from './DebateParticipant.svelte';
   import Help from './Help.svelte';
   import { onMount } from 'svelte';
   import { api, AuthError } from '../lib/api.js';
@@ -20,6 +21,45 @@
   let chosen = $state(null);
   let detail = $state(null);
   let problem = $state('');
+  let fleet = $state(null);
+  let fleetError = $state('');
+  let digest = $state(null);
+  let digestAt = $state(null);
+  let summaryPanel = $state(null);
+  let fleetBusy = false;
+  let detailBusy = false;
+  let summaryPending = false;
+  let summaryTimer;
+  const SUMMARY_PERIOD = 20 * 60 * 1000;
+  const duration = (seconds) => seconds == null ? '—' : seconds < 60 ? `${Math.round(seconds)} s` : `${Math.floor(seconds / 60)} min`;
+  const machineName = (machine) => { if (machine.local) return 'Serveur'; try { return new URL(machine.url).host; } catch { return machine.url; } };
+  const machineState = (machine) => fleetError || !fleet?.fresh ? 'État ancien' : !machine.online ? 'Hors ligne' : !machine.has_model ? 'Modèle absent' : machine.active ? 'En cours' : 'Disponible';
+  async function loadFleet() {
+    if (fleetBusy) return;
+    fleetBusy = true;
+    try { fleet = await api.debateComputers(); fleetError = ''; }
+    catch (e) { if (e instanceof AuthError) onAuthLost(); else fleetError = e.message; }
+    finally { fleetBusy = false; }
+  }
+  async function refresh(summary = false) {
+    const id = chosen;
+    if (!id) return;
+    if (detailBusy) { if (summary) summaryPending = true; return; }
+    detailBusy = true;
+    try {
+      const answer = await api.debate(id);
+      if (id !== chosen) return;
+      detail = answer;
+      if (summary || summaryPending || !digest) { summaryPending = false; digest = answer; digestAt = new Date().toISOString(); }
+      else if (digest.participants.some((p) => !answer.participants.some((current) => current.user_id === p.user_id)) || digest.claims.some((c) => !answer.claims.some((current) => current.id === c.id))) {
+        digest = answer; digestAt = new Date().toISOString();
+      }
+      problem = '';
+    } catch (e) { if (id === chosen) fail(e); }
+    finally { detailBusy = false; if (summaryPending && chosen) { summaryPending = false; refresh(true); } }
+  }
+  function back() { chosen = null; detail = null; digest = null; clearInterval(summaryTimer); }
+
 
   const host = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } };
   const pct = (n) => `${Math.round(n * 100)} %`;
@@ -40,19 +80,29 @@
   }
 
   async function open(id) {
+    clearInterval(summaryTimer);
     chosen = id;
     detail = null;
+    digest = null;
     try {
       const answer = await api.debate(id);
       if (chosen !== id) return;
       detail = answer;
+      digest = answer;
+      digestAt = new Date().toISOString();
       problem = '';
-    } catch (error) {
-      fail(error);
-    }
+      clearInterval(summaryTimer);
+      summaryTimer = setInterval(() => { if (!document.hidden) refresh(true); }, SUMMARY_PERIOD);
+    } catch (error) { if (chosen === id) fail(error); }
   }
-
-  onMount(load);
+  onMount(() => {
+    load(); loadFleet();
+    const fleetTimer = setInterval(() => { if (!document.hidden) loadFleet(); }, 5000);
+    const detailTimer = setInterval(() => { if (!document.hidden) refresh(); }, 20000);
+    const resume = () => { if (!document.hidden) { loadFleet(); refresh(digestAt && Date.now() - new Date(digestAt).getTime() >= SUMMARY_PERIOD); } };
+    document.addEventListener('visibilitychange', resume);
+    return () => { clearInterval(fleetTimer); clearInterval(detailTimer); clearInterval(summaryTimer); document.removeEventListener('visibilitychange', resume); };
+  });
 </script>
 
 <div class="page">
@@ -60,6 +110,19 @@
     <h1>Débats</h1>
 
   </header>
+
+  <section class="fleet" aria-label="Ordinateurs des débats">
+    <header class="cardHead"><h2 class="eyebrow">Ordinateurs des débats</h2><span class="muted small">{fleetError ? 'Connexion interrompue' : fleet?.fresh ? 'En direct' : fleet ? 'Dernier état connu' : 'Chargement…'}</span></header>
+    {#if fleet?.computers?.length}
+      <ul class="machines">{#each fleet.computers as machine (machine.url)}
+        <li class:working={!fleetError && fleet.fresh && machine.active && machine.online && machine.has_model}>
+          <strong title={machine.url}>{machineName(machine)}</strong><span class="badge small">{machineState(machine)}</span>
+          {#if fleet.fresh && !fleetError && machine.active}<span class="muted small">{duration(machine.running_for)}</span>{/if}
+          <details><summary>Détails</summary><p class="muted small">{machine.calls} vérifications · {duration(machine.average)} en moyenne · {machine.errors} erreurs</p>{#if machine.last_error}<p class="banner">{machine.last_error}</p>{/if}</details>
+        </li>
+      {/each}</ul>
+    {:else if fleet}<p class="muted small">Aucun ordinateur disponible.</p>{/if}
+  </section>
 
   {#if problem}<p class="banner" role="alert">{problem}</p>{/if}
 
@@ -87,11 +150,14 @@
       <div class="detail">
         {#if chosen && !detail}<p class="muted">Chargement…</p>{/if}
         {#if detail}
-          <section class="panel card" aria-label="Résumé">
-            <button type="button" class="tool-btn back" onclick={() => { chosen = null; detail = null; }}>← Tous les débats</button>
+          <section class="panel card" aria-label="Informations du débat">
+            <button type="button" class="tool-btn back" onclick={back}>← Tous les débats</button>
+            <button type="button" class="tool-btn summaryLink" onclick={() => summaryPanel?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Voir le résumé ↓</button>
             <h2 class="debateTitle">{detail.debate.topic}</h2>
             {#if detail.debate.axis}<p class="muted small">{detail.debate.axis.name}</p>{/if}
             <p class="muted small">{STATUS[detail.debate.status] ?? detail.debate.status} · {when(detail.debate.started_at)}</p>
+            <dl class="debateMeta"><div><dt>Début</dt><dd>{when(detail.debate.started_at)}</dd></div><div><dt>Vérification</dt><dd>{detail.debate.verify ? 'Activée' : 'Désactivée'}</dd></div>{#if detail.debate.closed_at}<div><dt>Fin</dt><dd>{when(detail.debate.closed_at)}</dd></div>{/if}</dl>
+            {#if detail.debate.thread_id}<a class="discordLink" href={`https://discord.com/channels/${detail.debate.guild_id}/${detail.debate.thread_id}`} target="_blank" rel="noopener noreferrer">Ouvrir le débat sur Discord ↗</a>{/if}
             <details><summary>Détails du débat</summary>            <p class="muted small">
               {STATUS[detail.debate.status] ?? detail.debate.status}{detail.debate.close_reason ? ` (${REASON[detail.debate.close_reason] ?? detail.debate.close_reason})` : ''}
               · {detail.debate.in_thread ? 'dans un fil' : 'dans le salon'} · {detail.debate.verify ? 'affirmations vérifiées' : 'sans vérification'}
@@ -104,11 +170,6 @@
               <strong>{detail.totals.participants}</strong> participant{detail.totals.participants > 1 ? 's' : ''} · <strong>{detail.totals.messages}</strong> message{detail.totals.messages > 1 ? 's' : ''}
               {#if detail.totals.changed_mind}· {detail.totals.changed_mind} changement{detail.totals.changed_mind > 1 ? 's' : ''} de position{/if}
             </p>
-            <ul class="bars">
-              {#each Object.entries(detail.totals.final).filter(([, n]) => n > 0) as [position, n]}
-                <li><span class="label">{POSITION[position]}</span><span class="count">{n}</span></li>
-              {/each}
-            </ul>
             {#if detail.messages_waiting_to_be_read}<p class="muted small">{detail.messages_waiting_to_be_read} message{detail.messages_waiting_to_be_read > 1 ? 's' : ''} à lire.</p>{/if}
             {#if detail.corrections.posted || detail.corrections.taken_back}
               <p class="muted small">Corrections publiées : {detail.corrections.posted} · retirées : {detail.corrections.taken_back}</p>
@@ -119,18 +180,7 @@
           <section class="panel card" aria-label="Participants">
             <header class="cardHead"><h2 class="eyebrow">Participants</h2><Help label="Comment est choisi le message phare ?">Le message qui reçoit le plus de réponses et de réactions (réponses × 3 + réactions). Le même critère pour tout le monde.</Help></header>
             <ul class="participants">
-              {#each detail.participants as p (p.user_id)}
-                <li>
-                  <header class="cardHead"><strong>{p.name ?? p.user_id}</strong><span class="badge small">{POSITION[p.position ?? 'none']}</span></header>
-                  <p class="muted small">{p.messages} message{p.messages > 1 ? 's' : ''} · {pct(p.share)}{p.changed && p.first_position !== p.position ? ` · avant : ${POSITION[p.first_position]}` : ''}</p>
-                  {#if p.key_message}
-                    <details><summary>Message phare</summary><blockquote>{p.key_message.excerpt}</blockquote>
-                      {#if p.key_message.url}<a href={p.key_message.url} target="_blank" rel="noopener noreferrer">Voir sur Discord</a>{/if}
-                    </details>
-                  {/if}
-                  {#if Object.values(p.claims).some((n) => n)}<p class="muted small">{Object.entries(p.claims).filter(([, n]) => n).map(([v, n]) => `${n} ${VERDICT[v][1]}`).join(' · ')}</p>{/if}
-                </li>
-              {/each}
+              {#each detail.participants as p (p.user_id)}<li><DebateParticipant person={p} guild={detail.debate.guild_id} positions={POSITION} verdicts={VERDICT} claims={detail.claims.filter((c) => c.author_id === p.user_id)} {onAuthLost} /></li>{/each}
             </ul>
           </section>
 
@@ -196,26 +246,51 @@
           {/if}
         {/if}
       </div>
+      {#if digest}
+        <aside class="digest" aria-label="Résumé actuel du débat" bind:this={summaryPanel}>
+          <header class="cardHead"><h2>Résumé actuel</h2><Help label="Actualisation du résumé">Mis à jour toutes les 20 minutes. Le bilan présente les positions et les affirmations examinées à cette heure.</Help></header>
+          <p class="muted small">Mis à jour à {new Date(digestAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
+          <ul class="bars">{#each Object.entries(digest.totals.final).filter(([, n]) => n > 0) as [position, n]}<li><span>{POSITION[position]}</span><strong>{n}</strong></li>{/each}</ul>
+          {#if digest.totals.changed_mind}<p class="small">{digest.totals.changed_mind} changement{digest.totals.changed_mind > 1 ? 's' : ''} de position</p>{/if}
+          <dl class="digestMetrics"><div><dt>Participants</dt><dd>{digest.totals.participants}</dd></div><div><dt>Messages</dt><dd>{digest.totals.messages}</dd></div><div><dt>Examinées</dt><dd>{digest.claims.length}</dd></div></dl>
+          {#if digest.claims.length}<h3 class="eyebrow">Affirmations examinées</h3><ul class="verdicts">{#each Object.entries(digest.totals.verdicts).filter(([, n]) => n > 0) as [v, n]}<li>{VERDICT[v][1]} <strong>{n}</strong></li>{/each}</ul>{/if}
+        </aside>
+      {/if}
     </div>
   {/if}
 </div>
 
 <style>
-  .layout.selected { grid-template-columns: minmax(15rem, 20rem) minmax(0, 1fr); }
+  .layout.selected { grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr) minmax(16rem, 22rem); }
   .back { align-self: flex-start; }
+  .debateMeta { display: flex; flex-wrap: wrap; gap: .75rem 2rem; }
+  .debateMeta dt { font-size: .75rem; color: var(--text-muted); }
+  .debateMeta dd { font-size: .875rem; }
+  .discordLink { align-self: flex-start; font-size: .8125rem; }
   .debateTitle { font-size: 1.25rem; line-height: 1.35; }
   .cardHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
   .answerTitle { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
-  .participants { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: .75rem; }
-  .participants > li { display: flex; flex-direction: column; gap: .5rem; padding: .875rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
-  blockquote { margin: .5rem 0; padding-left: .75rem; border-left: 2px solid var(--border-subtle); color: var(--text-secondary); }
+  .participants { display: flex; flex-direction: column; }
+  .participants > li { min-width: 0; }
   .parityScroll { overflow-x: auto; }
   .layout.selected > .list { position: sticky; top: 0; max-height: calc(100dvh - 8rem); overflow-y: auto; }
   .claims > li > p:first-child { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; }
   .claims > li > p:first-child > strong { flex-basis: 100%; }
   .source { overflow-wrap: anywhere; }
 
-  @media (max-width: 900px) { .layout.selected { grid-template-columns: 1fr; } .layout.selected > .list { display: none; } }
+  .fleet { display: flex; flex-direction: column; gap: .75rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-subtle); }
+  .machines { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: .75rem 1.5rem; }
+  .machines > li { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .5rem 0; }
+  .machines > li > strong { flex: 1 1 8rem; min-width: 0; overflow-wrap: anywhere; }
+  .machines details { flex-basis: 100%; font-size: .75rem; }
+  .machines .working > strong::before { content: ''; display: inline-block; width: .5rem; height: .5rem; margin-right: .5rem; border-radius: 50%; background: var(--success); }
+  .digest { position: sticky; top: 0; min-width: 0; display: flex; flex-direction: column; gap: 1rem; padding: 1rem 0; max-height: calc(100dvh - 8rem); overflow-y: auto; }
+  .digest h2 { font-size: 1rem; }
+  .digest .bars { flex-direction: column; gap: .5rem; }
+  .digest .bars li, .verdicts li { display: flex; justify-content: space-between; gap: .75rem; }
+  .summaryLink { display: none; }
+  @media (max-width: 1280px) { .layout.selected { grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr); } .digest { grid-column: 2; position: static; max-height: none; } .summaryLink { display: inline-flex; align-self: flex-start; } }
+  @media (max-width: 900px) { .digest { grid-column: 1; } .layout.selected { grid-template-columns: 1fr; } .layout.selected > .list { display: none; } }
   .page { flex: 1; min-height: 0; overflow-y: auto; padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 2.5rem; display: flex; flex-direction: column; gap: 1.25rem; animation: fadeIn var(--transition-slow) both; }
   h1 { font-size: clamp(1.5rem, 2vw, 1.9rem); line-height: 1.1; font-weight: 700; color: var(--text-primary); }
   .card { padding: 1rem 1.125rem; display: flex; flex-direction: column; gap: 0.75rem; box-shadow: var(--shadow-sm); }
@@ -226,7 +301,9 @@
   .pick:hover, .pick.on { background: var(--surface-control); border-color: var(--border-subtle); }
   .name { flex: 1 1 100%; color: var(--text-primary); font-weight: 500; }
   .bars { flex-direction: row; flex-wrap: wrap; gap: 1rem; }
-  .bars .count { margin-left: 0.4rem; font-weight: 700; color: var(--text-primary); }
+  .digestMetrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+  .digestMetrics dt { font-size: .75rem; color: var(--text-secondary); }
+  .digestMetrics dd { font-weight: 700; font-size: 1.25rem; }
   table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
   th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
   th { color: var(--text-muted); font-weight: 600; }

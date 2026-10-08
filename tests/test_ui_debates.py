@@ -72,9 +72,10 @@ def test_the_person_in_charge_reads_a_debate_with_its_checked_claims_and_their_l
         page.get_by_role("button", name="Faut-il réduire le temps de travail").click()
         page.get_by_label("Participants").wait_for()
         page.get_by_text("Détails du débat", exact=True).click()
-        summary = page.get_by_label("Résumé").inner_text()
+        summary = page.get_by_label("Informations du débat", exact=True).inner_text()
         assert "en cours" in summary and "dans un fil" in summary and "affirmations vérifiées" in summary and "fin si personne n’écrit pendant 24 heures" in summary
         assert "période" not in summary and "vote" not in summary
+        page.locator(".participant > summary").first.click()
         page.get_by_label("Participants").get_by_text("Message phare", exact=True).first.click()
         page.get_by_role("button", name="Comment est choisi le message phare ?", exact=True).click()
         table = page.get_by_label("Participants").inner_text()
@@ -87,7 +88,7 @@ def test_the_person_in_charge_reads_a_debate_with_its_checked_claims_and_their_l
         assert link.get_attribute("href") == EVIDENCE.url and "noopener" in link.get_attribute("rel") and link.get_attribute("target") == "_blank"
         page.get_by_text("Répartition par position", exact=True).click()
         assert page.get_by_label("Parité par position").inner_text().count("✅ Pour") == 1
-        for width in (1440, 1024, 720, 390, 320):
+        for width in (1920, 1440, 1024, 720, 390, 320):
             page.set_viewport_size({"width": width, "height": 1000})
             page.wait_for_timeout(400)
             assert_fits(page, ("debate participants and claims", width))
@@ -96,16 +97,16 @@ def test_the_person_in_charge_reads_a_debate_with_its_checked_claims_and_their_l
                 page.screenshot(path=str(folder / f"{width}-debates-participants.png"))
         page.get_by_role("button", name="Tous les débats").click()
         page.get_by_role("button", name="Le pouvoir doit-il être réparti").click()
-        page.get_by_label("Résumé").locator("p").filter(has_text="Structure de l").first.wait_for()
-        summary = page.get_by_label("Résumé").inner_text()
+        page.get_by_label("Informations du débat", exact=True).locator("p").filter(has_text="Structure de l").first.wait_for()
+        summary = page.get_by_label("Informations du débat", exact=True).inner_text()
         assert "Structure de l’État" in summary.replace("'", "’") and "Pour" not in summary
-        assert page.get_by_label("Résumé").locator(".bars li").count() == 0
+        assert page.get_by_label("Informations du débat", exact=True).locator(".bars li").count() == 0
         answered = page.get_by_label("Réponses de Dindon", exact=True).inner_text()
         assert all(words in answered for words in ("jugée fausse", "d'environ 7 %", "✅ Valide 0 · ❌ Invalide 1")), answered
         page.get_by_role("button", name="À propos des réponses de Dindon", exact=True).click()
         assert "sans source" in page.locator("[popover]:popover-open").inner_text()
         page.keyboard.press("Escape")
-        for width in (1440, 1024, 720, 390, 320):
+        for width in (1920, 1440, 1024, 720, 390, 320):
             page.set_viewport_size({"width": width, "height": 1000})
             page.wait_for_timeout(400)
             assert_fits(page, ("debate detail", width))
@@ -114,3 +115,45 @@ def test_the_person_in_charge_reads_a_debate_with_its_checked_claims_and_their_l
                 page.screenshot(path=str(folder / f"{width}-debates-review.png"))
         browser.close()
     assert errors == []
+
+
+def test_computers_refresh_and_the_summary_updates_every_twenty_minutes(base, ingest_db):
+    with sync_api.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+        page.clock.install()
+        fleet = {'computers': [{'url': 'http://100.100.1.2:11434', 'local': False, 'active': 0, 'online': True, 'has_model': True, 'calls': 4, 'errors': 0, 'average': 2, 'running_for': 8}], 'fresh': True, 'age_seconds': 0}
+        page.route('**/api/debates/computers', lambda route: route.fulfill(json=fleet))
+        page.goto(base + '/#/debats')
+        page.fill('#password', PASSWORD); page.click('button[type=submit]')
+        fleet_panel = page.get_by_role('region', name='Ordinateurs des débats')
+        sync_api.expect(fleet_panel).to_contain_text('Disponible')
+        fleet['computers'][0]['active'] = 1
+        page.clock.fast_forward(5000)
+        sync_api.expect(fleet_panel).to_contain_text('En cours')
+        fleet['fresh'] = False
+        page.clock.fast_forward(5000)
+        sync_api.expect(fleet_panel).to_contain_text('État ancien')
+        page.get_by_role('button', name='Faut-il réduire le temps de travail').click()
+        digest = page.get_by_role('complementary', name='Résumé actuel du débat')
+        sync_api.expect(digest).to_contain_text('✅ Pour')
+        middle = page.get_by_label('Informations du débat', exact=True).bounding_box()
+        right = digest.bounding_box()
+        assert middle['x'] + middle['width'] <= right['x']
+        if os.environ.get('DINDON_SHOTS'):
+            folder = Path(os.environ['DINDON_SHOTS']); folder.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(folder / '1440-debates-overview.png'))
+        page.locator('.participant > summary').first.click()
+        sync_api.expect(page.get_by_label('Fiche de la personne')).to_be_visible()
+        debate_id = ingest_db.execute("SELECT id FROM debates WHERE topic LIKE 'Faut-il réduire%' ORDER BY id LIMIT 1").fetchone()[0]
+        ingest_db.execute("UPDATE debate_positions SET position = 'against' WHERE debate_id = %s AND user_id = %s", (debate_id, BOB_ID))
+        page.clock.fast_forward(20000)
+        sync_api.expect(page.locator('.participant > summary').first).to_contain_text('Contre')
+        sync_api.expect(page.locator('.participant[open]')).to_have_count(1)
+        sync_api.expect(digest).to_contain_text('✅ Pour')
+        page.clock.fast_forward(20 * 60 * 1000)
+        sync_api.expect(digest).not_to_contain_text('✅ Pour')
+        sync_api.expect(digest.locator('.bars')).to_contain_text('Contre2')
+        page.get_by_role('button', name='Tous les débats').click()
+        sync_api.expect(digest).to_have_count(0)
+        browser.close()

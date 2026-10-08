@@ -41,9 +41,11 @@ def collect(conn: psycopg.Connection, debate_id: int, now: datetime | None = Non
             """SELECT dm.author_id, count(*) FROM debate_messages dm WHERE dm.debate_id = %s
                AND NOT EXISTS (SELECT 1 FROM privacy_subjects s WHERE s.user_id = dm.author_id) GROUP BY dm.author_id""", (debate_id,)).fetchall())
         history: dict[int, list[str]] = {}
-        for user_id, position in cur.execute("SELECT user_id, position FROM debate_positions WHERE debate_id = %s ORDER BY id", (debate_id,)).fetchall():
+        positions_history: dict[int, list[dict]] = {}
+        for user_id, position, chosen_at in cur.execute("SELECT user_id, position, chosen_at FROM debate_positions WHERE debate_id = %s ORDER BY id", (debate_id,)).fetchall():
             if user_id in people:
                 history.setdefault(user_id, []).append(position)
+                positions_history.setdefault(user_id, []).append({"position": position, "at": chosen_at.isoformat()})
         keys = {}
         for author, message_id, content, replies, reactions in cur.execute(
                 """SELECT DISTINCT ON (dm.author_id) dm.author_id, dm.message_id, m.content, rep.n, rea.n
@@ -67,7 +69,7 @@ def collect(conn: psycopg.Connection, debate_id: int, now: datetime | None = Non
         seen = history.get(user_id, [])
         participants.append({"user_id": str(user_id), "position": seen[-1] if seen else None, "first_position": seen[0] if seen else None, "changed": len(set(seen)) > 1,
                              "messages": counts.get(user_id, 0), "share": round(counts.get(user_id, 0) / total_messages, 3) if total_messages else 0.0,
-                             "key_message": keys.get(user_id), "claims": by_author.get(str(user_id), dict.fromkeys(claims_mod.VERDICTS, 0))})
+                             "position_history": positions_history.get(user_id, []), "key_message": keys.get(user_id), "claims": by_author.get(str(user_id), dict.fromkeys(claims_mod.VERDICTS, 0))})
     initial, final = dict.fromkeys([*rules.POSITIONS, "none"], 0), dict.fromkeys([*rules.POSITIONS, "none"], 0)
     for p in participants:
         initial[p["first_position"] or "none"] += 1

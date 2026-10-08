@@ -5,7 +5,7 @@
   import { api } from '../lib/api.js';
   import { day } from '../lib/format.js';
 
-  let { card, loading, error, onClose, onPick, guild } = $props();
+  let { card, loading, error, onClose, onPick, guild, embedded = false } = $props();
 
   // What the AI read of this person (the Positions page lists them by proposition): only when something was read
   let read = $state(null);
@@ -30,8 +30,8 @@
   let others = $derived(card ? card.names.seen_as.filter((n) => plain(n) !== plain(card.label)).slice(0, 5) : []);
 </script>
 
-<aside aria-label="Fiche de la personne">
-  <button class="close closeBtn" onclick={onClose} aria-label="Fermer la fiche"><span class="closeIcon"><Icon name="close" /></span></button>
+<aside class:embedded aria-label="Fiche de la personne">
+  {#if !embedded}<button class="close closeBtn" onclick={onClose} aria-label="Fermer la fiche"><span class="closeIcon"><Icon name="close" /></span></button>{/if}
   {#if loading}
     <p class="muted">Chargement…</p>
   {:else if error}
@@ -529,4 +529,11 @@
     font-size: 0.75rem;
     padding: 0.375rem 0.625rem;
   }
+  aside.embedded { position: static; width: 100%; height: auto; max-height: none; padding: .75rem 0 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; overflow: visible; animation: none; z-index: auto; }
+  aside.embedded::before { display: none; }
+  aside.embedded .metric { border: 0; border-radius: 0; box-shadow: none; background: transparent; padding: .5rem 0; }
+  aside.embedded .metric::before { display: none; }
+  aside.embedded .hero { margin: 0; height: auto; background: none; }
+  aside.embedded .portrait { width: 3rem; height: 3rem; margin: 0; }
+  aside.embedded .identity { padding-top: .5rem; }
 </style>

@@ -459,7 +459,7 @@ input[type='date'] {
 
 /* Consultation pages share one reading width and spacing. */
 .page:not(.embedded), .analysisPage > .content { padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 2.5rem; }
-.page:not(.embedded) > *, .analysisPage > .content > * { width: 100%; max-width: 75rem; margin-inline: auto; }
+.page:not(.embedded) > *, .analysisPage > .content > * { width: 100%; max-width: none; margin-inline: 0; }
 .page.embedded { padding: 0; }
 .eyebrow { text-transform: none; letter-spacing: normal; font-size: .8125rem; }
 .toolbar { flex-wrap: wrap; }
@@ -490,3 +490,9 @@ input, select, textarea { min-width: 0; max-width: 100%; }
   .btn, .tool-btn { min-height: 44px; }
   input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea { font-size: 16px; }
 }
+
+/* Open page sections; borders distinguish controls and individual records only. */
+.page .panel.panel { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.page .card, .page .status { padding-inline: 0; }
+.page .topic, .page .prop, .page .person { border-bottom: 1px solid var(--border-subtle); }
+.page .themeBlock { border: 0; border-top: 1px solid var(--border-subtle); border-radius: 0; background: transparent; }

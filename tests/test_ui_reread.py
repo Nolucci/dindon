@@ -99,7 +99,7 @@ def test_reread_layout_and_help_fit_with_long_results(base, ingest_db):
             page.set_viewport_size({'width': width, 'height': 1000})
             page.wait_for_timeout(400)
             assert_fits(page, ('reread', width))
-            assert page.locator('.card').first.evaluate('el => parseFloat(getComputedStyle(el).paddingLeft)') >= 12
+            assert page.locator('.card').first.evaluate('el => parseFloat(getComputedStyle(el).borderLeftWidth)') == 0
             help_button = page.get_by_role('button', name='À propos de la relecture', exact=True)
             help_button.click()
             bubble = page.locator('[popover]:popover-open')

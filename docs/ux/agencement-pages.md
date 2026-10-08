@@ -64,3 +64,13 @@ La validation couvre les pages de consultation et toutes les sections de Systèm
 - Relecture : marges intérieures ajoutées aux cadres ; filtres alignés et empilés sur les petits téléphones ; compteurs distincts ; colonnes Avant/Après qui passent en lignes sur mobile ; libellés Pour/Contre/Nuancé ; citations et motif dépliables ; annulation de chaque correction conservée. Les aides précisent la préservation des décisions manuelles et des positions incertaines.
 
 Les infobulles s’ouvrent au clic ou au clavier, restent dans l’écran et se ferment avec Échap ou un clic extérieur. Les tableaux de répartition conservent un défilement propre, sans faire défiler tout le cadre. Les corrections locales sont vérifiées sur ordinateur et téléphone, y compris avec des résultats longs et l’annulation d’une correction.
+
+## Débats : suivi et lecture en trois colonnes
+
+Les ordinateurs des débats sont affichés en haut, avec un état actualisé toutes les 5 secondes. Un état trop ancien ou une connexion interrompue ne sont pas présentés comme une activité en cours. Ce suivi concerne les ordinateurs du traitement des débats ; la télémétrie ne rattache pas chaque appel à un débat individuel.
+
+Sur grand écran, la liste reste à gauche, les informations, participants et citations au centre, et le bilan à droite. Le bilan demandé présente les positions, changements d’avis, nombre de messages et verdicts des affirmations examinées. Il est chargé à l’ouverture, puis actualisé toutes les 20 minutes ; son heure de mise à jour est affichée. Le contenu central se renouvelle toutes les 20 secondes sans fermer les profils ouverts.
+
+Chaque participant se déplie : message phare, historique horodaté de ses positions dans le débat, affirmations examinées, puis fiche existante (activité, positions étayées et rôles). La fiche est chargée à la demande dans le serveur du débat.
+
+À largeur intermédiaire, le résumé suit le contenu ; sur téléphone, le détail remplace la liste avec retour explicite et accès direct au résumé. Les pages utilisent désormais la largeur disponible. Les grandes bordures et fonds imbriqués sont retirés ; les contrôles et séparations entre résultats restent repérables.

@@ -68,6 +68,8 @@ def test_the_figures_the_positions_and_the_changes_of_mind(world, ingest_db):
     bob, carol, alice = found["participants"]                                                               # most messages first
     assert (bob["user_id"], bob["position"], bob["first_position"], bob["changed"], bob["messages"], bob["share"]) == (str(BOB_ID), "against", "for", True, 2, round(2 / 3, 3))
     assert (carol["position"], carol["changed"], carol["messages"]) == ("unsure", True, 1) and (alice["messages"], alice["share"], alice["key_message"]) == (0, 0.0, None)
+    assert [entry["position"] for entry in carol["position_history"]] == ["for", "unsure"]
+    assert all(entry["at"] for entry in carol["position_history"])
 
 
 def test_a_person_who_asked_not_to_be_recorded_is_in_no_figure(world, ingest_db):
