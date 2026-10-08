@@ -170,9 +170,9 @@ def test_the_public_corrections_are_flagged_loudly_and_only_active_with_a_measur
 
     asked = dict(debate_checks="live", searxng_url="http://x")
     locked = check_debates(debate_settings(settings, ollama, **asked))
-    assert "ne sont PAS actives" in debate_texts(locked, "warn") and "DINDON_DEBATE_PRECISION" in debate_texts(locked, "warn") and "CORRECTIONS PUBLIQUES sont actives" not in debate_texts(locked, "warn")
+    assert "équivalent à `answer`" in debate_texts(locked, "warn") and "DINDON_DEBATE_PRECISION" in debate_texts(locked, "warn") and "CORRECTIONS PUBLIQUES sont actives" not in debate_texts(locked, "warn")
     under = check_debates(debate_settings(settings, ollama, debate_precision=0.8, **asked))
-    assert "ne sont PAS actives" in debate_texts(under, "warn") and "seuil" in debate_texts(under, "warn")
+    assert "équivalent à `answer`" in debate_texts(under, "warn") and "seuil" in debate_texts(under, "warn")
     opened = check_debates(debate_settings(settings, ollama, debate_precision=0.95, **asked))
     assert "CORRECTIONS PUBLIQUES sont actives" in debate_texts(opened, "warn") and "0.95" in debate_texts(opened, "warn") and "ne sont PAS" not in debate_texts(opened, "warn")
 
@@ -181,6 +181,6 @@ def test_the_answer_level_says_that_dindon_speaks_without_a_source_and_works_wit
     from dindon.preflight import check_debates
 
     with_search = debate_texts(check_debates(debate_settings(settings, ollama, debate_checks="answer", searxng_url="http://x")), "warn")
-    assert "CHERCHE sur Internet" in with_search and "non fiable" in with_search and "bouton Vérifier" in with_search and "ne sont PAS actives" not in with_search
+    assert "CHERCHE sur Internet" in with_search and "non fiable" in with_search and "bouton Vérifier" in with_search and "équivalent" not in with_search
     alone = check_debates(debate_settings(settings, ollama, debate_checks="answer"))
     assert "aucun service de recherche" in debate_texts(alone, "warn") and "La vérification n'envoie rien à Internet" in debate_texts(alone, "warn") and debate_texts(alone, "fail") == ""
