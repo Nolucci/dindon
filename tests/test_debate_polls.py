@@ -93,7 +93,7 @@ def test_failed_publication_restarts_and_closure_disables_votes(world, ingest_db
     run(restarted.tick())
     row = poll_row(ingest_db, debate.id)
     assert row[2] and len(world.discord.posted(POLL_CHANNEL)) == 1
-    world.click(ALICE_ID, debate.thread_id, debate.id, 'end', 'now', permissions=8)
+    world.end(ALICE_ID, debate.thread_id, debate.id, permissions=8)
     world.tick(seconds=6)
     assert world.discord.of('POST', f'/polls/{row[2]}/expire')
     world.click(BOB_ID, POLL_CHANNEL, debate.id, 'pos', 'for')

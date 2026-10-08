@@ -1,26 +1,17 @@
-"""The debates on Discord: `/dindon debat sujet`, its popup, the buttons, the end. The rules and the state are in `dindon/debate/`; this module does what they decide, on Discord. See docs/regles-du-bot.md.
+"""Discord debate creation, approval, positions and private progress summaries.
 
-* `/dindon debat sujet` creates **nothing**: the person gets a popup (a Discord modal) where they choose the parameters: the subject and its context, a thread or the channel itself, whether the
-  claims are checked, and the silence after which the debate ends by itself. When they send it the debate is written (refused here if a limit says so), its place is made (a **public thread**
-  under the channel, or the channel itself), the **launch message** with the three position buttons and the end button is posted, and only then does the debate open (`attach_thread`).
-* The linked poll records the same positions as the debate buttons. There is **no time limit**. A debate ends when the person who opened it, or a moderator, presses « Terminer le débat », or after the silence chosen in the popup.
-* Every message written in the place of a running debate is handed over by the engine (`on_message`) and counted in batches. Bots are not participants. In the channel itself that is every message of
-  the channel, while the debate is open: the launch message says so.
-* A **tick** (every couple of seconds while a debate runs) writes the counted messages, ends the debates whose silence is over (`store.quiet`), posts what is owed to Discord (the closing
-  statistics), and refreshes the counters of the launch message, at most every few seconds (Discord limits how often a message is edited).
-* Everything that is owed is derived from the database (`store.unannounced`), not from memory: a bot that stops and starts again posts the closing it owed.
-* A thread (or channel) that was deleted on Discord ends its debate (the event, or a 404 as the first sign). A post that fails is tried again with growing waits, and given up after a few attempts.
-* **After a gap** (the bot was stopped, or Discord started a new Gateway session: what was written meanwhile never reached it) the place of each running debate is read again from Discord, from the
-  last message counted (or the launch message), before anything else is looked at.
-* A message of a person that is deleted stops counting (the ingestion forgets it, see ingest/loader.py). The bot's own launch message, if a moderator deletes it, is posted again. An edit changes nothing
-  here: the message was written, and counts.
-* The answers to a person are private (only they see them). Nothing here logs a subject, a message or a name: counts and kinds of errors only.
+A free subject is refined by the local model and shown privately for approval before
+any database row or Discord thread is created. Axis questions can be opened directly.
+`/dindon suivi` reads current votes and statistics; legacy end buttons also open the
+summary. Debates close automatically after silence or when a previously occupied
+camp empties. The tick handles counts, reconnect recovery and owed publications.
 """
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+import secrets
 import threading
 import time
 from dataclasses import replace
@@ -131,6 +122,7 @@ class Debates:
         self._attempts: dict[tuple[int, str], int] = {}
         self._retry_at: dict[tuple[int, str], float] = {}
         self._loaded = False
+        self._drafts: dict[str, tuple[float, int, int, int, dict]] = {}
         self._owing = False
         self._swept = -1e9
 
@@ -265,6 +257,7 @@ class Debates:
         for debate in await self.db(store.active):
             if debate.thread_id is not None:
                 self._threads[str(debate.thread_id)] = debate.id
+                self._dirty.add(debate.id)  # refresh existing launch messages, including legacy end buttons
         self._poll_pending = await self.db(lambda c: c.execute("SELECT EXISTS (SELECT 1 FROM debate_polls WHERE dirty AND channel_id IS NOT NULL)").fetchone()[0])
         self._loaded = True
         self._swept = self._mono()
@@ -314,7 +307,7 @@ class Debates:
             await say(data, TEXT["failed"])
 
     async def modal_submit(self, data: dict, user_id: int) -> None:
-        """The person filled the popup and sent it: the debate is written, its place (a thread, or the channel) and its launch message are made, and it opens."""
+        """Prepare a free subject for approval, or open a chosen axis question."""
         say = self.interactions.say
         parsed = texts.parse_setup_id((data.get("data") or {}).get("custom_id"))
         if parsed is None or parsed[0] != user_id or str(parsed[1]) != str(data.get("channel_id")):
@@ -347,23 +340,120 @@ class Debates:
             if axis is None:
                 await say(data, TEXT["no_axis"])
                 return
+        context = str(values.get("context") or "") or None
+        if typed and rules.clean_topic(typed) is None:
+            await say(data, texts.REFUSALS["topic"])
+            return
+        if context and rules.clean_context(context) is None:
+            await say(data, texts.REFUSALS["context"])
+            return
+        if quiet not in rules.QUIET_CHOICES:
+            await say(data, texts.REFUSALS["quiet"])
+            return
+        parameters = dict(guild_id=int(guild_id), channel_id=parsed[1], topic=typed or axis.question, context=context,
+                          created_by=user_id, in_thread=in_thread, verify=verify, axis=None if typed else axis, quiet_seconds=quiet)
+        if typed:
+            await self.interactions.defer(data)
+            try:
+                question, description = await asyncio.to_thread(polls.refine, typed, context, self.poll_client, self.poll_model)
+            except Exception as error:
+                log.warning("a debate proposal could not be prepared (%s)", type(error).__name__)
+                await self.interactions.finish(data, Reply("La question n’a pas pu être préparée. Relancez `/dindon debat` dans un instant."))
+                return
+            parameters.update(topic=question, context=description)
+            now = self._mono()
+            self._drafts = {k: v for k, v in self._drafts.items() if v[0] > now and v[1:3] != (user_id, int(guild_id))}
+            token = secrets.token_hex(12)
+            self._drafts[token] = (now + 900, user_id, int(guild_id), parsed[1], parameters)
+            buttons = [{"type": 2, "style": texts.SUCCESS, "label": "Ouvrir le débat", "custom_id": f"dindon:debat:confirm:{token}"},
+                       {"type": 2, "style": texts.SECONDARY, "label": "Annuler", "custom_id": f"dindon:debat:cancel:{token}"}]
+            await self.interactions.finish(data, Reply("", embed={"title": "Proposition de débat", "description": f"**{texts._plain(question)}**\n\n{texts._plain(description)}", "color": texts.BLURPLE},
+                                                       components=[{"type": 1, "components": buttons}]))
+            return
+        await self._create(data, parameters)
+
+    async def _confirm(self, data: dict, user_id: int, raw: str) -> None:
+        parts = raw.split(":")
+        if len(parts) != 4 or parts[2] not in ("confirm", "cancel"):
+            return
+        draft = self._drafts.get(parts[3])
+        if draft is None or draft[0] <= self._mono():
+            self._drafts.pop(parts[3], None)
+            await self.interactions.say(data, "Cette proposition a expiré. Relancez `/dindon debat`.")
+            return
+        if draft[1:4] != (user_id, int(data.get("guild_id") or 0), int(data.get("channel_id") or 0)):
+            await self.interactions.say(data, "Seule la personne qui prépare ce débat peut confirmer ici.")
+            return
+        self._drafts.pop(parts[3])  # consume before the first await: a double click cannot open twice
+        if parts[2] == "cancel":
+            await self.interactions.show(data, {"content": "Création annulée.", "embeds": [], "components": [], "allowed_mentions": texts.NO_MENTIONS})
+            return
+        if not self.allowed(data.get("guild_id")):
+            await self.interactions.say(data, TEXT["elsewhere"])
+            return
+        await self.interactions.defer_update(data)
+        await self._create(data, draft[4], deferred=True)
+
+    async def _create(self, data: dict, parameters: dict, *, deferred: bool = False) -> None:
         started = self.clock()
         try:
-            debate = await self.db(lambda c: store.start(c, guild_id=int(guild_id), channel_id=parsed[1], topic=typed or axis.question, context=str(values.get("context") or "") or None,
-                                                         created_by=user_id, in_thread=in_thread, verify=verify, axis=None if typed else axis, quiet_seconds=quiet, now=started))
+            debate = await self.db(lambda c: store.start(c, **parameters, now=started))
         except DebateRefused as refusal:
-            await say(data, self._refusal(refusal.code))
+            if deferred:
+                await self.interactions.finish(data, Reply(self._refusal(refusal.code)))
+            else:
+                await self.interactions.say(data, self._refusal(refusal.code))
             return
         except Exception as error:
             log.error("a debate could not be written (%s)", type(error).__name__)
-            await say(data, TEXT["failed"])
+            if deferred:
+                await self.interactions.finish(data, Reply(TEXT["failed"]))
+            else:
+                await self.interactions.say(data, TEXT["failed"])
             return
-        await self.interactions.defer(data)                           # Discord gives 3 seconds; the thread takes longer
+        if not deferred:
+            await self.interactions.defer(data)
         await self.interactions.finish(data, Reply(await self._open(debate, started)))
 
     @staticmethod
     def _refusal(code: str) -> str:
         return texts.REFUSALS.get(code, TEXT["failed"]).format(n=rules.MAX_OPEN_PER_SERVER)
+
+    async def follow_command(self, data: dict, user_id: int, option: dict) -> None:
+        """A private live summary, selected from the current thread or the server's open debates."""
+        guild_id = data.get("guild_id")
+        if not guild_id or not self.allowed(guild_id):
+            await self.interactions.say(data, TEXT["elsewhere"])
+            return
+        await self.interactions.defer(data)
+        try:
+            if not self._loaded:
+                await self.load()
+            await self._flush_poll_votes()
+            await self._flush_messages()
+            values = {o.get("name"): o.get("value") for o in option.get("options") or []}
+            if values.get("debat"):
+                selected = await self.db(lambda c: store.get(c, int(values["debat"])))
+            else:
+                row = await self.db(lambda c: c.execute("SELECT id FROM debates WHERE guild_id = %s AND thread_id = %s ORDER BY id DESC LIMIT 1",
+                                                        (int(guild_id), int(data.get("channel_id") or 0))).fetchone())
+                selected = await self.db(lambda c: store.get(c, row[0])) if row else None
+                if selected is None:
+                    rows = await self.db(lambda c: c.execute("SELECT id, topic FROM debates WHERE guild_id = %s AND status = 'open' ORDER BY id", (int(guild_id),)).fetchall())
+                    if len(rows) != 1:
+                        buttons = [{"type": 2, "style": texts.SECONDARY, "label": f"#{i} · {topic}"[:80], "custom_id": texts.custom_id("stats", i, "0")} for i, topic in rows]
+                        await self.interactions.finish(data, Reply("Choisissez un débat." if rows else "Aucun débat en cours dans ce serveur.", components=texts._row(buttons)))
+                        return
+                    selected = await self.db(lambda c: store.get(c, rows[0][0]))
+            if selected is None or selected.guild_id != int(guild_id):
+                await self.interactions.finish(data, Reply(texts.REFUSALS["unknown"]))
+                return
+            found = await self.db(lambda c: stats.collect(c, selected.id, self.clock()))
+            payload = texts.stats_page(found, 0, checks_on=self.verifying)
+            await self.interactions.finish(data, Reply("", embed=payload["embeds"][0], components=payload["components"]))
+        except Exception as error:
+            log.warning("a debate summary could not be read (%s)", type(error).__name__)
+            await self.interactions.finish(data, Reply(TEXT["failed"]))
 
     async def _open(self, debate: Debate, started: datetime) -> str:
         """Makes the place of the debate (a post of the server's forum, a thread, or the channel itself) and posts the message that launches it, then opens the debate. Returns what the author is told."""
@@ -375,10 +465,8 @@ class Debates:
                                                           WHERE a.code = %s AND k.value IN (-1, 1) ORDER BY k.value""", (debate.axis['code'],)).fetchall())
             if anchors:
                 debate = replace(debate, context="\n".join(f"{debate.axis['for' if value < 0 else 'against']} : {meaning}" for value, meaning in anchors))
-        question, description = await asyncio.to_thread(polls.draft, debate, self.poll_client, self.poll_model)
-        if self.poll_client is not None and not debate.axis and len(question) <= rules.TOPIC_MAX:
-            debate = replace(debate, topic=question, context=description)
-            await self.db(lambda c: c.execute("UPDATE debates SET topic = %s, context = %s WHERE id = %s", (question, description, debate.id)))
+        # Free subjects have already been approved. Do not rewrite them a second time.
+        question, description = polls.draft(debate)
         place, note, starter = debate.channel_id, "", None
         if debate.in_thread:
             made = await self._forum_post(debate)
@@ -532,8 +620,12 @@ class Debates:
     # --- the buttons ----------------------------------------------------------------------------------------------
 
     async def button(self, data: dict, user_id: int) -> None:
-        """A position, the end of the debate, or a page of the statistics. Answered privately, at once."""
-        parsed = texts.parse_custom_id((data.get("data") or {}).get("custom_id"))
+        """Approve a proposal, choose a position or view statistics."""
+        raw = str((data.get("data") or {}).get("custom_id", ""))
+        if raw.startswith(("dindon:debat:confirm:", "dindon:debat:cancel:")):
+            await self._confirm(data, user_id, raw)
+            return
+        parsed = texts.parse_custom_id(raw)
         if parsed is None:
             return
         kind, debate_id, value = parsed
@@ -553,7 +645,7 @@ class Debates:
             await self._show_stats(data, debate_id, int(value))
             return
         if kind == "end":
-            await self._end_by_button(data, debate_id, user_id)
+            await self.follow_command(data, user_id, {"options": [{"name": "debat", "value": debate_id}]})
             return
         if kind in ("rate", "pick"):
             await self._rating_click(data, kind, debate_id, user_id)
@@ -713,7 +805,8 @@ class Debates:
     async def _show_stats(self, data: dict, debate_id: int, page: int) -> None:
         """A click on a page button of the statistics: the page is made again from the database (what was deleted or erased since is gone)."""
         try:
-            found = await self.db(lambda c: stats.collect(c, debate_id, self.clock()))
+            debate = await self.db(lambda c: store.get(c, debate_id))
+            found = await self.db(lambda c: stats.collect(c, debate_id, self.clock())) if debate and str(debate.guild_id) == str(data.get("guild_id")) and self.allowed(data.get("guild_id")) else None
         except Exception as error:
             log.error("the statistics of a debate could not be read (%s)", type(error).__name__)
             await self.interactions.say(data, TEXT["failed"])

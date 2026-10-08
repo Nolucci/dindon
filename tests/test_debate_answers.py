@@ -264,7 +264,7 @@ def test_somebody_who_stopped_being_recorded_cannot_vote_and_their_earlier_vote_
 
 def test_nobody_can_vote_once_the_debate_is_over(answering, ingest_db):
     place, debate, _, answer_id = wrong(answering, ingest_db)
-    answering.click(ALICE_ID, place, debate.id, "end", "now", permissions=8)
+    answering.end(ALICE_ID, place, debate.id, permissions=8)
     judge(answering, CAROL_ID, place, answer_id, "invalid")
     assert "Ce débat est terminé" in answering.sent.last() and ingest_db.execute("SELECT count(*) FROM debate_answer_votes").fetchone()[0] == 0
 
@@ -344,7 +344,7 @@ def test_a_search_that_the_participants_asked_for_survives_a_restart(answering, 
 def test_no_search_is_made_in_a_debate_that_is_over(answering, ingest_db):
     place, debate, _, answer_id = wrong(answering, ingest_db)
     judge(answering, DAN_ID, place, answer_id, "invalid")
-    answering.click(ALICE_ID, place, debate.id, "end", "now", permissions=8)
+    answering.end(ALICE_ID, place, debate.id, permissions=8)
     assert check(answering) is False and answering.checker.searched == [] and row(ingest_db, answer_id)[2] is False
 
 
@@ -402,7 +402,7 @@ def test_verifier_is_refused_when_the_answer_is_gone_the_debate_is_over_or_the_p
     privacy.stop_recording(ingest_db, CAROL_ID)
     judge(answering, CAROL_ID, place, answer_id, "check")
     assert "ne pas être enregistré" in answering.sent.last() and check(answering) is False and answering.checker.searched == []
-    answering.click(ALICE_ID, place, debate.id, "end", "now", permissions=8)
+    answering.end(ALICE_ID, place, debate.id, permissions=8)
     judge(answering, EVE_ID, place, answer_id, "check")
     assert "Ce débat est terminé" in answering.sent.last() and answering.checker.searched == []
 
@@ -569,7 +569,7 @@ def test_the_statistics_count_what_dindon_answered_how_it_was_judged_and_how_oft
     assert found["totals"]["answers"] == {"true": 0, "false": 1, "valid": 1, "invalid": 2, "searched": 1}
     [given] = found["answers"]
     assert (given["claim"], given["verdict"], given["answer"], given["valid"], given["invalid"], given["searched"], given["found"], given["posted"]) == (CLAIM, "false", WRONG.answer, 1, 2, True, "contradicted", True)
-    answering.click(ALICE_ID, place, debate.id, "end", "now", permissions=8)
+    answering.end(ALICE_ID, place, debate.id, permissions=8)
     answering.tick(seconds=1)
     [closing] = answering.discord.posted(place, "Débat terminé")
     assert "Dindon a répondu à **1** affirmation(s) sans chercher sur Internet : 1 vote(s) Valide, 2 vote(s) Invalide, **1** recherche(s) sur Internet ensuite." in closing["embeds"][0]["description"]
@@ -579,7 +579,7 @@ def test_a_debate_where_dindon_answered_nothing_says_nothing_of_answers_and_no_l
     place, debate = opened(answering, ingest_db)
     said(answering, place, ingest_db, BOB, "La Terre tourne autour du Soleil, c'est établi depuis longtemps.")
     assert check(answering) is True
-    answering.click(ALICE_ID, place, debate.id, "end", "now", permissions=8)
+    answering.end(ALICE_ID, place, debate.id, permissions=8)
     answering.tick(seconds=1)
     text = answering.discord.posted(place, "Débat terminé")[0]["embeds"][0]["description"]
     assert "Dindon a répondu" not in text and "Aucune affirmation de fait n'a été vérifiée" not in text
@@ -604,7 +604,7 @@ def test_the_launch_message_says_in_one_line_what_dindon_does_and_the_whole_text
     description = texts.question(debate, {"for": 0, "unsure": 0, "against": 0}, verifying=True, live=mode)["embeds"][0]["description"]
     lines = [line for line in description.split("\n") if line]
     assert len(lines) == 3 and lines[0] == "**Un sujet de débat**"                                                 # the subject, then the two lines: the buttons and the end, what Dindon does
-    assert lines[1].startswith("Prenez position avec les boutons") and "Voter la fin" in lines[1] and "après 1 jour sans message" in lines[1]
+    assert lines[1].startswith("Prenez position avec les boutons") and "Voter la fin" not in lines[1] and "après 1 jour sans message" in lines[1]
     assert lines[2] == texts.notice_short(mode) and must_say in lines[2] and "/dindon info" in lines[2] and len(lines[2]) < 260 and "fields" not in texts.question(debate, {}, verifying=True, live=mode)["embeds"][0]
     open_in_the_channel = store.start(ingest_db, guild_id=1, channel_id=3, topic="Un autre sujet", created_by=BOB_ID, in_thread=False, now=None)
     assert len([line for line in texts.question(open_in_the_channel, {}, verifying=True, live=mode)["embeds"][0]["description"].split("\n") if line]) == 4      # (plus the warning that the channel is read)

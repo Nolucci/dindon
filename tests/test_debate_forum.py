@@ -258,7 +258,7 @@ def test_the_launch_message_of_a_post_is_edited_like_any_other_and_the_post_is_a
     with_forum.click(BOB_ID, post, debate.id, "pos", "for")
     with_forum.tick(seconds=6)
     assert [b["label"] for b in with_forum.discord.messages[(post, post)]["components"][0]["components"]] == ["Pour · 1", "Ne sait pas · 0", "Contre · 0", "Témoin · 0"]
-    with_forum.click(ALICE_ID, post, debate.id, "end", "now", permissions=8)
+    with_forum.end(ALICE_ID, post, debate.id, permissions=8)
     with_forum.tick(seconds=1)
     assert len(with_forum.discord.posted(post, "Débat terminé")) == 1 and with_forum.discord.threads[post]["archived"] is True
     assert with_forum.discord.messages[(post, post)]["components"] == []

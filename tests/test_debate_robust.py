@@ -67,7 +67,7 @@ def test_a_deleted_message_does_not_take_back_a_position(world, ingest_db):
 
 def test_a_message_deleted_after_the_debate_is_over_is_forgotten_too(world, ingest_db):
     thread, debate = started(world, ingest_db)
-    world.click(ALICE_ID, thread, debate.id, "end", "now", permissions=8)
+    world.end(ALICE_ID, thread, debate.id, permissions=8)
     assert store.get(ingest_db, debate.id).status == "closed"
     deleted(world, thread, 500)
     flush(world.runner)
@@ -110,7 +110,7 @@ def test_a_question_deleted_without_the_bot_hearing_of_it_is_found_when_the_coun
     thread, debate = started(world, ingest_db)
     del world.discord.messages[(thread, debate.question_message_id)]                                 # gone on Discord; no event came
     world.click(BOB_ID, thread, debate.id, "pos", "for")
-    world.tick(seconds=1)                                                                            # the edit finds it gone (404)…
+    world.tick(seconds=6)                                                                            # the edit finds it gone (404)…
     world.tick(seconds=1)                                                                            # …and the next look posts it again
     new = store.get(ingest_db, debate.id).question_message_id
     assert new not in (None, debate.question_message_id)
@@ -126,8 +126,8 @@ def test_a_launch_message_deleted_in_the_channel_is_posted_again_with_its_button
     world.tick(seconds=1)
     new = store.get(ingest_db, debate.id).question_message_id
     assert new not in (None, old) and len(world.discord.posted(place, "Débat")) == 1
-    [message] = [m for (p, _), m in world.discord.messages.items() if p == place]
-    assert [b["custom_id"] for row in message["components"] for b in row["components"]][-1] == f"dindon:debat:end:{debate.id}:now"        # the end button is back too
+    [message] = world.discord.posted(place, "🗳️ Débat")
+    assert all(":end:" not in b["custom_id"] for row in message["components"] for b in row["components"])
     assert store.get(ingest_db, debate.id).status == "open" and world.debates.is_debate_thread(place)
 
 
@@ -288,7 +288,7 @@ def test_a_thread_that_is_gone_when_the_bot_reads_it_ends_the_debate(world, inge
 
 def test_nothing_is_read_back_for_a_debate_that_is_over(world, ingest_db):
     thread, debate = started(world, ingest_db)
-    world.click(ALICE_ID, thread, debate.id, "end", "now", permissions=8)
+    world.end(ALICE_ID, thread, debate.id, permissions=8)
     world.tick(seconds=1)
     world.restart()
     mark = len(reads(world))

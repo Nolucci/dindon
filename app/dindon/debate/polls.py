@@ -17,6 +17,21 @@ Description : explique brièvement les termes techniques ou concepts politiques 
 Pas de faits chiffrés, de sources inventées, ni d'injonctions. Si aucun terme n'a besoin d'explication, description vide. Ne répète pas la question."""
 
 
+def refine(topic, context, client, model) -> tuple[str, str]:
+    """Prepare a proposal for approval; a failed model must never publish a fallback."""
+    if client is None:
+        raise ValueError("no wording model")
+    import json
+
+    prompt = PROMPT + "\nFournis toujours une description brève qui précise la portée du débat. Intègre le contexte fourni, sans perdre ses conditions ni ses réserves."
+    value = client.chat_json(model, prompt, json.dumps({"sujet": topic, "contexte": context or ""}, ensure_ascii=False), SCHEMA)
+    question = rules.clean_topic(value.get("question")) if isinstance(value, dict) and isinstance(value.get("question"), str) else None
+    description = rules.clean_context(value.get("description")) if isinstance(value, dict) and isinstance(value.get("description"), str) else None
+    if not question or not question.endswith("?") or not description:
+        raise ValueError("invalid wording proposal")
+    return question, description
+
+
 def draft(debate, client=None, model=None) -> tuple[str, str | None]:
     if debate.axis:
         question = f"Faut-il privilégier « {debate.axis['for']} » plutôt que « {debate.axis['against']} » ?"

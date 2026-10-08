@@ -239,7 +239,7 @@ def _row(buttons: list[dict]) -> list[dict]:
 
 
 def question(debate: Debate, counts: dict[str, int], *, verifying: bool = False, live: bool | str = False) -> dict:
-    """The message that launches the debate: the subject, its context, the three position buttons (each shows how many people chose it) and the button that ends it. Without buttons
+    """The message that launches the debate: the subject, context and position buttons. Without buttons
     once the debate is over."""
     over = debate.status == "closed"
     lines = [f"**{_plain(debate.topic)}**"]
@@ -253,8 +253,8 @@ def question(debate: Debate, counts: dict[str, int], *, verifying: bool = False,
     else:
         quiet = f", ou après {rules.quiet_label(debate.quiet_seconds)} sans message" if debate.quiet_seconds else ""
         lines.append(f"{'Répondez' if debate.axis else 'Prenez position'} avec les boutons pour participer (modifiable) : seuls les participants sont lus et comptés dans le débat. "
-                     f"👀 Témoin : vous regardez seulement, sans pouvoir le terminer ; vos messages sont gardés comme témoin, sans être analysés pour le débat. "
-                     f"Fin : quand la majorité du plus petit camp demande l'arrêt (« Voter la fin »), quand un camp se vide{quiet}.")
+                     f"👀 Témoin : vous regardez seulement ; vos messages ne sont pas analysés pour le débat. "
+                     f"Fin : quand un camp se vide{quiet}.")
         if verifying and debate.verify:
             lines.append(notice_short(live))
         if not debate.in_thread:
@@ -263,8 +263,7 @@ def question(debate: Debate, counts: dict[str, int], *, verifying: bool = False,
              "footer": {"text": "Dindon compte les messages de ce débat pour les statistiques de fin. /dindon stop vous en exclut."}}
     positions = [{"type": 2, "style": SECONDARY, "label": f"{label} · {counts.get(key, 0)}", "emoji": {"name": emoji}, "custom_id": custom_id("pos", debate.id, key)}
                  for key, (emoji, label) in position_buttons(debate.axis).items()]
-    finish = [{"type": 2, "style": DANGER, "label": "Voter la fin du débat", "emoji": {"name": "🏁"}, "custom_id": custom_id("end", debate.id, "now")}]
-    return {"content": "", "embeds": [embed], "components": [] if over else [*_row(positions), *_row(finish)], "allowed_mentions": NO_MENTIONS}
+    return {"content": "", "embeds": [embed], "components": [] if over else _row(positions), "allowed_mentions": NO_MENTIONS}
 
 
 # --- the popup where the person chooses the parameters of the debate ----------------------------------------------------------------------------------
@@ -366,7 +365,7 @@ KEY_RULE = "Message phare : le plus commenté et le plus apprécié du fil (rép
 def _duration(debate: dict) -> str:
     """How long the debate lasted, in words (from the launch message to its end)."""
     try:
-        seconds = int((datetime.fromisoformat(debate["closed_at"]) - datetime.fromisoformat(debate["started_at"])).total_seconds())
+        seconds = int((datetime.fromisoformat(debate.get("closed_at") or debate.get("observed_at")) - datetime.fromisoformat(debate["started_at"])).total_seconds())
     except (KeyError, TypeError, ValueError):
         return "—"
     if seconds < 90:
@@ -399,9 +398,10 @@ def stats_page(stats: dict, page: int, *, checks_on: bool = False) -> dict:
     people_pages = _pages(len(stats["participants"]), PEOPLE_PER_PAGE)
     if page == 0:
         final = totals["final"]
-        lines = [f"**{_plain(debate['topic'])}**", REASONS.get(debate["close_reason"] or "", "Le débat est terminé."),
+        running = debate.get("status") == "open"
+        lines = [f"**{_plain(debate['topic'])}**", "Le débat est en cours." if running else REASONS.get(debate["close_reason"] or "", "Le débat est terminé."),
                  f"**{totals['participants']}** participant(s) · **{totals['messages']}** message(s) · durée **{_duration(debate)}**"]
-        if totals["participants"]:
+        if totals["participants"] or running:
             lines.append("Positions : " + " · ".join(f"{buttons[k][0]} {buttons[k][1]} **{final[k]}**" for k in rules.POSITIONS if final.get(k) or k in rules.PARTICIPANT_POSITIONS) + (f" · sans position **{final['none']}**" if final["none"] else ""))
             if totals["changed_mind"]:
                 lines.append(f"{totals['changed_mind']} personne(s) ont changé de position pendant le débat.")
@@ -413,7 +413,11 @@ def stats_page(stats: dict, page: int, *, checks_on: bool = False) -> dict:
         if given.get("false"):
             lines.append(f"Dindon a répondu à **{given['false']}** affirmation(s) sans chercher sur Internet : {given['valid']} vote(s) Valide, {given['invalid']} vote(s) Invalide, "
                          f"**{given['searched']}** recherche(s) sur Internet ensuite.")
-        title, color = "🏁 Débat terminé", GREY
+        if running and debate.get("thread_id"):
+            lines.append(f"[Rejoindre le débat](https://discord.com/channels/{debate['guild_id']}/{debate['thread_id']})")
+        title, color = ("🗳️ Débat en cours", BLURPLE) if running else ("🏁 Débat terminé", GREY)
+        if running:
+            title += f" · #{debate['id']}"
     elif page <= people_pages:
         chunk = stats["participants"][(page - 1) * PEOPLE_PER_PAGE: page * PEOPLE_PER_PAGE]
         lines = []

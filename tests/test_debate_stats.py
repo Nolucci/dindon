@@ -45,7 +45,7 @@ def message(world, thread, db, author, content):
 
 def ended(world, db, thread, debate):
     """The person who opened the debate presses « Terminer » and the engine looks at it once."""
-    world.click(ALICE_ID, thread, debate.id, "end", "now", permissions=8)       # (a moderator ends it at once)
+    world.end(ALICE_ID, thread, debate.id, permissions=8)       # (a moderator ends it at once)
     world.tick(seconds=1)
     assert store.get(db, debate.id).status == "closed"
 

@@ -38,7 +38,7 @@ log = logging.getLogger("dindon.bot.privacy")
 EPHEMERAL = 64
 CHANNEL_MESSAGE, DEFERRED_MESSAGE, UPDATE_MESSAGE, MODAL = 4, 5, 7, 9
 DEFERRED_UPDATE = 6
-SUBCOMMANDS = ("info", "mes-donnees", "stop", "effacer", "reprendre", "card", "mycard", "map", "debat", "param")
+SUBCOMMANDS = ("info", "mes-donnees", "stop", "effacer", "reprendre", "card", "mycard", "map", "debat", "suivi", "param")
 COOLDOWN_SECONDS = 15
 MAX_FILE_BYTES = 7_000_000          # under every limit of Discord for an attachment
 
@@ -61,8 +61,10 @@ COMMAND = {
                      {"type": 6, "name": "personne", "description": "Se centrer sur une personne : ses liens les plus forts", "required": False},
                      {"type": 3, "name": "forme", "description": "La forme du graphique autour de la personne (normale par défaut)", "required": False,
                       "choices": [{"name": label, "value": key} for key, label in discord_map.SHAPES.items()]}]},
-        {"type": 1, "name": "debat", "description": "Ouvrir un débat : une fenêtre pour choisir ses paramètres, des positions, des statistiques à la fin",
+        {"type": 1, "name": "debat", "description": "Créer un débat : choisir ses paramètres et confirmer la question proposée",
          "options": [{"type": 3, "name": "sujet", "description": "La question débattue (vide : vous pourrez choisir un axe dans la fenêtre)", "required": False, "min_length": 3, "max_length": 200}]},
+        {"type": 1, "name": "suivi", "description": "Voir où en est un débat, ses votes et ses statistiques",
+         "options": [{"type": 4, "name": "debat", "description": "Numéro du débat (facultatif depuis son fil)", "min_value": 1}]},
         {"type": 1, "name": "param", "description": "Choisir le forum des débats et le salon des sondages (modérateurs)",
          "options": [{"type": 7, "name": "forum", "description": "Le forum des débats : chaque débat y devient un post", "channel_types": [15]},
                      {"type": 7, "name": "sondages", "description": "Le salon texte où publier les sondages liés aux débats", "channel_types": [0, 5]},
@@ -448,6 +450,10 @@ class Interactions:
         """'Thinking…' (private), when the answer takes longer than the 3 seconds that Discord gives."""
         await self._callback(data, DEFERRED_MESSAGE)
 
+    async def defer_update(self, data: dict) -> None:
+        """Acknowledge a button while preparing an update of its existing message."""
+        await self._callback(data, DEFERRED_UPDATE)
+
     async def finish(self, data: dict, reply: Reply) -> None:
         """The real answer, after `defer`."""
         await self._edit(data, reply)
@@ -456,8 +462,7 @@ class Interactions:
         """Replaces the 'thinking…' of a deferred answer by the real one."""
         path = f"/webhooks/{data.get('application_id')}/{data['token']}/messages/@original"
         body: dict = {"content": reply.text, "components": reply.components or [], "allowed_mentions": {"parse": []}}
-        if reply.embed:
-            body["embeds"] = [reply.embed]
+        body["embeds"] = [reply.embed] if reply.embed else []
         if reply.file is None:
             body["attachments"] = []                    # a message that turns into text (or a card) lets go of the picture of the map it had
         status = await asyncio.to_thread(self._request, "PATCH", path, body, False, reply.file)
@@ -512,11 +517,13 @@ class Interactions:
             await self._mycard(data, user_id, text)
         elif sub == "map":
             await self._map(data, user_id, options[0], text)
-        elif sub in ("debat", "param"):
+        elif sub in ("debat", "suivi", "param"):
             if self.debates is None:
                 await self._callback(data, CHANNEL_MESSAGE, text["no_debates"])
             elif sub == "param":
                 await self.debates.param_command(data, user_id, options[0])
+            elif sub == "suivi":
+                await self.debates.follow_command(data, user_id, options[0])
             else:
                 await self.debates.command(data, user_id, options[0])
         elif self.service.too_soon(user_id):
