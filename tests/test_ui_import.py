@@ -71,7 +71,7 @@ def test_the_window_imports_a_part_of_the_server_shows_errors_and_can_stop(base,
         page.click("button[type=submit]")
         page.wait_for_selector("text=Aucun serveur importé", timeout=20000)             # nothing imported yet: the window is how to start
 
-        page.get_by_role("button", name="Importer").click()
+        page.get_by_role("button", name="Importer", exact=True).click()
         dialog = page.locator("[role=dialog]")
         dialog.wait_for()
         page.wait_for_selector(".channels li")
@@ -82,8 +82,10 @@ def test_the_window_imports_a_part_of_the_server_shows_errors_and_can_stop(base,
         page.locator(f".channels li >> nth={names.index(channel.name)}").locator("input").check()   # one channel, one person
         assert start.is_enabled()
         assert "Import partiel" not in dialog.inner_text()
+        dialog.get_by_text("Filtrer par personne", exact=True).click()
         dialog.get_by_label("Auteurs").fill(author)
-        assert "Import partiel" in dialog.inner_text()                                   # told before the start that it is not a complete import
+        dialog.get_by_role("button", name="Ajouter cet identifiant").click()
+        assert dialog.get_by_role("button", name="Retirer " + author).is_visible()                                   # told before the start that it is not a complete import
         shot(page, "import-form.png")
         start.click()
         page.wait_for_selector("section.progress h3:has-text('Terminé')", timeout=30000)
@@ -93,20 +95,27 @@ def test_the_window_imports_a_part_of_the_server_shows_errors_and_can_stop(base,
         with connection(ingest_url) as conn:
             assert ids_in(conn) == expected
 
-        dialog.get_by_label("Auteurs").fill("pseudo")                                    # a mistake is told in words, and nothing starts
-        start.click()
-        page.wait_for_selector("[role=alert]:has-text('identifiant Discord')")
-        assert dialog.locator("section.progress h3").inner_text() == "Terminé"           # still the previous result
+        dialog.get_by_role("button", name="Retirer " + author).click()
+        dialog.get_by_label("Auteurs").fill(world.person_by_id(author).display_name)
+        dialog.locator(".picker .result").first.wait_for()
+        dialog.locator(".picker .result").first.click()
+        assert dialog.locator(".picker .selected button").count() == 1
+
+        dialog.get_by_label("Auteurs").fill("pseudo")
+        assert dialog.get_by_role("button", name="Ajouter cet identifiant").count() == 0
+        assert dialog.locator("section.progress h3").inner_text() == "Terminé"
 
         page.keyboard.press("Escape")                                                    # closing: the map shows what was imported
         dialog.wait_for(state="detached")
         page.wait_for_selector("footer span:has-text('personne')", timeout=15000)
 
         fake.latency = 0.6                                                               # a slow import, to stop it
-        page.get_by_role("button", name="Importer").click()
+        page.set_viewport_size({"width": 390, "height": 800})
+        page.get_by_role("button", name="Plus", exact=True).click()
+        page.get_by_role("button", name="Importer", exact=True).click()
         page.wait_for_selector(".channels li")
         dialog.get_by_role("button", name="Tous").click()
-        dialog.get_by_label("Auteurs").fill("")
+
         start.click()
         page.wait_for_selector("section.progress h3:has-text('En cours')", timeout=15000)
         stop = dialog.get_by_role("button", name="Annuler l’import")
@@ -122,14 +131,24 @@ def test_the_window_imports_a_part_of_the_server_shows_errors_and_can_stop(base,
 def test_the_channels_of_a_big_server_can_be_searched(base, fake, world):
     with sync_api.sync_playwright() as p:
         browser = p.chromium.launch(args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
-        page = browser.new_page(viewport={"width": 1440, "height": 1000})
+        page = browser.new_page(viewport={"width": 390, "height": 800})
         page.goto(base)
         page.fill("#password", PASSWORD)
         page.click("button[type=submit]")
         page.wait_for_selector("text=Aucun serveur importé", timeout=20000)
-        page.get_by_role("button", name="Importer").click()
+        page.get_by_role("button", name="Plus", exact=True).click()
+        page.get_by_role("button", name="Importer", exact=True).click()
         page.wait_for_selector(".channels li")
         total = page.locator(".channels li").count()
+        for _ in range(20):
+            drawer = page.locator('.navbar').bounding_box()
+            if drawer['x'] + drawer['width'] <= .5:
+                break
+            page.wait_for_timeout(50)
+        assert drawer['x'] + drawer['width'] <= .5
+        assert page.locator('.channels').evaluate("el => getComputedStyle(el).gridTemplateColumns.split(' ').length") == 1
+        shot(page, "import-phone.png")
+        assert page.get_by_role("button", name="Lancer l’import").is_visible()
         word = next(c.name for c in world.channels if not c.parent_id and "é" in c.name)           # an accent: the search ignores them
         page.get_by_label("Chercher un salon").fill(word.replace("é", "e")[:4])
         shown = page.locator(".channels li").count()

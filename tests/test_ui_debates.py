@@ -66,19 +66,21 @@ def test_the_person_in_charge_reads_a_debate_with_its_checked_claims_and_their_l
         page.wait_for_selector("nav", timeout=20000)
         page.get_by_role("button", name="Débats").click()
         page.get_by_role("heading", name="Débats", exact=True).wait_for()
-        assert "Désactivée" in page.get_by_label("État de la vérification").inner_text()
+        assert page.get_by_label("État de la vérification").count() == 0
         page.get_by_role("button", name="Faut-il réduire le temps de travail").click()
         page.get_by_label("Participants").wait_for()
+        page.get_by_text("Détails du débat", exact=True).click()
         summary = page.get_by_label("Résumé").inner_text()
         assert "en cours" in summary and "dans un fil" in summary and "affirmations vérifiées" in summary and "fin si personne n’écrit pendant 24 heures" in summary
         assert "période" not in summary and "vote" not in summary
         table = page.get_by_label("Participants").inner_text()
         assert "Bobby" in table and "✅ Pour" in table and "❌ Contre" in table and "le même critère pour tout le monde" in table
-        claims = page.get_by_label("Affirmations vérifiées")
+        claims = page.get_by_label("Affirmations examinées")
         text = claims.inner_text()
         assert "contredite" in text and "non vérifiable" in text and EVIDENCE.quote in text and "insee.fr" in text
         link = claims.get_by_role("link", name="insee.fr")
         assert link.get_attribute("href") == EVIDENCE.url and "noopener" in link.get_attribute("rel") and link.get_attribute("target") == "_blank"
+        page.get_by_text("Répartition par position", exact=True).click()
         assert page.get_by_label("Parité par position").inner_text().count("✅ Pour") == 1
         page.get_by_role("button", name="Le pouvoir doit-il être réparti").click()
         page.get_by_label("Résumé").get_by_text("Question posée par Dindon").wait_for()

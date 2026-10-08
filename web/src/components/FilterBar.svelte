@@ -9,7 +9,7 @@
     since = $bindable(''),
     until = $bindable(''),
     kinds = $bindable({}),
-    density = $bindable('2500'),
+    density = $bindable('800'),
     channel = $bindable(''),
     theme = $bindable(''),
     role = $bindable(''),
@@ -32,7 +32,8 @@
   const fmt = new Intl.NumberFormat('fr-FR');
 
   let box;                 // the search box (input and suggestions)
-  let dismissed = $state(false); // Escape, or a click elsewhere, closed the suggestions until the next letter
+  let dismissed = $state(false);
+  let expanded = $state(false); // Escape, or a click elsewhere, closed the suggestions until the next letter
 
   function clearSearch() {
     query = '';
@@ -126,7 +127,8 @@
     </div>
   {/if}
 
-  <div class="kinds" role="group" aria-label="Types d’échanges">
+  <button type="button" class="btn" aria-label="Filtres" aria-expanded={expanded} aria-controls="map-filters" onclick={() => expanded = !expanded}>Filtres{dirty ? ' •' : ''}</button>
+  {#if expanded}<div class="extraFilters" id="map-filters" aria-label="Filtres de la carte">  <div class="kinds" role="group" aria-label="Types d’échanges">
     {#each kindList as k (k.id)}
       <button type="button" class="kind" aria-pressed={kinds[k.id]} onclick={() => { kinds[k.id] = !kinds[k.id]; onChange(); }}>
         <span class="swatch"></span>{k.label}
@@ -160,24 +162,25 @@
     </select>
   {/if}
 
-  <select class="select fsel" bind:value={minWeight} onchange={onChange} aria-label="Force minimale des liens">
-    <option value="0">Force</option>
-    <option value="0.5">Force : au moins 0,5</option>
-    <option value="1">Force : au moins 1</option>
-    <option value="3">Force : au moins 3</option>
-    <option value="10">Force : au moins 10</option>
+  <select class="select fsel" bind:value={minWeight} onchange={onChange} aria-label="Intensité minimale des échanges">
+    <option value="0">Intensité des échanges</option>
+    <option value="0.5">Intensité : au moins 0,5</option>
+    <option value="1">Intensité : au moins 1</option>
+    <option value="3">Intensité : au moins 3</option>
+    <option value="10">Intensité : au moins 10</option>
   </select>
 
   <label class="toggle" title="Les personnes qui ont déjà écrit mais n’ont aucun lien affiché, quelle que soit la période">
     <input type="checkbox" bind:checked={showIsolated} onchange={onIsolated} />
-    <span class="toggleLabel">Sans lien</span>
+    <span class="toggleLabel">Personnes sans échange</span>
   </label>
 
   <div class="segmented" role="group" aria-label="Disposition">
     <button type="button" aria-pressed={!grouped} onclick={() => { grouped = false; onLayout(); }} title="Les personnes qui échangent se rapprochent">Échanges</button>
-    <button type="button" aria-pressed={grouped} onclick={() => { grouped = true; onLayout(); }} title="Un îlot par rôle, les pseudos qui se ressemblent côte à côte (sans tenir compte des échanges)">Rôles &amp; pseudos</button>
+    <button type="button" aria-pressed={grouped} onclick={() => { grouped = true; onLayout(); }} title="Un îlot par rôle, les pseudos qui se ressemblent côte à côte (sans tenir compte des échanges)">Par rôle</button>
   </div>
 
+</div>{/if}
   {#if dirty}
     <button type="button" class="tool-btn reset" onclick={onReset} title="Remettre période, types, salon, thème, rôle et force par défaut">Réinitialiser</button>
   {/if}
@@ -189,6 +192,10 @@
 </div>
 
 <style>
+  .extraFilters { flex-basis: 100%; display: flex; align-items: center; flex-wrap: wrap; gap: .625rem; padding-top: .75rem; border-top: 1px solid var(--border-subtle); }
+  .bar .search { flex: 1 1 17rem; min-width: min(17rem, 100%); max-width: none; }
+  .extraFilters .fsel { max-width: 18rem; min-width: 10rem; }
+
   /* FilterBar.module.css */
   .bar {
     display: flex;
@@ -197,7 +204,7 @@
     padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--border-subtle);
     background: var(--bg-primary);
-    flex-wrap: nowrap;               /* one line; on a narrow window it wraps again (below) */
+    flex-wrap: wrap;               /* one line; on a narrow window it wraps again (below) */
     flex-shrink: 0;
   }
 
@@ -367,7 +374,7 @@
   /* Stats.module.css .seriesToggleRow, .seriesToggleBtn: a kind that is hidden fades */
   .kinds {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     flex-shrink: 0;
     gap: 0.25rem;
   }

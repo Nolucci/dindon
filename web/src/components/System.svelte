@@ -4,7 +4,7 @@
   import { ago as agoOf } from '../lib/format.js';
   import { matches, slash } from '../lib/text.js';
 
-  let { guild = '', onAuthLost } = $props();
+  let { guild = '', section = $bindable('status'), onAuthLost } = $props();
 
   // Deleting what the analysis derived (never the messages), one kind at a time, after a confirmation
   const RESULTS = {
@@ -15,7 +15,7 @@
   let resetNote = $state('');
   let resetting = $state('');
   async function resetResults(what) {
-    if (!confirm(`Supprimer ${RESULTS[what][1]} ? Les messages ne sont pas touchés. Cette action est définitive.`)) return;
+    if (!confirm(`Supprimer ${RESULTS[what][1]} ? Les messages ne sont pas touchés. Serveur : ${info?.followed.find((s) => s.id === guild)?.name || guild}. Cette action est définitive.`)) return;
     resetting = what;
     resetNote = '';
     try {
@@ -32,8 +32,16 @@
   const fmt = new Intl.NumberFormat('fr-FR');
   let info = $state(null);
   let problem = $state('');
+  let debateFleet = $state(null);
+  let debateChecks = $state(null);
+  const duration = (n) => n == null ? '—' : `${Math.round(n)} s`;
+  async function loadDebateStatus() {
+    try { const [fleet, overview] = await Promise.all([api.debateComputers(), api.debates()]); debateFleet = fleet; debateChecks = overview.checks; }
+    catch (error) { if (error instanceof AuthError) onAuthLost(); }
+  }
   let now = $state(Date.now());
   let timer;
+  let fleetTimer;
   let tick;
   // Automatic reading: the AI reads what the bot records, by itself, when it was asked to
   let auto = $state(null);         // /api/automation: settings, state, pending, next_at, timezone, intervals
@@ -150,7 +158,7 @@
   const summary = (result) => {
     if (!result) return null;
     if (result.idle) return 'rien à lire';
-    return result.servers.map((s) => `${s.stages.length} étape${s.stages.length > 1 ? 's' : ''} : ${s.state === 'done' ? 'terminé' : s.state === 'failed' ? `échec (${s.error})` : s.error ?? s.state}`).join(' ; ');
+    return result.servers.map((s) => `${s.stages.length} étape${s.stages.length > 1 ? 's' : ''} : ${s.state === 'done' ? 'terminé' : s.state === 'failed' ? `échec (${s.error})` : s.error ?? ({ cancelled: 'annulé', running: 'en cours', idle: 'en attente' }[s.state] ?? s.state)}`).join(' ; ');
   };
 
   // Performance: what the bot and the AI may take of the machine, at the cost of speed
@@ -161,6 +169,8 @@
   let shareForm = $state(null);     // the percentage of the work by computer ("local" is the server), while it is edited
   const shareKey = (worker) => (worker.local ? 'local' : worker.url);
   const sharesChanged = $derived(shareForm && workers?.shares && JSON.stringify(shareForm) !== JSON.stringify(workers.shares));
+  let performanceOpen = $state(false);
+  $effect(() => { if (form?.preset === 'custom') performanceOpen = true; });
   let form = $state(null);          // what the person is editing
   let saved = $state('');
   const PRESET_NAMES = { saver: 'Économe', balanced: 'Équilibré', full: 'Plein régime', custom: 'Personnalisé' };
@@ -273,6 +283,8 @@
   }
 
   onMount(() => {
+    loadDebateStatus();
+    fleetTimer = setInterval(() => { if (!document.hidden && section === 'status') loadDebateStatus(); }, 5000);
     refresh();
     loadPerf();
     loadWorkers();
@@ -284,6 +296,7 @@
   });
   onDestroy(() => {
     clearInterval(timer);
+    clearInterval(fleetTimer);
     clearInterval(tick);
   });
 
@@ -296,20 +309,26 @@
   <header>
     <div>
       <h1>Système</h1>
-      <p class="subtitle">L’état de chaque pièce de Dindon, et ce qui mérite un coup d’œil. La page se met à jour toute seule.</p>
+
     </div>
     {#if info}
-      <span class="badge" class:success={worst === 'ok'} class:danger={worst === 'error'} class:accent={worst === 'warning'}>
-        {worst === 'ok' ? 'Tout va bien' : `${attention} point${attention > 1 ? 's' : ''} à voir`}
+      <span class="badge" class:success={worst === 'ok' && !workers?.workers?.some((w) => !w.online)} class:danger={worst === 'error'} class:accent={worst === 'warning' || workers?.workers?.some((w) => !w.online)}>
+        {workers?.workers?.some((w) => !w.online) ? 'Ordinateur d’analyse hors ligne' : worst === 'ok' ? 'Services principaux disponibles' : `${attention} point${attention > 1 ? 's' : ''} à voir`}
       </span>
     {/if}
   </header>
 
+  <nav class="systemTabs" aria-label="Sections du système">
+    {#each [['status', 'État'], ['automation', 'Analyses auto'], ['discord', 'Discord'], ['performance', 'Performance'], ['maintenance', 'Maintenance']] as [key, label]}
+      <button type="button" class="btn" class:active={section === key} aria-pressed={section === key} onclick={() => section = key}>{label}</button>
+    {/each}
+  </nav>
   {#if problem}<p class="banner" role="alert">{problem}</p>{/if}
 
   {#if !info}
     <p class="muted">Chargement…</p>
   {:else}
+    {#if section === 'status'}
     {#if info.checks.length}
       <section class="panel checks" aria-label="Points à voir">
         <div class="toolbar">
@@ -389,6 +408,21 @@
       </section>
     </div>
 
+      <section class="panel card" aria-label="Vérification des débats">
+        <header><h2>Vérification des débats</h2><button type="button" class="btn" onclick={loadDebateStatus}>Actualiser</button></header>
+        {#if debateChecks}<p class="muted small">{debateChecks.mode === 'off' ? 'Désactivée' : debateChecks.mode === 'live' ? 'Réponses avec vérification des sources' : debateChecks.mode === 'answer' ? 'Réponses sans recherche Internet' : 'Observation'} · {debateChecks.model}</p>{#if debateChecks.why_not}<p class="banner">{debateChecks.why_not}</p>{/if}{/if}
+        {#if debateFleet?.computers?.length}
+          {#if !debateFleet.fresh}<p class="muted small">Dernier état connu · {duration(debateFleet.age_seconds)}</p>{/if}
+          <ul class="workerList">{#each debateFleet.computers as machine (machine.url)}<li>
+            <strong>{machine.local ? 'Serveur' : machine.url}</strong>
+            <span class="badge" class:danger={!machine.online || !machine.has_model}>{!machine.online ? 'Hors ligne' : !machine.has_model ? 'Modèle absent' : machine.active ? 'En cours' : 'Disponible'}</span>
+            <span class="muted small">{machine.calls} vérifications · {duration(machine.average)} en moyenne · {machine.observed} % · {machine.errors} erreurs</span>
+            {#if machine.last_error}<span class="muted small">{machine.last_error}</span>{/if}
+          </li>{/each}</ul>
+        {:else}<p class="muted small">Aucune activité de vérification disponible.</p>{/if}
+      </section>
+    {/if}
+    {#if section === 'automation'}
     <section class="panel card wide" aria-label="Lecture automatique">
       <header><h2 class="eyebrow">Lecture automatique</h2>{#if auto}<span class="badge" class:success={auto.settings.enabled}>{auto.settings.enabled ? 'Activée' : 'Éteinte'}</span>{/if}</header>
       <p class="muted small">L’IA lit d’elle-même ce que le bot enregistre, <strong>un peu à la fois</strong>, sans que vous ayez à lancer quoi que ce soit. Elle respecte les limites de performance ci-dessous et ne démarre jamais pendant qu’une autre analyse tourne.</p>
@@ -400,7 +434,7 @@
           <label class="check"><input type="checkbox" bind:checked={autoForm.themes} /> <span><strong>Thèmes</strong> : nouvelle recherche quand 25 conversations ne sont dans aucun thème. Remplace les propositions que personne n’a touchées.</span></label>
           <label class="check"><input type="checkbox" bind:checked={autoForm.positions} /> <span><strong>Positions des personnes</strong> : ce que chacun pense, avec citations, puis les axes et la cohérence des rôles. <em>Regarde les opinions des gens.</em></span></label>
           {#if autoForm.positions}
-            <label class="check ack"><input type="checkbox" bind:checked={autoForm.positions_acknowledged} aria-label="Les personnes sont informées" /> <span>Je confirme que les personnes de ce serveur <strong>sont informées</strong> et que le cadre juridique est validé (<code>docs/regles-du-bot.md</code>). Les messages d’une personne qui a demandé à ne plus être enregistrée ne sont jamais lus.</span></label>
+            <label class="check ack" class:missing={!autoForm.positions_acknowledged}><input type="checkbox" bind:checked={autoForm.positions_acknowledged} aria-label="Les personnes sont informées" /> <span>Je confirme que les personnes de ce serveur <strong>sont informées</strong> et que le cadre juridique est validé (le cadre de traitement des données). Les messages d’une personne qui a demandé à ne plus être enregistrée ne sont jamais lus.</span></label>
           {/if}
         </fieldset>
         <div class="knobs">
@@ -439,6 +473,8 @@
       {/if}
     </section>
 
+    {/if}
+    {#if section === 'discord'}
     <section class="panel card wide" aria-label="Carte sur Discord">
       <header><h2 class="eyebrow">Carte sur Discord</h2>{#if dmap}<span class="badge" class:success={dmap.enabled}>{dmap.enabled ? 'Activée' : 'Éteinte'}</span>{/if}</header>
       <p class="muted small">La commande <code>/dindon map</code> poste dans le salon une image de la carte, <strong>visible par tout le salon</strong>. Elle ne montre que ce que vous réglez ici, jamais un message, et jamais une personne qui a demandé à ne plus être enregistrée.</p>
@@ -458,7 +494,7 @@
           <label class="check"><input type="checkbox" value="roles" bind:group={dmap.sections} /> <span><strong>Rôles</strong> que la personne s’est donnés. <em>Lecture de ce qu’elle dit d’elle-même.</em></span></label>
           <label class="check"><input type="checkbox" value="axes" bind:group={dmap.sections} /> <span><strong>Positions sur les axes</strong> (les 5 plus nettes, sans citation). <em>Lecture de l’IA : regarde les opinions des gens.</em></span></label>
           {#if dmapSensitive}
-            <label class="check ack"><input type="checkbox" bind:checked={dmap.acknowledged} aria-label="Les personnes sont informées" /> <span>Je confirme que les personnes de ce serveur <strong>sont informées</strong> et que le cadre juridique est validé (<code>docs/regles-du-bot.md</code>). Cette fiche est visible de tous ceux qui sont dans le salon vocal.</span></label>
+            <label class="check ack" class:missing={!dmap.acknowledged}><input type="checkbox" bind:checked={dmap.acknowledged} aria-label="Les personnes sont informées" /> <span>Je confirme que les personnes de ce serveur <strong>sont informées</strong> et que le cadre juridique est validé (le cadre de traitement des données). Cette fiche est visible de tous ceux qui sont dans le salon vocal.</span></label>
           {/if}
           <span class="muted small">Seules les personnes dont le nom est affiché sur la carte ont une fiche. Jamais un message, jamais un salon.</span>
         </fieldset>
@@ -513,6 +549,8 @@
       {/if}
     </section>
 
+    {/if}
+    {#if section === 'performance'}
     <section class="panel card wide" aria-label="Performance">
       <header><h2 class="eyebrow">Performance</h2>{#if perf}<span class="badge" class:accent={perf.settings.preset !== 'full'}>{PRESET_NAMES[perf.settings.preset]}</span>{/if}</header>
       <p class="muted small">Limitez ce que le bot et l’IA prennent de la machine, <strong>au prix de leur vitesse</strong>. Rien n’est perdu : l’IA est plus lente, les messages du bot apparaissent un peu plus tard sur la carte.</p>
@@ -525,7 +563,7 @@
           {/each}
         </div>
 
-        <div class="knobs">
+        <details bind:open={performanceOpen}><summary>Réglages personnalisés</summary>        <div class="knobs">
           <label class="knob">
             <span class="knobHead"><span>IA : part du temps où elle travaille</span><output>{form.ai_max_load} %</output></span>
             <input type="range" min="10" max="100" step="5" bind:value={form.ai_max_load} oninput={edited} aria-label="Part du temps où l’IA travaille" />
@@ -555,6 +593,7 @@
           </label>
         </div>
 
+        </details>
         <div class="actions">
           <button type="button" class="btn btn-primary" onclick={savePerf} disabled={!changed}>Enregistrer</button>
           {#if changed}<button type="button" class="btn" onclick={() => { form = { ...perf.settings }; saved = ''; }}>Annuler</button>{/if}
@@ -585,7 +624,7 @@
                 <button type="button" class="btn" onclick={equalShares}>Répartir également</button>
                 <button type="button" class="btn" disabled={!sharesChanged} onclick={saveShares}>Enregistrer la répartition</button>
               </div>
-              <p class="muted small">Les parts s’ajustent après chaque salve selon les performances. Un ordinateur à 0 % reste en réserve.</p>
+              <p class="muted small">Les parts s’ajustent après chaque étape selon les performances. Un ordinateur à 0 % reste en réserve.</p>
             {/if}
           {:else}<p class="muted small">Le serveur travaille seul pour le moment.</p>{/if}
           <div class="actions">
@@ -600,6 +639,8 @@
       {/if}
     </section>
 
+    {/if}
+    {#if section === 'maintenance'}
     <section class="panel card wide" aria-label="Résultats de l’analyse">
       <header><h2 class="eyebrow">Résultats de l’analyse</h2></header>
       <p class="muted small">Supprime ce que l’analyse a déduit du serveur affiché sur la carte. Les messages et les liens de la carte ne sont jamais touchés ; l’analyse peut les refaire.</p>
@@ -635,16 +676,20 @@
       {/if}
     </section>
 
+    {/if}
     <p class="muted small footnote">Dindon {info.version} · fichiers illisibles dans <code>inbox/failed</code> : {info.inbox.failed}</p>
   {/if}
 </div>
 
 <style>
+  .systemTabs { display: flex; flex-wrap: wrap; gap: .375rem; position: sticky; top: 0; z-index: 3; background: var(--bg-primary); padding-block: .5rem; }
+  .systemTabs .active { border-color: var(--accent); background: var(--bg-active); }
+  .ack.missing { border-color: var(--danger); }
   .page {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 1.5rem 1.75rem 2.5rem;
+    padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 2.5rem;
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
@@ -665,11 +710,6 @@
     color: var(--text-primary);
   }
 
-  .subtitle {
-    max-width: 62ch;
-    margin-top: 0.5rem;
-    color: var(--text-secondary);
-  }
 
   .checks {
     padding: 1rem 1.25rem;
@@ -717,6 +757,7 @@
   }
 
   .grid {
+    align-items: start;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
     gap: 1rem;
@@ -803,7 +844,7 @@
   .check { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8125rem; color: var(--text-secondary); }
   .check input { margin-top: 0.25rem; }
   .check strong { color: var(--text-primary); }
-  .ack { padding: 0.5rem 0.625rem; border: 1px solid #ed4245; border-radius: var(--radius-md); }
+  .ack { padding: 0.5rem 0.625rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
   .hours { display: flex; align-items: center; gap: 0.5rem; }
   .status { display: flex; flex-direction: column; }
   .status div { display: flex; gap: 1rem; padding: 0.375rem 0; border-top: 1px solid var(--border-subtle); font-size: 0.8125rem; }

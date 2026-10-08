@@ -53,7 +53,7 @@
   }
 
   function choose(person) {
-    chosen = { user_id: person.user_id, name: person.name };
+    chosen = { user_id: person.user_id, name: person.name, registered: person.registered };
     confirming = '';
     notice = '';
   }
@@ -77,6 +77,7 @@
       confirming = '';
       if (action === 'erase') chosen = null;
       await load();
+      if (chosen) chosen = { ...chosen, registered: info.subjects.some((s) => s.user_id === chosen.user_id) };
       if (searched) found = await api.privacyFind(query.trim());
     } catch (error) {
       fail(error);
@@ -91,10 +92,7 @@
 <div class="page">
   <header>
     <h1>Vie privée</h1>
-    <p class="subtitle">
-      Les personnes qui ont demandé à ne plus être enregistrées, et ce que vous pouvez faire pour elles. Une personne s’arrête et s’efface seule depuis Discord avec
-      <code>/dindon stop</code> ; ici vous traitez une demande reçue autrement. Le cadre (ce que cela couvre et ne couvre pas) est dans <code>docs/regles-du-bot.md</code>.
-    </p>
+    <p class="subtitle">Arrêter la collecte, remettre une copie des données ou traiter une demande d’effacement.</p>
   </header>
 
   {#if problem}<p class="banner" role="alert">{problem}</p>{/if}
@@ -128,20 +126,20 @@
 
       {#if chosen}
         <div class="chosen" role="group" aria-label="Actions pour {chosen.name}">
-          <p><strong>{chosen.name}</strong> <code>{chosen.user_id}</code></p>
+          <p><strong>{chosen.name}</strong> <span class="badge small">{chosen.registered ? 'Collecte arrêtée' : 'Collecte autorisée'}</span></p>
           <div class="actions">
-            <button class="btn" type="button" disabled={busy} onclick={() => act('stop')}>Ne plus enregistrer</button>
+            {#if !chosen.registered}<button class="btn" type="button" disabled={busy} onclick={() => act('stop')}>Ne plus enregistrer</button>{/if}
             <button class="btn btn-danger" type="button" disabled={busy} onclick={() => act('erase')}>
               {confirming === 'erase' ? 'Confirmer : effacer pour toujours' : 'Ne plus enregistrer et effacer'}
             </button>
             <a class="btn" href="/api/privacy/export/{chosen.user_id}" download>Copie de ses données</a>
-            <button class="btn" type="button" disabled={busy} onclick={() => act('release')}>Enregistrer de nouveau</button>
+            {#if chosen.registered}<button class="btn" type="button" disabled={busy} onclick={() => act('release')}>Enregistrer de nouveau</button>{/if}
             {#if confirming === 'erase'}<button class="btn" type="button" onclick={() => (confirming = '')}>Annuler</button>{/if}
           </div>
-          <p class="hint">
+          <details><summary>Ce que l’effacement couvre</summary><p class="hint">
             « Effacer » supprime ses messages, réactions, mentions, noms, ce qui en a été tiré (conversations, vecteurs) et ses traces dans les fichiers déposés ou archivés.
             Les sauvegardes de la base disparaissent d’elles-mêmes sous 14 jours. Ce que d’autres ont écrit à son sujet reste (c’est leur message).
-          </p>
+          </p></details>
         </div>
       {/if}
     </section>
@@ -181,14 +179,14 @@
         {#if info.retention_days > 0}
           Les messages de plus de <strong>{info.retention_days} jours</strong> sont supprimés chaque jour.
         {:else}
-          <strong>Aucune limite</strong> : rien n’est supprimé avec le temps. Pour en fixer une : <code>DINDON_RETENTION_DAYS</code> dans <code>.env</code>.
+          <strong>Aucune limite</strong> : aucune suppression automatique liée à l’âge des messages.
         {/if}
       </p>
       <p>
         {#if info.erase_on_removal}
           Si le bot est <strong>retiré d’un serveur</strong>, tout ce qui le concerne est <strong>supprimé aussitôt</strong>.
         {:else}
-          Si le bot est retiré d’un serveur, ses données <strong>restent</strong>. Pour tout supprimer dans ce cas : <code>DINDON_ERASE_ON_REMOVAL=true</code> dans <code>.env</code>.
+          Si le bot est retiré d’un serveur, ses données <strong>restent conservées</strong>.
         {/if}
       </p>
     </section>
@@ -205,16 +203,10 @@
         </div>
       {/if}
       {#if info.log.length}
-        <ul class="rows">
-          {#each entries as entry (entry.id)}
-            <li>
-              <span class="muted small">{when(entry.at)}</span>
-              <span class="name">{ACTIONS[entry.action] ?? entry.action}</span>
-              {#if entry.user_id}<code>{entry.user_id}</code>{/if}
-              <span class="muted small">{SOURCES[entry.source] ?? entry.source}</span>
-            </li>
-          {/each}
-        </ul>
+        <div class="logTable"><table><thead><tr><th>Date</th><th>Action</th><th>Personne</th><th>Origine</th></tr></thead><tbody>
+          {#each entries as entry (entry.id)}<tr><td>{when(entry.at)}</td><td>{ACTIONS[entry.action] ?? entry.action}</td><td>{info.subjects.find((s) => s.user_id === entry.user_id)?.name || entry.user_id || '—'}</td><td>{SOURCES[entry.source] ?? entry.source}</td></tr>{/each}
+        </tbody></table></div>
+
       {:else}
         <p class="muted">Rien pour l’instant. Le journal ne garde que des nombres et des identifiants, jamais un message.</p>
       {/if}
@@ -225,7 +217,11 @@
 </div>
 
 <style>
-  .page { flex: 1; min-height: 0; overflow-y: auto; padding: 1.5rem 1.75rem 2.5rem; display: flex; flex-direction: column; gap: 1.25rem; animation: fadeIn var(--transition-slow) both; }
+  .logTable { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; text-align: left; font-size: .8125rem; }
+  th, td { padding: .625rem; border-bottom: 1px solid var(--border-subtle); }
+  th { color: var(--text-secondary); }
+  .page { flex: 1; min-height: 0; overflow-y: auto; padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 2.5rem; display: flex; flex-direction: column; gap: 1.25rem; animation: fadeIn var(--transition-slow) both; }
   h1 { font-size: clamp(1.5rem, 2vw, 1.9rem); line-height: 1.1; font-weight: 700; color: var(--text-primary); }
   .subtitle { max-width: 68ch; margin-top: 0.5rem; color: var(--text-secondary); }
   .card { padding: 1rem 1.125rem; display: flex; flex-direction: column; gap: 0.75rem; box-shadow: var(--shadow-sm); }

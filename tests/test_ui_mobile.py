@@ -31,6 +31,7 @@ def test_on_a_phone_the_pages_are_at_the_bottom_and_the_map_has_buttons_for_a_fi
             assert button.is_visible() and button.bounding_box()["width"] >= 44
         page.get_by_role("button", name="Zoomer", exact=True).click()
         page.locator(".tabBar button", has_text="Système").click()
+        page.get_by_role("button", name="Discord", exact=True).click()
         page.wait_for_selector("text=Fiche sur Discord")
         page.locator(".tabBar button", has_text="Carte").click()
         page.screenshot(path=str(tmp_path / "phone.png"))

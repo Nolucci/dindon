@@ -63,11 +63,13 @@ def test_the_window_gives_the_link_and_says_which_servers_are_followed(base, wor
         page.get_by_role("button", name="Inviter le bot").click()
         dialog = page.locator("[role=dialog]")
         dialog.wait_for()
-        link = dialog.get_by_role("link", name="Ouvrir Discord")
+        link = dialog.get_by_role("link", name="Ajouter à un serveur Discord")
         link.wait_for()
         href = link.get_attribute("href")
         assert href.startswith("https://discord.com/oauth2/authorize?") and "client_id=424242424242424242" in href and "scope=bot" in href
         assert link.get_attribute("target") == "_blank" and "noopener" in link.get_attribute("rel")      # it opens Discord elsewhere, cut off from the page
+        dialog.get_by_text("Afficher le lien d’invitation", exact=True).click()
+        dialog.get_by_text("Permissions demandées", exact=True).click()
         assert dialog.get_by_label("Lien d’invitation").input_value() == href
         assert "Voir les salons" in dialog.inner_text() and "Lire l’historique des messages" in dialog.inner_text()
 
@@ -75,7 +77,7 @@ def test_the_window_gives_the_link_and_says_which_servers_are_followed(base, wor
         assert set(rows) == {world.name, "Un autre serveur"}
         assert "non suivi" not in rows[world.name] and "suivi" in rows[world.name]
         assert "non suivi" in rows["Un autre serveur"]
-        assert "DINDON_GUILD_IDS" in dialog.inner_text()                                                   # and how to follow the other one
+        assert "serveurs suivis" in dialog.inner_text()                                                   # and how to follow the other one
         if os.environ.get("DINDON_SHOTS"):
             Path(os.environ["DINDON_SHOTS"]).mkdir(parents=True, exist_ok=True)
             page.screenshot(path=str(Path(os.environ["DINDON_SHOTS"]) / "invite.png"))

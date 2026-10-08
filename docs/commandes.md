@@ -42,6 +42,19 @@ docker compose exec app dindon analyze --stage claims --limit 40
 docker compose exec bot dindon debate-report
 ```
 
+## Relecture des positions
+
+La relecture est **à part de l'analyse** (page Analyse, onglet « Relecture ») : elle ne tourne jamais en même temps qu'elle, et c'est le propriétaire qui la lance, quand il le veut. Elle relit chaque position de chaque personne avec les messages qui la précèdent (huit à dix messages avant la preuve, tout ce qui se trouve entre les preuves, et le message auquel la personne répond ; les auteurs y sont anonymes, jamais un nom), et demande au modèle, sans lui dire ce que l'analyse avait conclu :
+
+- si la personne exprime **sa propre opinion** (pas une citation, une ironie, une question, un fait sans avis) ;
+- quelle est sa **position** vis-à-vis de la proposition (accord, désaccord, nuance), en lisant les négations et le sens d'une réponse contre ce qui précède ;
+- si la **proposition** est bien la thèse défendue ou combattue (sinon, la thèse exacte) ;
+- quel **thème** convient le mieux, parmi le sien et les plus proches.
+
+Le code ne fait pas confiance au modèle : rien ne change sous une certitude de 70 ; une position qu'une personne a confirmée ou rejetée n'est jamais relue ; chaque correction garde ce qu'elle était (`claim_rereads`, `claims.stance_before`) et s'annule d'un clic ; une proposition nouvelle est rapprochée des existantes par son vecteur avant d'être créée, puis seulement *proposée* et reliée aux axes. Après la relecture, les scores des personnes sont recalculés puis **contrôlés** : chacun est recalculé à part, hors de la fonction SQL, et comparé (`audit_scores`) ; un écart est signalé, et les scores sont recalculés.
+
+Ce qui a déjà été relu avec la méthode actuelle n'est pas relu, sauf si l'on coche « relire aussi ce que la méthode actuelle a déjà relu » ; quand la méthode change (`reread.VERSION`), tout redevient à relire. Le modèle est `DINDON_REREAD_MODEL` (par défaut le modèle de nommage) : un modèle plus fort vaut la peine, la relecture étant rare. Mesure : `python tools/measure_reread.py --model qwen3:14b` sur `tools/reread_reference.json` (17 positions inventées : avec `qwen3:14b`, les 4 positions justes sont laissées telles quelles et 10 des 13 fausses sont corrigées ; avec `qwen3:8b`, 8 sur 13).
+
 Un import filtré par personne ou période est partiel : il ne remplace pas le premier import complet nécessaire au suivi automatique.
 
 ## Variables principales de `.env`

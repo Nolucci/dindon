@@ -184,6 +184,7 @@ def test_the_map_keeps_its_search_and_filters(base):
         page.fill("input[type=search]", "bo")
         page.wait_for_selector(".search li button")
         assert "Bobby" in page.locator(".search li button").first.inner_text()
+        page.get_by_role("button", name="Filtres", exact=True).click()
         assert page.get_by_role("button", name="Réponses").count() == 1 and page.get_by_role("group", name="Période").count() == 1
         browser.close()
 
@@ -200,7 +201,8 @@ def test_bulk_topic_review_and_contradiction_evidence(base, ingest_db):
 
         page.get_by_role("button", name="Contradictions", exact=True).click()
         page.get_by_role("button", name="Voir les citations").first.click()
-        expect(page.get_by_role("complementary", name="Fiche de la personne")).to_be_visible()
+        expect(page.locator(".said").first).to_be_visible()
+        assert page.get_by_role("complementary", name="Fiche de la personne").count() == 0
         page.get_by_role("button", name="Analyse", exact=True).click()
         expect(page.get_by_role("heading", name="Contradictions", exact=True)).to_be_visible()
         browser.close()
@@ -216,6 +218,7 @@ def test_a_person_reviews_the_axes_that_the_ai_proposed_for_a_proposition(base, 
         page.get_by_label("Chercher une proposition ou une personne").fill("Taxer les très hauts revenus")
         expect(page.locator(".prop")).to_have_count(1)
         page.locator(".prop .row").click()
+        page.get_by_text("Réviser la proposition et ses axes", exact=True).click()
         links = page.get_by_role("region", name="Axes de cette proposition")
         links.wait_for()
         assert "Propriété des moyens de production" in links.inner_text() and "proposé par l’IA" in links.inner_text()
@@ -232,6 +235,8 @@ def test_a_person_reviews_the_axes_that_the_ai_proposed_for_a_proposition(base, 
         links.get_by_role("button", name="Retirer").first.click()
         expect(links.locator(".link")).to_have_count(1)
         assert ingest_db.execute("SELECT count(*) FROM proposition_axis pa JOIN propositions p ON p.id = pa.proposition_id WHERE p.text = 'Taxer les très hauts revenus'").fetchone() == (1,)
+        page.locator(".embedded").get_by_text("Analyse et réglages", exact=True).click()
+        page.get_by_text("Options de lecture", exact=True).click()
         page.get_by_label("Ne compter dans les scores que les liens validés").check()
         for _ in range(30):                                                                  # (the request is on its way)
             if ingest_db.execute("SELECT value FROM scoring_settings WHERE key = 'only_validated_loadings'").fetchone()[0] == 1:

@@ -14,6 +14,8 @@ from dindon.analysis.job import AnalysisJobs
 from dindon.analysis import helpers
 from dindon.api.activity import router as activity_router
 from dindon.api.analysis import router as analysis_router
+from dindon.api.reread import router as reread_router
+from dindon.analysis.reread import RereadJobs
 from dindon.api.auth import COOKIE, LIFETIME, Auth, require_session
 from dindon.api.debates import router as debates_router
 from dindon.api.automation import router as automation_router
@@ -175,9 +177,10 @@ def create_app(settings: Settings | None = None, background: bool = True) -> Fas
     app.state.settings, app.state.auth, app.state.pool, app.state.hub, app.state.collector = settings, auth, pool, hub, None
     app.state.imports = ImportJobs(settings)
     app.state.analysis = AnalysisJobs(settings)
+    app.state.reread = RereadJobs(settings, app.state.analysis)
 
     _add_security_headers(app)
-    for api_router in (_health_router(settings), _session_router(auth), _live_router(hub), router, imports_router, invite_router, analysis_router, system_router,
+    for api_router in (_health_router(settings), _session_router(auth), _live_router(hub), router, imports_router, invite_router, analysis_router, reread_router, system_router,
                        privacy_router, positions_router, performance_router, automation_router, debates_router, discord_map_router, discord_card_router, activity_router):
         app.include_router(api_router)
     _mount_interface(app, settings)

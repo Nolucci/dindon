@@ -38,7 +38,7 @@ def _evidence(conn, claim_ids: list[int]) -> dict[int, list[dict]]:
 @router.get("")
 def overview(request: Request, guild: int | None = None, limit: int = Query(250, ge=1, le=500), q: str = Query("", max_length=100),
              theme: int | None = None, sort: str = Query("people", pattern="^(people|divided|recent)$"), stance: str = Query("", pattern="^(|for|against|nuanced)$"),
-             rejected: bool = False) -> dict:
+             rejected: bool = False, offset: int = Query(0, ge=0, le=1000000)) -> dict:
     """How much was read, and the propositions with how many people are for, nuanced, against.
 
     Filters: `q` (words of the proposition, or the name of a person who takes a position on it), `theme`, `stance` (only the propositions where somebody is
@@ -64,7 +64,7 @@ def overview(request: Request, guild: int | None = None, limit: int = Query(250,
                FROM current_stances s JOIN propositions p ON p.id = s.proposition_id
                LEFT JOIN LATERAL (
                    SELECT COALESCE(t.merged_into, t.id) AS topic_id FROM claims c
-                   JOIN topic_assignments a ON a.conversation_id = c.conversation_id JOIN topics t ON t.id = a.topic_id
+                   JOIN claim_themes a ON a.claim_id = c.id JOIN topics t ON t.id = a.topic_id
                    WHERE c.proposition_id = p.id GROUP BY 1 ORDER BY count(*) DESC, 1 LIMIT 1) th ON true
                LEFT JOIN topics tt ON tt.id = th.topic_id
                WHERE s.guild_id = %(guild)s AND p.status <> 'merged' AND (p.status <> 'rejected' OR %(rejected)s)
@@ -94,7 +94,7 @@ def overview(request: Request, guild: int | None = None, limit: int = Query(250,
            "divided": lambda r: (-(min(r["pour"], r["contre"]) * 2 + r["nuance"]), -r["people"], r["id"]),
            "recent": lambda r: (-r["last_at"].timestamp(), r["id"])}[sort]
     kept.sort(key=key)
-    props = kept[:limit]
+    props = kept[offset:offset + limit]
     with request.app.state.pool.connection() as conn:
         catalog = [{"code": r["code"], "name": r["name"], "negative_pole": r["negative_pole"], "positive_pole": r["positive_pole"]}
                    for r in conn.execute("SELECT code, name, negative_pole, positive_pole FROM axes WHERE is_active ORDER BY position").fetchall()]
@@ -102,7 +102,7 @@ def overview(request: Request, guild: int | None = None, limit: int = Query(250,
                                 JOIN axes a ON a.id = pa.axis_id AND a.is_active
                                 WHERE pa.proposition_id IN (SELECT proposition_id FROM claims WHERE guild_id = %s AND proposition_id IS NOT NULL)""", (guild_id,)).fetchone()
         only = conn.execute("SELECT value FROM scoring_settings WHERE key = 'only_validated_loadings'").fetchone()
-    return {"guild": str(guild_id), "prompt_version": PROMPT_VERSION, "matching": len(kept), "axes_catalog": catalog,
+    return {"guild": str(guild_id), "prompt_version": PROMPT_VERSION, "matching": len(kept), "offset": offset, "limit": limit, "axes_catalog": catalog,
             "axes_links": {"total": links["total"], "validated": links["validated"], "only_validated": bool(only and only["value"])},
             "themes": sorted(themes_all.values(), key=lambda t: -t["propositions"]),
             "conversations": {"kept": done["kept"], "read": done["read"]},
@@ -226,11 +226,14 @@ def proposition(request: Request, proposition_id: int, guild: int | None = None)
 
 
 def _theme_of_claim():
-    """SQL: the theme (a merged theme counts for the one it joined) of the conversation that a claim was read in."""
+    """SQL: the theme of a claim (a merged theme counts for the one it joined): the one a reread gave it, else the one of the conversation that it was read in."""
     return """LEFT JOIN LATERAL (
-                   SELECT COALESCE(t.merged_into, t.id) AS topic_id FROM topic_assignments a JOIN topics t ON t.id = a.topic_id
-                   WHERE a.conversation_id = cl.conversation_id AND t.status <> 'rejected'
-                   ORDER BY a.run_id DESC LIMIT 1) th ON true
+                   SELECT COALESCE(t.merged_into, t.id) AS topic_id FROM (
+                       SELECT ct.topic_id, 0 AS first, 0 AS run FROM claim_topics ct WHERE ct.claim_id = cl.id
+                       UNION ALL
+                       SELECT a.topic_id, 1, -a.run_id FROM topic_assignments a WHERE a.conversation_id = cl.conversation_id) src
+                   JOIN topics t ON t.id = src.topic_id AND t.status <> 'rejected'
+                   ORDER BY src.first, src.run LIMIT 1) th ON true
                LEFT JOIN topics tt ON tt.id = th.topic_id"""
 
 

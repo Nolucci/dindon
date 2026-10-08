@@ -11,8 +11,10 @@
   let read = $state(null);
   let openAxis = $state(null);
   let openTheme = $state(null);
+  let tab = $state('activity');
   $effect(() => {
     const id = card?.id;
+    tab = 'activity';
     read = null;
     openAxis = null;
     openTheme = null;
@@ -47,16 +49,22 @@
       {#if others.length}<p class="muted small">Vu aussi sous : {others.join(', ')}</p>{/if}
       <div class="facts">
         {#each card.claimed_roles.slice(0, 3) as role (role.role)}<span class="fact role" title={role.ideology}>{role.role}</span>{/each}
-        <span class="fact">{fmt.format(card.activity.messages)} messages</span>
+        <span class="fact">{fmt.format(card.activity.messages)} message{card.activity.messages > 1 ? 's' : ''}</span>
         <span class="fact">{fmt.format(card.top_links.length ? card.top_links.reduce((n, l) => n + l.n, 0) : 0)} échanges</span>
         {#if card.activity.last_message_at}<span class="fact">vu le {day(card.activity.last_message_at)}</span>{/if}
       </div>
     </div>
 
+    <nav class="personTabs" aria-label="Sections de la fiche">
+      {#each [['activity', 'Activité'], ['positions', 'Positions'], ['roles', 'Rôles']] as [key, label]}
+        <button type="button" class:active={tab === key} aria-pressed={tab === key} onclick={() => tab = key}>{label}</button>
+      {/each}
+    </nav>
+    {#if tab === 'activity'}
     <section>
       <h3 class="eyebrow">Activité</h3>
       <dl>
-        <div class="metric"><dt>Messages</dt><dd>{fmt.format(card.activity.messages)}</dd></div>
+
         <div class="metric"><dt>Jours actifs</dt><dd>{fmt.format(card.activity.active_days)}</dd></div>
         <div class="metric"><dt>Par jour actif</dt><dd>{card.activity.messages_per_active_day}</dd></div>
         <div class="metric"><dt>Longueur moyenne</dt><dd>{card.activity.average_length}<span class="unit">&nbsp;car.</span></dd></div>
@@ -68,12 +76,15 @@
       <p class="muted small">Messages par mois</p>
     </section>
 
+    {/if}
+    {#if tab === 'positions'}
+      {#if !read}<p class="muted small">Chargement des positions…</p>{:else if !read.axes.some((a) => a.score !== null) && !read.themes.length}<p class="muted small">Aucune position étayée disponible.</p>{/if}
     {#if read && read.axes.some((a) => a.score !== null)}
       <section>
         <h3 class="eyebrow">Où elle se situe</h3>
-        <p class="muted small">Du pôle de gauche (rouge) au pôle de droite (vert). Le point est sa position lue par l’IA, le crochet dessous la marge d’incertitude (plus il est large, moins on en sait), le cadre ce qu’attend un rôle qu’elle s’est donné.</p>
+        <p class="muted small">Point : position estimée · Crochet : incertitude · Cadre : rôle déclaré.</p>
         <ul class="axes">
-          {#each read.axes as axis (axis.code)}
+          {#each read.axes.filter((a) => a.score !== null) as axis (axis.code)}
             {@const bad = axis.expected.find((e) => e.verdict === 'incompatible')}
             <li>
               <button type="button" class="axisHead" onclick={() => (openAxis = openAxis === axis.code ? null : axis.code)} aria-expanded={openAxis === axis.code} disabled={!axis.contributions.length}>
@@ -93,23 +104,6 @@
             </li>
           {/each}
         </ul>
-      </section>
-    {/if}
-
-    {#if read && read.roles.length}
-      <section>
-        <h3 class="eyebrow">Rôles qu’elle s’est donnés</h3>
-        <ul class="roles">
-          {#each read.roles as r}
-            <li>
-              <span class="roleName">{r.role}</span>
-              <span class="badge small" class:success={r.verdict === 'concordant'} class:danger={r.verdict === 'discordant'}>
-                {r.verdict === 'discordant' ? 'contradiction' : r.verdict === 'concordant' ? 'cohérent' : 'pas assez de propos'}
-              </span>
-            </li>
-          {/each}
-        </ul>
-        {#each read.role_conflicts as c}<p class="muted small">« {c.a} » et « {c.b} » s’excluent sur l’axe « {c.axis} ».</p>{/each}
       </section>
     {/if}
 
@@ -144,6 +138,8 @@
       </section>
     {/if}
 
+    {/if}
+    {#if tab === 'activity'}
     <section>
       <h3 class="eyebrow">Échanges</h3>
       <div class="tableShell">
@@ -185,17 +181,41 @@
       </section>
     {/if}
 
-    {#if card.claimed_roles.length}
+    {/if}
+    {#if tab === 'roles'}
+    {#if read && read.roles.length}
+      <section>
+        <h3 class="eyebrow">Rôles qu’elle s’est donnés</h3>
+        <ul class="roles">
+          {#each read.roles as r}
+            <li>
+              <span class="roleName">{r.role}</span>
+              <span class="badge small" class:success={r.verdict === 'concordant'} class:danger={r.verdict === 'discordant'}>
+                {r.verdict === 'discordant' ? 'contradiction' : r.verdict === 'concordant' ? 'cohérent' : 'pas assez de propos'}
+              </span>
+            </li>
+          {/each}
+        </ul>
+        {#each read.role_conflicts as c}<p class="muted small">« {c.a} » et « {c.b} » s’excluent sur l’axe « {c.axis} ».</p>{/each}
+      </section>
+    {/if}
+
+    {#if card.claimed_roles.length && !read?.roles.length}
       <section>
         <h3 class="eyebrow">Rôles que la personne s’est donnés</h3>
         <p class="tags">{#each card.claimed_roles as role}<span title={role.ideology}>{role.role}</span>{/each}</p>
         <p class="muted small">{card.claimed_roles_note}</p>
       </section>
     {/if}
+      {#if !card.claimed_roles.length && !read?.roles.length}<p class="muted small">Aucun rôle déclaré.</p>{/if}
+    {/if}
   {/if}
 </aside>
 
 <style>
+  .personTabs { display: flex; gap: .25rem; margin-top: 1rem; border-bottom: 1px solid var(--border-subtle); }
+  .personTabs button { flex: 1; padding: .625rem .25rem; color: var(--text-secondary); }
+  .personTabs button.active { color: var(--text-primary); border-bottom: 2px solid var(--accent); }
   .axes, .roles, .talked, .contrib { list-style: none; display: flex; flex-direction: column; gap: 0.625rem; margin-top: 0.5rem; }
   .axes > li { display: flex; flex-direction: column; gap: 0.25rem; }
   .axisHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.125rem 0.5rem; background: none; border: none; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -214,11 +234,11 @@
   .positions li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.375rem 0.5rem; }
   .propText { font-weight: 600; color: var(--text-primary); }
   .positions blockquote { flex-basis: 100%; margin: 0; padding: 0.25rem 0.625rem; border-left: 3px solid var(--border-subtle); color: var(--text-secondary); font-size: 0.8125rem; line-height: 1.45; }
-  .hero { margin: -1.25rem -1.125rem 0; height: 4.5rem; background: linear-gradient(135deg, color-mix(in srgb, var(--tint) 70%, #000), color-mix(in srgb, var(--tint) 25%, var(--bg-secondary))); }
+  .hero { display: flow-root; margin: -1.25rem -1.125rem 0; height: 4.5rem; background: linear-gradient(135deg, color-mix(in srgb, var(--tint) 70%, #000), color-mix(in srgb, var(--tint) 25%, var(--bg-secondary))); }
   .portrait { position: relative; display: block; width: 4.75rem; height: 4.75rem; margin: 2.25rem 0 0 0.25rem; border: 4px solid var(--bg-secondary); border-radius: 50%; overflow: hidden; background: var(--tint); box-shadow: 0 0 0 2px var(--tint), var(--shadow-md); }
   .portrait img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
   .initial { display: grid; place-items: center; width: 100%; height: 100%; font-size: 1.75rem; font-weight: 700; color: #fff; }
-  .identity { padding-top: 0.5rem; }
+  .identity { padding-top: 2.75rem; }
   .identity h2 { margin: 0.125rem 0 0.25rem; }
   .facts { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-top: 0.625rem; }
   .fact { padding: 0.1875rem 0.5rem; border-radius: 999px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); color: var(--text-secondary); font-size: 0.6875rem; font-weight: 600; }
@@ -280,8 +300,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 1.75rem;
-    height: 1.75rem;
+    width: 2.75rem;
+    height: 2.75rem;
     color: var(--text-muted);
     border-radius: var(--radius-sm);
     transition: color var(--transition-fast), background var(--transition-fast);
@@ -399,8 +419,8 @@
   th {
     font-size: 0.6875rem;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    text-transform: none;
+    letter-spacing: normal;
     color: var(--text-muted);
     padding: 0.5rem 0.75rem;
     text-align: right;

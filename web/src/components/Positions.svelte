@@ -1,5 +1,6 @@
 <script>
-  import { onDestroy } from 'svelte';
+  import ExportMenu from './ExportMenu.svelte';
+  import { onDestroy, untrack } from 'svelte';
   import { api, makeGuard } from '../lib/api.js';
   import { day } from '../lib/format.js';
   import { matches, slash } from '../lib/text.js';
@@ -15,10 +16,10 @@
   let info = $state(null);        // /api/analysis (ready, job)
   let opened = $state(null);      // { id, loading, people }
   let problem = $state('');
-  // The choice of the batches ("salves") is kept in this browser, so that a reload does not undo it
+  // The choice of the batches (« étapes ») is kept in this browser, so that a reload does not undo it
   const SALVO_KEY = 'dindon.salvo';
   const saved = (() => { try { return JSON.parse(localStorage.getItem(SALVO_KEY) ?? '{}') ?? {}; } catch { return {}; } })();
-  let perBatch = $state(saved.perBatch ?? 40);         // conversations read in each batch ("salve")
+  let perBatch = $state(saved.perBatch ?? 40);         // conversations read in each batch ("étape")
   let batches = $state(saved.batches ?? 1);            // how many batches
   let untilEnd = $state(saved.untilEnd === true);      // keep going until nothing is left to read
   $effect(() => {
@@ -26,6 +27,8 @@
     try { localStorage.setItem(SALVO_KEY, value); } catch { /* storage refused: the choice is only kept until the reload */ }
   });
   let busy = $state(false);
+  let controlsOpen = $state(false);
+  $effect(() => { if (running) controlsOpen = true; });
   let poll = null;
 
   // Search and filters: asked of the server (it knows the names of the people who take each position)
@@ -38,6 +41,10 @@
   let themes = $state([]);           // for the menu: all the themes, whatever the filter
   const filtering = $derived(q.trim() !== '' || themeFilter !== '' || stanceFilter !== '');
   let timer = null;
+  let offset = $state(0);
+  const pageSize = 50;
+  let listLoading = $state(false);
+  let listRequest = 0;
   let newAxis = $state('');          // adding a link to an axis
   let newPole = $state('1');
   let newStrength = $state('1');
@@ -53,11 +60,15 @@
 
   const guard = makeGuard(() => onAuthLost(), (message) => (problem = message));
 
-  const filters = () => ({ q: q.trim() || undefined, theme: themeFilter || undefined, stance: stanceFilter || undefined, sort,
+  const filters = () => ({ offset, limit: pageSize, q: q.trim() || undefined, theme: themeFilter || undefined, stance: stanceFilter || undefined, sort,
     rejected: showRejected ? 'true' : undefined });
 
   async function load() {
+    const server = guild;
+    const current = ++listRequest;
     const [d, i] = await Promise.all([guard(() => api.positions(guild, filters())), guard(() => api.analysis(guild))]);
+    if (server !== guild || current !== listRequest) return null;
+    listLoading = false;
     if (d) {
       data = d;
       if (!filtering) themes = d.themes;
@@ -84,8 +95,10 @@
   $effect(() => {
     if (!guild) return;
     opened = null;
+    offset = 0;
+    data = null;
     (async () => {
-      await load();
+      await untrack(load);
       if (running) startPolling();
     })();
   });
@@ -95,15 +108,28 @@
   });
 
   // The list follows what is typed, a moment after the last key
+  async function loadList() {
+    const current = ++listRequest;
+    const server = guild;
+    listLoading = true;
+    const d = await guard(() => api.positions(server, filters()));
+    if (current !== listRequest || server !== guild) return;
+    listLoading = false;
+    if (d) {
+      data = d;
+      if (!d.propositions.some((p) => p.id === opened?.id)) opened = null;
+    }
+  }
   function changed() {
+    offset = 0;
     clearTimeout(timer);
-    timer = setTimeout(async () => {
-      const d = await guard(() => api.positions(guild, filters()));
-      if (d) {
-        data = d;
-        if (!d.propositions.some((p) => p.id === opened?.id)) opened = null;      // a proposition that was opened in the meantime stays open
-      }
-    }, 250);
+    timer = setTimeout(loadList, 250);
+  }
+  async function changePage(next) {
+    offset = next;
+    opened = null;
+    await loadList();
+    document.getElementById('positions-results')?.scrollIntoView({ block: 'start' });
   }
 
   function reset() {
@@ -150,7 +176,7 @@
       g.items.push(p);
       g.people += p.people;
     }
-    return [...by.values()].sort((a, b) => b.people - a.people);
+    return [...by.values()];
   });
 
   // The axes that a proposition moves someone on: the model proposes them, a person validates, corrects or removes them
@@ -217,66 +243,12 @@
   {#if !guild}
     <section class="panel card"><p class="muted">Aucun serveur n’est encore importé.</p></section>
   {:else}
-    <section class="panel card" aria-label="Lecture">
-      <div class="head">
-        <span class="eyebrow">Lecture</span>
-        {#if !info}<span class="muted">Chargement…</span>
-        {:else if !ready.ollama}<span class="badge danger">Ollama ne répond pas</span>
-        {:else if missing.length}<span class="badge danger">Modèle à installer</span>
-        {:else}<span class="badge success">Ollama prêt</span>{/if}
-      </div>
-      {#if info && !ready.ollama}<p class="banner">Ollama n’est pas joignable : {ready.problem}</p>{/if}
-      {#if info && ready.ollama && missing.length}<p class="banner">Il manque : {#each missing as name}<code>ollama pull {name}</code> {/each}</p>{/if}
-
-      {#if data}
-        <dl class="counts">
-          <div class="metric"><dt>Conversations lues</dt><dd>{fmt.format(data.conversations.read)} <span class="unit">/ {fmt.format(data.conversations.kept)}</span></dd></div>
-          <div class="metric"><dt>Personnes</dt><dd>{fmt.format(data.claims.people)}</dd></div>
-          <div class="metric"><dt>Positions retenues</dt><dd>{fmt.format(data.claims.positions)}</dd></div>
-          <div class="metric"><dt>Propositions</dt><dd>{fmt.format(data.propositions_total)}</dd></div>
-        </dl>
-        <div class="actions">
-          {#if running}
-            <button class="btn btn-danger" onclick={cancel} disabled={job.state === 'cancelling'}>Arrêter la lecture</button>
-          {:else}
-            <button class="btn btn-primary" onclick={start} disabled={!canStart || busy}>Lire les positions</button>
-          {/if}
-          <button type="button" class="btn" onclick={onAutomate}>Automatiser les prochaines lectures</button>
-          <a class="btn" href={api.digestUrl(guild, 'md', 'positions')} download>Exporter les positions (.md)</a>
-          <a class="btn" href={api.digestUrl(guild, 'json', 'positions')} download>JSON</a>
-        </div>
-        <p class="muted hint">{fmt.format(remaining)} conversation{remaining > 1 ? 's' : ''} restante{remaining > 1 ? 's' : ''}. Les conversations déjà lues ne sont pas relues.</p>
-        <details class="advanced"><summary>Options de lecture</summary>
-          <label class="inline">Conversations par salve
-            <input class="field-input num" type="number" min="1" max="100000" step="1" bind:value={perBatch} aria-label="Nombre de conversations lues par salve" />
-          </label>
-          <label class="inline">Nombre de salves
-            <input class="field-input num" type="number" min="1" max="10000" step="1" bind:value={batches} disabled={untilEnd} aria-label="Nombre de salves" />
-          </label>
-          <label class="check"><input type="checkbox" bind:checked={untilEnd} /> <span>Continuer jusqu’à la fin ({fmt.format(remaining)} restantes)</span></label>
-          <p class="muted hint">Après chaque salve, les positions sont vérifiées et reliées aux axes : les contradictions apparaissent au fur et à mesure.
-            {untilEnd ? 'Toutes les conversations restantes seront lues.' : `Jusqu’à ${fmt.format(Math.max(1, Math.floor(Number(perBatch)) || 1) * Math.max(1, Math.floor(Number(batches)) || 1))} conversations.`}</p>
-          <p class="muted hint">Environ 15 s par conversation. {fmt.format(data.claims.refused)} position{data.claims.refused > 1 ? 's' : ''} refusée{data.claims.refused > 1 ? 's' : ''} faute de preuve. Modèle : <code>{info?.models.naming}</code>. Les ordinateurs d’analyse ajoutés dans Système peuvent recevoir le texte nécessaire au calcul.</p>
-        </details>
-        {#if job && job.state !== 'idle'}
-          <div class="progress" aria-live="polite">
-            <span class="badge" class:success={job.state === 'done'} class:danger={job.state === 'failed'} class:accent={running}>{STATES[job.state]}</span>
-            {#if running && job.round && (job.rounds !== 1)}<span class="muted">salve {job.round}{job.rounds ? ` / ${job.rounds}` : ''}</span>{/if}
-            {#if running && job.of}<progress max={job.of} value={job.done}></progress><span class="muted">{job.done} / {job.of}</span>{/if}
-            {#if job.error}<p class="banner" role="alert">{job.error}</p>{/if}
-            {#if job.lines.length}<details class="jobLog"><summary>Journal de lecture</summary><pre class="lines">{job.lines.join('\n')}</pre></details>{/if}
-          </div>
-        {/if}
-      {/if}
-    </section>
-
-    <section aria-label="Propositions">
-      <h2 class="eyebrow">Propositions <span class="count">{data?.propositions.length ?? 0}</span></h2>
+    <section id="positions-results" aria-label="Propositions" aria-busy={listLoading}>
       <div class="toolbar" role="search" aria-label="Chercher dans les propositions">
-        <input class="field-input" type="search" placeholder="Chercher une proposition ou une personne… (/)" bind:value={q} oninput={changed} aria-label="Chercher une proposition ou une personne" use:slash />
+        <input class="field-input" type="search" placeholder="Proposition ou personne…" bind:value={q} oninput={changed} aria-label="Chercher une proposition ou une personne" use:slash />
         <select class="select" bind:value={themeFilter} onchange={changed} aria-label="Filtrer par thème">
           <option value="">Tous les thèmes</option>
-          {#each themes as t (t.id ?? 0)}<option value={t.id ?? ''} disabled={t.id === null}>{t.label} ({t.propositions})</option>{/each}
+          {#each themes as t (t.id ?? 0)}<option value={t.id ?? '0'}>{t.label} ({t.propositions})</option>{/each}
         </select>
         <select class="select" bind:value={stanceFilter} onchange={changed} aria-label="Filtrer par position">
           <option value="">Toutes les positions</option>
@@ -290,19 +262,14 @@
           <option value="recent">Les plus récentes</option>
         </select>
         {#if filtering}<button type="button" class="tool-btn reset" onclick={reset}>Effacer les filtres</button>{/if}
-        <span class="found" aria-live="polite">{data?.matching ?? 0} proposition{(data?.matching ?? 0) > 1 ? 's' : ''}{filtering ? ` sur ${data?.propositions_total ?? 0}` : ''}</span>
+        <ExportMenu {guild} part="positions" />
+        <span class="found" aria-live="polite">{data ? fmt.format(data.matching) : '—'} proposition{(data?.matching ?? 0) > 1 ? 's' : ''}{filtering ? ` sur ${data?.propositions_total ?? 0}` : ''}</span>
       </div>
-      <label class="check"><input type="checkbox" bind:checked={showRejected} onchange={() => load()} /> Voir aussi les propositions écartées</label>
+      <label class="check"><input type="checkbox" bind:checked={showRejected} onchange={changed} /> Voir aussi les propositions écartées</label>
       {#if data && !data.propositions.length && filtering}
         <p class="muted empty">Aucune proposition ne correspond.</p>
       {:else if data && !data.propositions.length}
-        <p class="muted empty">Aucune position lue pour l’instant. Lancez la lecture (elle suppose que les conversations et leurs vecteurs ont été faits : page <strong>Thèmes</strong>).</p>
-      {/if}
-      {#if data?.axes_links?.total}
-        <label class="check" title="Les liens que personne n'a relus sont ignorés dans les scores des personnes">
-          <input type="checkbox" checked={data.axes_links.only_validated} onchange={(e) => onlyValidated(e.currentTarget.checked)} />
-          <span>Ne compter dans les scores que les liens validés ({data.axes_links.validated} sur {data.axes_links.total})</span>
-        </label>
+        <p class="muted empty">Aucune position pour l’instant. Ouvrez « Analyse et réglages » pour lancer une analyse.</p>
       {/if}
       {#each groups as group (group.key)}
         <h3 class="theme">{group.theme} <span class="count">{group.items.length} proposition{group.items.length > 1 ? 's' : ''} · {group.people} positions</span></h3>
@@ -319,8 +286,23 @@
               {#if opened?.id === p.id}
                 <div class="people">
                   {#if opened.loading}<p class="muted">Chargement…</p>{/if}
-                  {#if !opened.loading}
-                    <div class="review">
+                  {#if opened.people.length > 4}
+                    <input class="field-input" type="search" placeholder="Chercher une personne ou un rôle dans cette proposition" bind:value={personQ} aria-label="Chercher une personne dans cette proposition" />
+                  {/if}
+                  {#each opened.people.filter((w) => matches(personQ, w.label, w.roles.join(' '), w.evidence.map((e) => e.quote).join(' '))) as who (who.id)}
+                    <article class="person">
+                      <header>
+                        <strong>{who.label}</strong>
+                        <span class="badge small" class:success={who.stance === 1} class:danger={who.stance === -1}>{STANCE[who.stance][0]}</span>
+                        {#each who.roles as role}<span class="role">{role}</span>{/each}
+                        <details class="confidence"><summary>Estimation</summary><span class="muted small">Confiance estimée : {Math.round(who.confidence * 100)} %</span></details>
+                      </header>
+                      {#each who.evidence as e}
+                        <blockquote>« {e.quote} » <span class="muted small">— #{e.channel}, {dayOrNothing(e.at)}</span></blockquote>
+                      {/each}
+                    </article>
+                  {/each}
+                  {#if !opened.loading}<details class="reviewDetails"><summary>Réviser la proposition et ses axes</summary>                    <div class="review">
                       {#if p.status === 'rejected'}
                         <span class="badge small">Écartée des résultats et des scores</span>
                         <button type="button" class="btn" onclick={() => review(false)}>Rétablir</button>
@@ -329,7 +311,7 @@
                       {/if}
                     </div>
                     <section class="links" aria-label="Axes de cette proposition">
-                      <h4 class="eyebrow">Axes sur lesquels être d’accord avec cette proposition déplace quelqu’un</h4>
+                      <h4 class="eyebrow">Axes associés</h4>
                       {#each opened.axes as l (l.axis)}
                         <div class="link">
                           <span class="linkName">{l.name}</span>
@@ -362,37 +344,87 @@
                           <button type="button" class="btn btn-primary" onclick={validateLinks}>Valider ces liens</button>
                         {/if}
                       </div>
-                    </section>
-                  {/if}
-                  {#if opened.people.length > 4}
-                    <input class="field-input" type="search" placeholder="Chercher une personne ou un rôle dans cette proposition" bind:value={personQ} aria-label="Chercher une personne dans cette proposition" />
-                  {/if}
-                  {#each opened.people.filter((w) => matches(personQ, w.label, w.roles.join(' '), w.evidence.map((e) => e.quote).join(' '))) as who (who.id)}
-                    <article class="person">
-                      <header>
-                        <strong>{who.label}</strong>
-                        <span class="badge small" class:success={who.stance === 1} class:danger={who.stance === -1}>{STANCE[who.stance][0]}</span>
-                        {#each who.roles as role}<span class="role">{role}</span>{/each}
-                        <span class="muted small">confiance {Math.round(who.confidence * 100)} %</span>
-                      </header>
-                      {#each who.evidence as e}
-                        <blockquote>« {e.quote} » <span class="muted small">— #{e.channel}, {dayOrNothing(e.at)}</span></blockquote>
-                      {/each}
-                    </article>
-                  {/each}
+                    </section></details>{/if}
                 </div>
               {/if}
             </li>
           {/each}
         </ul>
       {/each}
-      {#if data && data.propositions_total > data.propositions.length}<p class="muted small">Les {data.propositions.length} plus partagées sur {data.propositions_total}.</p>{/if}
+      {#if data && data.matching > pageSize}
+        <nav class="pagination" aria-label="Pages des propositions">
+          <button type="button" class="btn" disabled={offset === 0 || listLoading} onclick={() => changePage(Math.max(0, offset - pageSize))}>Précédent</button>
+          <span aria-live="polite">{offset + 1}–{offset + data.propositions.length} sur {fmt.format(data.matching)}</span>
+          <button type="button" class="btn" disabled={offset + pageSize >= data.matching || listLoading} onclick={() => changePage(offset + pageSize)}>Suivant</button>
+        </nav>
+      {/if}
     </section>
+    <details class="panel card" bind:open={controlsOpen} aria-label="Lecture"><summary>Analyse et réglages</summary>
+      <div class="head">
+        <span class="eyebrow">Lecture</span>
+        {#if !info}<span class="muted">Chargement…</span>
+        {:else if !ready.ollama}<span class="badge danger">Analyse indisponible</span>
+        {:else if missing.length}<span class="badge danger">Modèle à installer</span>
+        {:else}<span class="badge success">Analyse disponible</span>{/if}
+      </div>
+      {#if info && !ready.ollama}<p class="banner">Ollama n’est pas joignable : {ready.problem}</p>{/if}
+      {#if info && ready.ollama && missing.length}<p class="banner">Il manque : {#each missing as name}<code>ollama pull {name}</code> {/each}</p>{/if}
+
+      {#if data}
+        <dl class="counts">
+          <div class="metric"><dt>Conversations lues</dt><dd>{fmt.format(data.conversations.read)} <span class="unit">/ {fmt.format(data.conversations.kept)}</span></dd></div>
+          <div class="metric"><dt>Personnes</dt><dd>{fmt.format(data.claims.people)}</dd></div>
+          <div class="metric"><dt>Positions retenues</dt><dd>{fmt.format(data.claims.positions)}</dd></div>
+          <div class="metric"><dt>Propositions</dt><dd>{fmt.format(data.propositions_total)}</dd></div>
+        </dl>
+        <div class="actions">
+          {#if running}
+            <button class="btn btn-danger" onclick={cancel} disabled={job.state === 'cancelling'}>Arrêter la lecture</button>
+          {:else}
+            <button class="btn btn-primary" onclick={start} disabled={!canStart || busy}>Analyser les conversations restantes</button>
+          {/if}
+          <button type="button" class="btn" onclick={onAutomate}>Automatiser les prochaines lectures</button>
+
+        </div>
+        <p class="muted hint">{fmt.format(remaining)} conversation{remaining > 1 ? 's' : ''} restante{remaining > 1 ? 's' : ''}. Les conversations déjà lues ne sont pas relues.</p>
+        <details class="advanced"><summary>Options de lecture</summary>      {#if data?.axes_links?.total}
+        <label class="check" title="Les liens que personne n'a relus sont ignorés dans les scores des personnes">
+          <input type="checkbox" checked={data.axes_links.only_validated} onchange={(e) => onlyValidated(e.currentTarget.checked)} />
+          <span>Ne compter dans les scores que les liens validés ({data.axes_links.validated} sur {data.axes_links.total})</span>
+        </label>
+      {/if}
+
+          <label class="inline">Conversations par étape
+            <input class="field-input num" type="number" min="1" max="100000" step="1" bind:value={perBatch} aria-label="Nombre de conversations lues par étape" />
+          </label>
+          <label class="inline">Nombre d’étapes
+            <input class="field-input num" type="number" min="1" max="10000" step="1" bind:value={batches} disabled={untilEnd} aria-label="Nombre d’étapes" />
+          </label>
+          <label class="check"><input type="checkbox" bind:checked={untilEnd} /> <span>Continuer jusqu’à la fin ({fmt.format(remaining)} restantes)</span></label>
+          <p class="muted hint">Après chaque étape, les positions sont vérifiées et reliées aux axes : les contradictions apparaissent au fur et à mesure.
+            {untilEnd ? 'Toutes les conversations restantes seront lues.' : `Jusqu’à ${fmt.format(Math.max(1, Math.floor(Number(perBatch)) || 1) * Math.max(1, Math.floor(Number(batches)) || 1))} conversations.`}</p>
+          <p class="muted hint">Environ 15 s par conversation. {fmt.format(data.claims.refused)} position{data.claims.refused > 1 ? 's' : ''} refusée{data.claims.refused > 1 ? 's' : ''} faute de preuve. Modèle : <code>{info?.models.naming}</code>. Les ordinateurs d’analyse ajoutés dans Système peuvent recevoir le texte nécessaire au calcul.</p>
+        </details>
+        {#if job && job.state !== 'idle'}
+          <div class="progress" aria-live="polite">
+            <span class="badge" class:success={job.state === 'done'} class:danger={job.state === 'failed'} class:accent={running}>{STATES[job.state]}</span>
+            {#if running && job.round && (job.rounds !== 1)}<span class="muted">étape {job.round}{job.rounds ? ` / ${job.rounds}` : ''}</span>{/if}
+            {#if running && job.of}<progress max={job.of} value={job.done}></progress><span class="muted">{job.done} / {job.of}</span>{/if}
+            {#if job.error}<p class="banner" role="alert">{job.error}</p>{/if}
+            {#if job.lines.length}<details class="jobLog"><summary>Journal de lecture</summary><pre class="lines">{job.lines.join('\n')}</pre></details>{/if}
+          </div>
+        {/if}
+      {/if}
+    </details>
+
   {/if}
 </div>
 
 <style>
-  .page { flex: 1; min-height: 0; overflow-y: auto; padding: 1.5rem 1.75rem 2.5rem; display: flex; flex-direction: column; gap: 1.25rem; animation: fadeIn var(--transition-slow) both; }
+  .pagination { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: .75rem; padding: 1rem 0; }
+  .reviewDetails { margin-top: .75rem; padding-top: .5rem; border-top: 1px solid var(--border-subtle); }
+  #positions-results { scroll-margin-top: 5rem; }
+  .page { flex: 1; min-height: 0; overflow-y: auto; padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 2.5rem; display: flex; flex-direction: column; gap: 1.25rem; animation: fadeIn var(--transition-slow) both; }
   .page.embedded { flex: none; min-height: auto; overflow: visible; padding: 0; animation: none; }
   h1 { font-size: clamp(1.5rem, 2vw, 1.9rem); line-height: 1.1; font-weight: 700; color: var(--text-primary); }
   .subtitle { max-width: 68ch; margin-top: 0.5rem; color: var(--text-secondary); }
@@ -400,7 +432,7 @@
   .head { display: flex; align-items: center; justify-content: space-between; }
   .counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.625rem; }
   .metric { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.75rem 0.875rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-control); }
-  .metric dt { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+  .metric dt { font-size: 0.6875rem; font-weight: 700; letter-spacing: normal; text-transform: none; color: var(--text-muted); }
   .metric dd { font-size: 1.25rem; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
   .unit { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
   .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }

@@ -50,6 +50,7 @@ def test_the_person_limits_the_machine_from_the_page_systeme(base, ingest_db):
         page.click("button[type=submit]")
         page.wait_for_selector("nav", timeout=20000)
         page.get_by_role("button", name="Système", exact=True).click()
+        page.get_by_role("button", name="Performance", exact=True).click()
         panel = page.get_by_role("region", name="Performance")
         panel.wait_for()
         expect(panel.get_by_role("radio", name="Équilibré")).to_have_attribute("aria-checked", "true")
@@ -58,6 +59,7 @@ def test_the_person_limits_the_machine_from_the_page_systeme(base, ingest_db):
 
         panel.get_by_role("radio", name="Économe").click()
         assert save.is_enabled()
+        panel.get_by_text("Réglages personnalisés", exact=True).click()
         expect(panel.get_by_text("environ 4 fois plus lente")).to_be_visible()                                       # said in words what it costs
         save.click()
         panel.get_by_text("Enregistré.").wait_for()
@@ -87,6 +89,7 @@ def test_the_discord_map_names_follow_the_chosen_person_limit(base, ingest_db):
         page.click("button[type=submit]")
         page.wait_for_selector("nav", timeout=20000)
         page.get_by_role("button", name="Système", exact=True).click()
+        page.get_by_role("button", name="Discord", exact=True).click()
         panel = page.get_by_role("region", name="Carte sur Discord")
         people = panel.get_by_role("slider", name="Personnes sur l’image")
         names = panel.get_by_role("slider", name="Noms affichés")
@@ -115,6 +118,7 @@ def test_the_person_switches_on_the_automatic_reading_and_the_positions_ask_for_
         page.click("button[type=submit]")
         page.wait_for_selector("nav", timeout=20000)
         page.get_by_role("button", name="Système", exact=True).click()
+        page.get_by_role("button", name="Analyses auto", exact=True).click()
         panel = page.get_by_role("region", name="Lecture automatique")
         panel.wait_for()
         assert panel.get_by_text("Éteinte").is_visible() and panel.get_by_role("button", name="Enregistrer").is_disabled()

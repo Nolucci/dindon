@@ -47,11 +47,12 @@
   let minWeight = $state('0');
   let mapOptions = $state({ channels: [], themes: [], roles: [] });
   let people = $state(String(PEOPLE_STEPS_DEFAULT)); // how many people at most, the most connected first (a slider on the map itself)
-  let density = $state('2500'); // how many links to draw at most: the strongest ones first
+  let density = $state('800'); // how many links to draw at most: the strongest ones first
   let showImport = $state(false); // the window to import a part of the server
   let showInvite = $state(false); // the window to invite the bot to a server
   let view = $state('map');       // the map is kept alive (hidden) while another page is shown
   let analysisSection = $state('themes');
+  let systemSection = $state('status');
   let stale = false;              // something happened to the map while it was hidden: it is brought up to date when it comes back
   let grouped = $state(false);     // placed by role and by resemblance of names instead of by exchanges
   let showIsolated = $state(false); // also the people who wrote and have no link on the map (points on their own)
@@ -88,7 +89,7 @@
   let showsPresent = $derived(preset !== 'custom' || !until);
   let noKind = $derived(!KINDS.some((k) => kinds[k.id]));
 
-  const DEFAULTS = { preset: 'all', density: '2500', minWeight: '0', people: String(PEOPLE_STEPS_DEFAULT) };
+  const DEFAULTS = { preset: 'all', density: '800', minWeight: '0', people: String(PEOPLE_STEPS_DEFAULT) };
   // Something differs from what the map shows when it is opened
   let dirty = $derived(preset !== DEFAULTS.preset || since !== '' || until !== '' || !KINDS.every((k) => kinds[k.id]) || density !== DEFAULTS.density || people !== DEFAULTS.people
     || channel !== '' || theme !== '' || role !== '' || minWeight !== DEFAULTS.minWeight || showIsolated || grouped || query !== '');
@@ -251,6 +252,9 @@
   }
 
   onMount(() => {
+    if (!location.hash) history.replaceState(null, '', '#/carte');
+    readRoute();
+    window.addEventListener('hashchange', readRoute);
     map = new MapGraph(container, {
       onSelect: (id) => selectPerson(id),
       onHover: () => {},
@@ -271,6 +275,7 @@
       refreshStatus();
     })();
     return () => {
+      window.removeEventListener('hashchange', readRoute);
       stopEvents();
       clearInterval(tick);
       clearInterval(statusTimer);
@@ -314,6 +319,7 @@
   // The page of the left bar. The map is only hidden: coming back, it takes its size again
   function showView(name) {
     view = name;
+    writeRoute();
     if (name === 'map') {
       tick().then(() => {
         map?.resized();
@@ -324,6 +330,21 @@
       });
     }
   }
+
+  const routes = { map: 'carte', debates: 'debats', analyse: 'analyse', system: 'systeme', privacy: 'vie-privee' };
+  function writeRoute() {
+    const route = `#/${routes[view]}${view === 'analyse' ? '/' + analysisSection : view === 'system' ? '/' + systemSection : ''}`;
+    if (location.hash !== route) location.hash = route;
+  }
+  function readRoute() {
+    const [page, part] = location.hash.slice(2).split('/');
+    const name = Object.keys(routes).find((key) => routes[key] === page);
+    if (!name) return;
+    if (name === 'analyse' && ['themes', 'positions', 'coherence', 'reread'].includes(part)) analysisSection = part;
+    if (name === 'system' && ['status', 'automation', 'discord', 'performance', 'maintenance'].includes(part)) systemSection = part;
+    showView(name);
+  }
+  $effect(() => { if (view === 'analyse' || view === 'system') { analysisSection; systemSection; writeRoute(); } });
 
   function showPerson(id) {
     showView('map');
@@ -406,13 +427,14 @@
           <span>Personnes</span>
           <input type="range" min="0" max={PEOPLE_STEPS.length - 1} step="1" value={Math.max(PEOPLE_STEPS.indexOf(Number(people)), 0)} aria-label="Nombre de personnes affichées"
                  oninput={(e) => { people = String(PEOPLE_STEPS[Number(e.currentTarget.value)]); }} onchange={reloadSoon} />
-          <output>{meta ? `${fmt.format(meta.nodes_shown)} / ` : ''}{fmt.format(Number(people))}</output>
+          <output>{fmt.format(Number(people))} max.</output>
         </label>
 
+        <span class="mapLegend">Taille : échanges · Couleur : rôle Discord</span>
         {#if !loading && !guilds.length}
           <div class="empty">
             <h2>Aucun serveur importé</h2>
-            <p>Déposez un export JSON dans le dossier <code>inbox/</code>, ou lancez <code>dindon backfill</code> avec un jeton.</p>
+            <button type="button" class="btn btn-primary" onclick={() => showImport = true}>Importer l’historique</button>
           </div>
         {:else if !loading && noKind}
           <div class="empty"><h2>Aucun type d’échange choisi</h2><p>Activez au moins un des trois : réponses, mentions ou réactions.</p></div>
@@ -428,30 +450,23 @@
       </main>
 
       <footer>
-        <span class="live on" class:reconnecting={!live} title={live ? 'Les nouveaux échanges s’allument sur la carte dès qu’ils arrivent.' : 'Le flux en direct est en train de se reconnecter : la carte reste juste, elle se rallumera seule.'}><i></i>En direct</span>
+        <span class="live on" class:reconnecting={!live} title={live ? 'Les nouveaux échanges s’allument sur la carte dès qu’ils arrivent.' : 'Le flux en direct est en train de se reconnecter : la carte reste juste, elle se rallumera seule.'}><i></i>{live ? 'En direct' : 'Reconnexion…'}</span>
         {#if meta}
-          <span>{fmt.format(meta.nodes_shown)} {plural(meta.nodes_shown, 'personne', 'personnes')}{#if meta.isolated_shown > 0}&nbsp;(dont {fmt.format(meta.isolated_shown)} sans lien{#if meta.isolated_hidden > 0}, + {fmt.format(meta.isolated_hidden)} masquées{/if}){/if}{#if meta.nodes_hidden > 0}&nbsp;(+ {fmt.format(meta.nodes_hidden)} moins connectées, masquées){/if}</span>
-          <span>{fmt.format(meta.edges_shown)} {plural(meta.edges_shown, 'lien', 'liens')}{#if meta.edges_hidden > 0}&nbsp;(+ {fmt.format(meta.edges_hidden)} plus faibles, masqués){/if}</span>
+          <span title={`${meta.nodes_hidden ?? 0} personnes masquées · ${meta.isolated_shown ?? 0} sans lien`}>{fmt.format(meta.nodes_shown)} {plural(meta.nodes_shown, 'personne', 'personnes')}{meta.nodes_hidden > 0 ? ` sur ${fmt.format(meta.nodes_shown + meta.nodes_hidden)}` : ''}</span>
+          <span>{fmt.format(meta.edges_shown)} {plural(meta.edges_shown, 'lien', 'liens')}</span>
         {/if}
         {#if newMessages}<span>{fmt.format(newMessages)} nouveaux messages depuis l’ouverture</span>{/if}
         {#if lastExchange}<span class="exchange" aria-live="polite">{lastExchange}</span>{/if}
         {#if lastEventAt}<span class="muted">dernier événement {ago(lastEventAt)}</span>{/if}
         <span class="spacer"></span>
-        {#if status?.collector?.enabled && status.collector.mode === 'catchup'}
-          <span class="muted">rattrapage nocturne : {status.collector.last_catchup_at ? `dernier ${ago(status.collector.last_catchup_at)}` : 'pas encore fait'} (le bot reçoit le direct){#if status.collector.last_error}&nbsp;· <span class="warn">{status.collector.last_error}</span>{/if}</span>
-        {:else if status?.collector?.enabled}
-          <span class="muted">surveillance : relevé {ago(status.collector.last_poll_at)}{#if status.collector.last_error}&nbsp;· <span class="warn">{status.collector.last_error}</span>{/if}</span>
-        {:else if status}
-          <span class="muted">pas de surveillance : seuls les exports déposés dans inbox/ sont lus</span>
-        {/if}
-        {#if status?.inbox?.failed}<span class="warn">{status.inbox.failed} fichier(s) illisible(s) dans inbox/failed</span>{/if}
+        {#if status?.collector?.last_error || status?.inbox?.failed}<button type="button" class="tool-btn" onclick={() => showView('system')}>Voir les alertes</button>{/if}
       </footer>
     </div>
 
     {#if view === 'analyse'}
-      <Analyse {guild} bind:section={analysisSection} onAuthLost={onLogout} onAutomate={() => showView('system')} onPerson={showPerson} />
+      <Analyse {guild} bind:section={analysisSection} onAuthLost={onLogout} onAutomate={() => { systemSection = 'automation'; showView('system'); }} onPerson={showPerson} />
     {:else if view === 'system'}
-      <System {guild} onAuthLost={onLogout} />
+      <System bind:section={systemSection} {guild} onAuthLost={onLogout} />
     {:else if view === 'debates'}
       <Debates onAuthLost={onLogout} />
     {:else if view === 'privacy'}
@@ -460,7 +475,7 @@
   </div>
 
   {#if showImport}
-    <ImportPanel onClose={importClosed} onAuthLost={onLogout} />
+    <ImportPanel guild={guild} onClose={importClosed} onAuthLost={onLogout} />
   {/if}
 
   {#if showInvite}
@@ -469,6 +484,7 @@
 </div>
 
 <style>
+  .mapLegend { position: absolute; bottom: .75rem; left: .75rem; padding: .375rem .625rem; border-radius: .5rem; background: var(--bg-secondary); color: var(--text-secondary); font-size: .7rem; pointer-events: none; }
   /* app/layout.module.css: the left bar, then the content */
   .layout {
     display: flex;
@@ -590,9 +606,6 @@
     flex: 1;
   }
 
-  .warn {
-    color: #ffb3b8;
-  }
 
   .exchange {
     color: #f0b232;

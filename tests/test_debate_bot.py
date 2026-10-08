@@ -212,7 +212,7 @@ class QuietChecker:
 
     mode = "observe"
 
-    def check(self, text):
+    def check(self, text, context=""):
         return []
 
 

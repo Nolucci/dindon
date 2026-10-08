@@ -2,9 +2,10 @@
   import { onDestroy, onMount } from 'svelte';
   import { api, AuthError } from '../lib/api.js';
   import Modal from './Modal.svelte';
+  import PeoplePicker from './PeoplePicker.svelte';
   import { matches } from '../lib/text.js';
 
-  let { onClose, onAuthLost } = $props();
+  let { guild = '', onClose, onAuthLost } = $props();
 
   let options = $state(null); // { configured, guilds: [{ id, name, channels: [{ id, name, kind, empty }] }] }
   let loadError = $state('');
@@ -24,7 +25,6 @@
   const channels = $derived(options?.guilds.find((g) => g.id === guildId)?.channels ?? []);
   const visible = $derived(channels.filter((c) => matches(channelQ, c.name)));
   const selectedIds = $derived(channels.filter((c) => chosen[c.id]).map((c) => c.id));
-  const narrowed = $derived(Boolean(authors.trim() || mentions.trim() || after || before));
   const fmt = new Intl.NumberFormat('fr-FR');
   const STATES = { idle: '', running: 'En cours…', cancelling: 'Arrêt en cours…', done: 'Terminé', cancelled: 'Annulé', failed: 'Échec' };
   const STAGES = { reading: 'Lecture Discord', profiles: 'Récupération des profils', reactions: 'Récupération des réactions',
@@ -63,7 +63,7 @@
       return;
     }
     options = answer;
-    guildId = answer.guilds[0]?.id ?? '';
+    guildId = answer.guilds.some((g) => g.id === guild) ? guild : answer.guilds[0]?.id ?? '';
     await refresh();
     if (running) startPolling();
   });
@@ -103,7 +103,7 @@
     {:else}
       {#if options.guilds.length > 1}
         <label class="field">Serveur
-          <select class="select" bind:value={guildId} disabled={running} onchange={() => (chosen = {})}>
+          <select class="select" bind:value={guildId} disabled={running} onchange={() => { chosen = {}; authors = ''; mentions = ''; channelQ = ''; }}>
             {#each options.guilds as g}<option value={g.id}>{g.name}</option>{/each}
           </select>
         </label>
@@ -121,35 +121,27 @@
         {#if channelQ.trim() && !visible.length}<p class="muted note">Aucun salon ne correspond.</p>{/if}
         <ul class="channels">
           {#each visible as c}
-            <li><label><input type="checkbox" bind:checked={chosen[c.id]} /><span class="prefix">#</span><span class="channelName">{c.name}</span>{#if c.kind === 'forum'}<span class="muted note">forum</span>{/if}{#if c.empty}<span class="muted note">vide</span>{/if}</label></li>
+            <li><label><input type="checkbox" bind:checked={chosen[c.id]} /><span class="prefix">#</span><span class="channelName">{c.name}{#if channels.filter((other) => other.name === c.name).length > 1}<small class="muted"> · {c.id}</small>{/if}</span>{#if c.kind === 'forum'}<span class="muted note">forum</span>{/if}{#if c.empty}<span class="muted note">vide</span>{/if}</label></li>
           {/each}
         </ul>
       </fieldset>
 
       <fieldset disabled={running}>
         <legend>Filtres <span class="count">facultatifs</span></legend>
-        <label class="field">Écrits par
-          <input class="field-input" type="text" bind:value={authors} placeholder="identifiants Discord, séparés par des espaces ou des virgules" aria-label="Auteurs" />
-        </label>
-        <label class="field">Qui mentionnent
-          <input class="field-input" type="text" bind:value={mentions} placeholder="identifiants Discord" aria-label="Personnes mentionnées" />
-        </label>
         <div class="dates">
           <label class="field">Du <input class="field-input" type="date" bind:value={after} aria-label="Du" /></label>
           <label class="field">Au (inclus) <input class="field-input" type="date" bind:value={before} aria-label="Au" /></label>
         </div>
-        <p class="hint">
-          Un identifiant se copie par clic droit sur la personne dans Discord (mode développeur activé), « Copier l’identifiant ».
-          {#if narrowed}
-            <strong>Import partiel :</strong> seule une partie des salons est récupérée, donc il ne compte pas comme un premier import complet ;
-            un import complet fait plus tard rapporte tout.
-          {/if}
-        </p>
+        <details><summary>Filtrer par personne</summary>
+          <PeoplePicker guild={guildId} label="Auteurs" bind:value={authors} {onAuthLost} />
+          <PeoplePicker guild={guildId} label="Personnes mentionnées" bind:value={mentions} {onAuthLost} />
+        </details>
       </fieldset>
 
       {#if formError}<p class="banner" role="alert">{formError}</p>{/if}
 
-      <div class="actions">
+      <div class="actions importActions">
+        <span class="selectionSummary">{selectedIds.length} salon{selectedIds.length > 1 ? 's' : ''} · {after || before ? `${after || 'début'} → ${before || 'aujourd’hui'}` : 'Tout l’historique'}</span>
         {#if running}
           <button class="btn btn-danger" onclick={cancel} disabled={job.state === 'cancelling'}>Annuler l’import</button>
         {:else}
@@ -192,7 +184,7 @@
           {/if}
           {#if job.error}<p class="banner" role="alert">{job.error}</p>{/if}
           {#if job.lines.length}
-            <pre class="lines">{job.lines.join('\n')}</pre>
+            <details><summary>Journal de l’import</summary><pre class="lines">{job.lines.join('\n')}</pre></details>
           {/if}
           {#if running}<p class="muted">Vous pouvez fermer cette fenêtre : l’import continue.</p>{/if}
         </section>
@@ -201,6 +193,9 @@
 </Modal>
 
 <style>
+  .importActions > .btn { flex-shrink: 0; white-space: nowrap; }
+  .importActions { flex-wrap: wrap; position: sticky; bottom: -1rem; padding: .75rem 0; background: var(--bg-secondary); border-top: 1px solid var(--border-strong); z-index: 2; }
+  .selectionSummary { flex: 1 1 12rem; font-size: .8125rem; color: var(--text-secondary); }
   /* Settings.module.css .group, .groupTitle */
   fieldset {
     border: 1px solid var(--border-subtle);
@@ -221,8 +216,8 @@
     margin-left: -0.5rem;
     font-size: 0.6875rem;
     font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    letter-spacing: normal;
+    text-transform: none;
     color: var(--text-muted);
   }
 
@@ -246,8 +241,12 @@
 
   .channels {
     list-style: none;
-    columns: 2;
-    column-gap: 1rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: min(30vh, 18rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    gap: .125rem .5rem;
   }
 
   .channels li {
@@ -313,16 +312,7 @@
     gap: 0.75rem;
   }
 
-  .hint {
-    margin-top: 0.75rem;
-    font-size: 0.75rem;
-    line-height: 1.5;
-    color: var(--text-muted);
-  }
 
-  .hint strong {
-    color: var(--text-secondary);
-  }
 
   .actions {
     display: flex;
@@ -410,7 +400,7 @@
   }
 
   @media (max-width: 448px) {
-    .channels { columns: 1; }
+    .channels { grid-template-columns: 1fr; }
     .dates { grid-template-columns: 1fr; }
   }
 </style>

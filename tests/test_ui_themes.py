@@ -76,10 +76,11 @@ def test_the_page_runs_the_analysis_and_the_person_decides_what_each_topic_becom
         page.wait_for_selector("nav", timeout=20000)
 
         page.get_by_role("button", name="Analyse", exact=True).click()
-        page.wait_for_selector("text=Ollama prêt", timeout=15000)
+        page.locator(".embedded").get_by_text("Analyse et réglages", exact=True).click()
+        page.wait_for_selector("text=Analyse disponible", timeout=15000)
         assert page.locator("article.topic").count() == 0 and "Aucun thème à examiner" in page.inner_text(".page")
 
-        page.get_by_role("button", name="Lancer l’analyse").click()
+        page.get_by_role("button", name="Analyser les conversations").click()
         page.wait_for_selector("article.topic", timeout=60000)                              # the page follows the job, then shows its result
         page.wait_for_selector(".progress .badge:has-text('Terminée')", timeout=60000)
         cards = page.locator("article.topic")
@@ -96,18 +97,21 @@ def test_the_page_runs_the_analysis_and_the_person_decides_what_each_topic_becom
         assert page.locator("article.topic.isValidated").count() == 1
 
         card = page.locator("article.topic").filter(has_text="proposé").first
+        card.locator("summary").filter(has_text="Modifier").click()
         card.get_by_role("button", name="Renommer").click()
         card.get_by_label("Nom du thème").fill("Mon propre nom")
         card.get_by_role("button", name="Enregistrer").click()
         page.wait_for_selector("h3:has-text('Mon propre nom')")
 
         merging = page.locator("article.topic").filter(has_text="proposé").first
+        merging.locator("summary").filter(has_text="Modifier").click()
         merging.get_by_role("button", name="Fusionner…").click()
         merging.get_by_label("Fusionner avec").select_option(index=1)
         merging.get_by_role("button", name="Fusionner", exact=True).click()
         wait_for_count(page, "article.topic", total - 1)                                    # the merged topic is no longer listed
 
         rejected = page.locator("article.topic").filter(has_text="proposé").first
+        rejected.locator("summary").filter(has_text="Modifier").click()
         rejected.get_by_role("button", name="Rejeter").click()
         wait_for_count(page, "article.topic", total - 2)                                    # a rejected topic leaves the page...
         page.get_by_label("Montrer les thèmes rejetés").check()

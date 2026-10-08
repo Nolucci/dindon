@@ -44,7 +44,8 @@
       clearTimeout(copiedTimer);
       copiedTimer = setTimeout(() => (copied = false), 2500);
     } catch {
-      document.getElementById('invite-link')?.select(); // no clipboard (insecure page, refused): the link is selected for Ctrl+C
+      const field = document.getElementById('invite-link');
+      if (field) { field.closest('details').open = true; field.focus(); field.select(); } // no clipboard (insecure page, refused): the link is selected for Ctrl+C
     }
   }
 
@@ -72,49 +73,22 @@
       Créez un bot dans le portail développeur de Discord et mettez son jeton dans <code>DISCORD_TOKEN</code>.
     </p>
   {:else}
-    <p>
-      <strong class="app">{info.application.name || 'Le bot'}</strong> s’ajoute depuis Discord : le bouton ouvre une page où vous choisissez le serveur.
-      Il faut avoir la permission « Gérer le serveur » sur celui-ci.
-    </p>
-
-    <fieldset>
-      <legend>Ce que le bot demande</legend>
+    <p>Ajoutez <strong class="app">{info.application.name || 'Dindon'}</strong> à un serveur que vous gérez.</p>
+    {#if !info.application.public}<p class="banner info">Bot privé : seul son propriétaire peut l’ajouter à un serveur.</p>{/if}
+    <details><summary>Permissions demandées</summary><fieldset>
+      <legend>Permissions Discord</legend>
       <ul class="permissions">
         {#each info.permissions as name}<li><span class="tick">✓</span>{PERMISSIONS[name] ?? name}</li>{/each}
       </ul>
-      <p class="hint">
-        Rien d’autre : il n’écrit pas, ne modère rien et ne gère rien. Le lien ajoute la commande <code>/dindon</code> (info, mes-données, stop, effacer, reprendre), par laquelle
-        chaque membre gère ses données, arrête d’être enregistré ou se fait effacer.
-      </p>
-    </fieldset>
-
+      <p class="hint">Dindon lit les salons accessibles et publie des messages, fils et sondages pour les débats. Chaque membre peut gérer ses données avec <code>/dindon</code>.</p>
+    </fieldset></details>
     <div class="actions">
-      <a class="btn btn-primary" href={info.url} target="_blank" rel="noopener noreferrer">Ouvrir Discord</a>
+      <a class="btn btn-primary" href={info.url} target="_blank" rel="noopener noreferrer">Ajouter à un serveur Discord</a>
       <button type="button" class="btn" onclick={copy}>{copied ? 'Lien copié' : 'Copier le lien'}</button>
     </div>
-    <input id="invite-link" class="field-input link" type="text" readonly value={info.url} aria-label="Lien d’invitation" onfocus={(event) => event.currentTarget.select()} />
+    <details><summary>Afficher le lien d’invitation</summary><input id="invite-link" class="field-input link" type="text" readonly value={info.url} aria-label="Lien d’invitation" onfocus={(event) => event.currentTarget.select()} /></details>
 
-    {#if !info.application.public}
-      <p class="banner info">
-        Le réglage « Public Bot » de l’application est désactivé : seul son propriétaire peut l’ajouter à un serveur
-        (portail développeur, onglet Bot).
-      </p>
-    {/if}
-
-    {#if info.follow_all}
-      <p class="banner info">
-        <strong>Inviter suffit : Dindon suit tout serveur où le bot est.</strong> Dès l’invitation, il enregistre les messages de tous les salons
-        que le bot peut voir. N’invitez-le que là où les personnes sont informées. (Pour limiter à certains serveurs, listez leurs identifiants dans
-        <code>DINDON_GUILD_IDS</code>.)
-      </p>
-    {:else}
-      <p class="banner info">
-        <strong>Inviter ne suffit pas à enregistrer un serveur.</strong> Dindon ne suit que les serveurs de <code>DINDON_GUILD_IDS</code> ; sur les autres,
-        le bot est présent mais rien n’est enregistré. Sur un serveur suivi, il enregistre les messages de tous les salons qu’il peut voir :
-        ne l’y mettez que si les personnes sont informées.
-      </p>
-    {/if}
-
+    <p class="banner info">{info.follow_all ? 'Les messages des salons accessibles seront collectés dès l’ajout.' : 'Seuls les serveurs configurés pour être suivis sont collectés.'} Informez les membres avant de commencer.</p>
     <fieldset>
       <legend>
         Serveurs où le bot est
@@ -138,10 +112,7 @@
           {/each}
         </ul>
         {#if waiting.length && !info.follow_all}
-          <p class="hint">
-            Pour suivre un serveur : ajoutez son identifiant à <code>DINDON_GUILD_IDS</code> dans <code>.env</code> (séparés par des virgules), puis recréez les
-            conteneurs avec <code>docker compose --profile bot up -d</code>.
-          </p>
+          <p class="hint">Pour collecter les messages d’un autre serveur, ajoutez-le aux serveurs suivis dans la configuration.</p>
         {/if}
       {:else}
         <p class="hint">Le bot n’est encore sur aucun serveur.</p>
@@ -171,8 +142,8 @@
     margin-left: -0.5rem;
     font-size: 0.6875rem;
     font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    letter-spacing: normal;
+    text-transform: none;
     color: var(--text-muted);
   }
 

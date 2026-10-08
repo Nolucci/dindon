@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { api, AuthError } from '../lib/api.js';
 
   let { onAuthLost } = $props();
@@ -42,86 +42,32 @@
     chosen = id;
     detail = null;
     try {
-      detail = await api.debate(id);
+      const answer = await api.debate(id);
+      if (chosen !== id) return;
+      detail = answer;
       problem = '';
     } catch (error) {
       fail(error);
     }
   }
 
-  // The computers that check the debates (the server and its helpers), as the bot last said it: refreshed every few seconds, and only while the page is visible
-  let fleet = $state(null);
-  let timer;
-  const seconds = (n) => (n == null ? '—' : n < 60 ? `${Math.round(n)} s` : `${Math.floor(n / 60)} min ${Math.round(n % 60)} s`);
-  const machine = (c) => (c.local ? 'Ce serveur' : c.url.replace(/^https?:\/\//, ''));
-  const condition = (c) => (!c.online ? ['hors ligne', 'danger'] : !c.has_model ? ['modèle absent', 'danger'] : c.active ? [`calcule depuis ${seconds(c.running_for)}`, 'success'] : ['libre', '']);
-
-  async function loadFleet() {
-    if (document.hidden) return;
-    try {
-      fleet = await api.debateComputers();
-    } catch (error) {
-      if (error instanceof AuthError) onAuthLost();                    // any other failure: the last figures stay
-    }
-  }
-
   onMount(() => {
     load();
-    loadFleet();
-    timer = setInterval(loadFleet, 3000);
+
+
   });
-  onDestroy(() => clearInterval(timer));
 </script>
 
 <div class="page">
   <header>
     <h1>Débats</h1>
-    <p class="subtitle">Les débats ouverts avec <code>/dindon debat</code> : qui a pris quelle position, ce que chacun a écrit, et ce que Dindon a vérifié sur Internet, avec la citation exacte et le lien de chaque source.</p>
+
   </header>
 
   {#if problem}<p class="banner" role="alert">{problem}</p>{/if}
 
   {#if overview}
-    <section class="panel card" aria-label="État de la vérification">
-      <h2 class="eyebrow">Vérification des affirmations</h2>
-      {#if overview.checks.mode === 'off'}
-        <p class="muted">Désactivée : rien n’est lu et rien ne sort de la machine. Pour l’activer, voir « Comment l’activer » dans <code>docs/regles-du-bot.md</code>.</p>
-      {:else}
-        <p>
-          Mode <strong>{overview.checks.mode === 'live' ? 'Dindon répond, et les sources corrigent' : overview.checks.mode === 'answer' ? 'Dindon répond d’abord, sans Internet' : 'observation (rien n’est publié)'}</strong>
-          · modèle {overview.checks.model} · services : {overview.checks.search_services.join(', ') || 'aucun'}
-        </p>
-        {#if overview.checks.why_not}<p class="banner" role="status">Les corrections par les sources seules ne sont pas actives : {overview.checks.why_not}.</p>{/if}
-      {/if}
-    </section>
-
-    <section class="panel card" aria-label="Ordinateurs de vérification">
-      <h2 class="eyebrow">Ordinateurs qui vérifient les débats</h2>
-      {#if !fleet || fleet.computers.length === 0}
-        <p class="muted small">Rien à montrer : le bot n’a pas encore dit ce que font ses ordinateurs (aucun débat ne tourne, ou les vérifications sont désactivées).</p>
-      {:else}
-        {#if !fleet.fresh}<p class="banner" role="status">Le bot n’a rien dit depuis {seconds(fleet.age_seconds)} : les chiffres ci-dessous sont les derniers connus.</p>{/if}
-        <table>
-          <thead><tr><th>Ordinateur</th><th>État</th><th>Vérifications</th><th>Durée moyenne</th><th>Part du travail</th><th>Erreurs</th></tr></thead>
-          <tbody>
-            {#each fleet.computers as c (c.url)}
-              {@const [label, tone] = condition(c)}
-              <tr>
-                <td>{machine(c)}</td>
-                <td><span class="badge small {tone}">{label}</span>{#if c.active && c.kind}<span class="muted small"> · {c.kind}</span>{/if}</td>
-                <td>{c.calls}</td>
-                <td>{seconds(c.average)}</td>
-                <td>{c.observed} %</td>
-                <td>{c.errors}{#if c.last_error}<span class="muted small"> · {c.last_error}</span>{/if}</td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-        <p class="hint">Modèle : {fleet.model}. « Calcule » veut dire qu’une vérification est en cours sur cet ordinateur : Ollama ne donne pas le taux d’utilisation du processeur, la page montre donc ce que Dindon lui a demandé. Les chiffres repartent de zéro quand le bot redémarre.</p>
-      {/if}
-    </section>
-
-    <div class="layout">
+    <div class="layout" class:selected={chosen !== null}>
       <section class="panel card list" aria-label="Les débats">
         <h2 class="eyebrow">Les derniers débats</h2>
         {#if overview.debates.length === 0}
@@ -133,7 +79,7 @@
                 <button type="button" class="pick" class:on={chosen === d.id} onclick={() => open(d.id)}>
                   <span class="name">{d.topic}</span>
                   <span class="badge small">{STATUS[d.status] ?? d.status}</span>
-                  <span class="muted small">{d.participants} participant(s) · {d.messages} message(s){d.claims ? ` · ${d.claims} vérifiée(s)` : ''}</span>
+                  <span class="muted small">{d.participants} participant{d.participants > 1 ? 's' : ''} · {d.messages} message{d.messages > 1 ? 's' : ''}{d.claims ? ` · ${d.claims} examinée${d.claims > 1 ? 's' : ''}` : ''}</span>
                 </button>
               </li>
             {/each}
@@ -145,17 +91,20 @@
         {#if chosen && !detail}<p class="muted">Chargement…</p>{/if}
         {#if detail}
           <section class="panel card" aria-label="Résumé">
-            <h2 class="eyebrow">{detail.debate.topic}</h2>
+            <button type="button" class="tool-btn back" onclick={() => { chosen = null; detail = null; }}>← Tous les débats</button>
+            <h2 class="debateTitle">{detail.debate.topic}</h2>
             {#if detail.debate.axis}<p class="muted small">Question posée par Dindon · axe « {detail.debate.axis.name} »</p>{/if}
-            <p class="muted small">
+            <p class="muted small">{STATUS[detail.debate.status] ?? detail.debate.status} · {when(detail.debate.started_at)}</p>
+            <details><summary>Détails du débat</summary>            <p class="muted small">
               {STATUS[detail.debate.status] ?? detail.debate.status}{detail.debate.close_reason ? ` (${REASON[detail.debate.close_reason] ?? detail.debate.close_reason})` : ''}
               · {detail.debate.in_thread ? 'dans un fil' : 'dans le salon'} · {detail.debate.verify ? 'affirmations vérifiées' : 'sans vérification'}
               · fin si personne n’écrit pendant {QUIET[detail.debate.quiet_seconds] ?? `${detail.debate.quiet_seconds} s`}
               · du {when(detail.debate.started_at)} au {when(detail.debate.closed_at)}
             </p>
+</details>
             {#if detail.debate.context}<p class="muted small">Contexte : {detail.debate.context}</p>{/if}
             <p>
-              <strong>{detail.totals.participants}</strong> participant(s) · <strong>{detail.totals.messages}</strong> message(s)
+              <strong>{detail.totals.participants}</strong> participant{detail.totals.participants > 1 ? 's' : ''} · <strong>{detail.totals.messages}</strong> message{detail.totals.messages > 1 ? 's' : ''}
               · {detail.totals.changed_mind} ont changé de position
             </p>
             <ul class="bars">
@@ -172,17 +121,17 @@
           <section class="panel card" aria-label="Participants">
             <h2 class="eyebrow">Participants</h2>
             <table>
-              <thead><tr><th>Personne</th><th>Position</th><th>Messages</th><th>Message phare</th><th>Vérifiées</th></tr></thead>
+              <thead><tr><th>Personne</th><th>Position</th><th>Messages</th><th>Message phare</th><th>Examinées</th></tr></thead>
               <tbody>
                 {#each detail.participants as p (p.user_id)}
                   <tr>
                     <td>{p.name ?? p.user_id}</td>
-                    <td>{POSITION[p.position ?? 'none']}{p.changed ? ` (avant : ${POSITION[p.first_position]})` : ''}</td>
+                    <td>{POSITION[p.position ?? 'none']}{p.changed && p.first_position !== p.position ? ` (avant : ${POSITION[p.first_position]})` : ''}</td>
                     <td>{p.messages} ({pct(p.share)})</td>
                     <td>
                       {#if p.key_message}
                         « {p.key_message.excerpt} »
-                        {#if p.key_message.url}<a href={p.key_message.url} target="_blank" rel="noopener noreferrer">ouvrir</a>{/if}
+                        {#if p.key_message.url}<a href={p.key_message.url} target="_blank" rel="noopener noreferrer">Voir sur Discord</a>{/if}
                         <span class="muted small">({p.key_message.replies} rép., {p.key_message.reactions} réact.)</span>
                       {:else}—{/if}
                     </td>
@@ -194,17 +143,17 @@
             <p class="hint">Message phare : le plus commenté et le plus apprécié du fil (réponses ×3 + réactions), le même critère pour tout le monde.</p>
           </section>
 
-          {#if detail.answers.length}
+          {#if detail.answers.some((a) => !detail.claims.some((c) => c.message_id === a.message_id && c.claim === a.claim))}
             <section class="panel card" aria-label="Réponses de Dindon">
               <h2 class="eyebrow">Réponses de Dindon, sans Internet</h2>
-              <p class="muted small">Quand Dindon est certain qu’une affirmation est fausse, il le dit sous le message, sans source ; les participants jugent sa réponse. S’il y a plus d’Invalide, il cherche sur Internet.</p>
+              <p class="muted small">Réponses provisoires, sans source.</p>
               <ul class="claims">
-                {#each detail.answers as a (a.id)}
+                {#each detail.answers.filter((a) => !detail.claims.some((c) => c.message_id === a.message_id && c.claim === a.claim)) as a (a.id)}
                   <li>
                     <p>
                       <span class="badge small {a.verdict === 'false' ? 'danger' : 'ok'}">{a.verdict === 'false' ? 'jugée fausse' : 'jugée exacte (rien dit)'}</span>
                       <strong>« {a.claim} »</strong>
-                      <a href={jump(a)} target="_blank" rel="noopener noreferrer">le message</a>
+                      <a href={jump(a)} target="_blank" rel="noopener noreferrer">Voir sur Discord</a>
                     </p>
                     {#if a.answer}<p class="source">{a.answer}</p>{/if}
                     {#if a.verdict === 'false'}
@@ -217,17 +166,17 @@
           {/if}
 
           {#if detail.claims.length}
-            <section class="panel card" aria-label="Affirmations vérifiées">
-              <h2 class="eyebrow">Affirmations vérifiées</h2>
+            <section class="panel card" aria-label="Affirmations examinées">
+              <h2 class="eyebrow">Affirmations examinées</h2>
               {#if Object.keys(detail.parity).length}
-                <table class="parity" aria-label="Parité par position">
-                  <thead><tr><th>Position</th><th>Vérifiées</th>{#each detail.verdicts as v}<th>{VERDICT[v][1]}</th>{/each}</tr></thead>
+                <details><summary>Répartition par position</summary>                <table class="parity" aria-label="Parité par position">
+                  <thead><tr><th>Position</th><th>Examinées</th>{#each detail.verdicts.filter((v) => detail.claims.some((c) => c.verdict === v)) as v}<th>{VERDICT[v][1]}</th>{/each}</tr></thead>
                   <tbody>
                     {#each Object.entries(detail.parity) as [position, row]}
-                      <tr><td>{POSITION[position]}</td><td>{row.total}</td>{#each detail.verdicts as v}<td>{row[v]}</td>{/each}</tr>
+                      <tr><td>{POSITION[position]}</td><td>{row.total}</td>{#each detail.verdicts.filter((v) => detail.claims.some((c) => c.verdict === v)) as v}<td>{row[v]}</td>{/each}</tr>
                     {/each}
                   </tbody>
-                </table>
+                </table></details>
               {/if}
               <ul class="claims">
                 {#each detail.claims as c (c.id)}
@@ -235,9 +184,12 @@
                     <p>
                       <span class="badge small {VERDICT[c.verdict][2]}">{VERDICT[c.verdict][0]} {VERDICT[c.verdict][1]}</span>
                       <strong>« {c.claim} »</strong>
-                      <span class="muted small">— {c.author_name ?? c.author_id}{c.period ? ` · ${c.period}` : ''} · {c.queries} recherche(s), {c.pages} page(s)</span>
-                      <a href={jump(c)} target="_blank" rel="noopener noreferrer">le message</a>
+                      <span class="muted small">— {c.author_name ?? c.author_id}{c.period ? ` · ${c.period}` : ''} </span>
+                      <a href={jump(c)} target="_blank" rel="noopener noreferrer">Voir sur Discord</a>
                     </p>
+                    {#each detail.answers.filter((a) => a.message_id === c.message_id && a.claim === c.claim) as a}
+                      <details><summary>Réponse initiale de Dindon</summary><p class="source">{a.answer || (a.verdict === 'false' ? 'Jugée fausse' : 'Jugée exacte')} · {a.valid} valide, {a.invalid} invalide</p></details>
+                    {/each}
                     {#each c.sources as s}
                       <p class="source">
                         <a href={s.url} target="_blank" rel="noopener noreferrer">{host(s.url)}</a>
@@ -257,11 +209,15 @@
 </div>
 
 <style>
-  .page { flex: 1; min-height: 0; overflow-y: auto; padding: 1.5rem 1.75rem 2.5rem; display: flex; flex-direction: column; gap: 1.25rem; animation: fadeIn var(--transition-slow) both; }
+  .layout.selected { grid-template-columns: minmax(15rem, 20rem) minmax(0, 1fr); }
+  .back { align-self: flex-start; }
+  .debateTitle { font-size: 1.25rem; line-height: 1.35; }
+  .card { overflow-x: auto; }
+  @media (max-width: 900px) { .layout.selected { grid-template-columns: 1fr; } .layout.selected > .list { display: none; } }
+  .page { flex: 1; min-height: 0; overflow-y: auto; padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 2.5rem; display: flex; flex-direction: column; gap: 1.25rem; animation: fadeIn var(--transition-slow) both; }
   h1 { font-size: clamp(1.5rem, 2vw, 1.9rem); line-height: 1.1; font-weight: 700; color: var(--text-primary); }
-  .subtitle { max-width: 68ch; margin-top: 0.5rem; color: var(--text-secondary); }
   .card { padding: 1rem 1.125rem; display: flex; flex-direction: column; gap: 0.75rem; box-shadow: var(--shadow-sm); }
-  .layout { display: grid; grid-template-columns: minmax(16rem, 22rem) 1fr; gap: 1.25rem; align-items: start; }
+  .layout { display: grid; grid-template-columns: 1fr; gap: 1.25rem; align-items: start; }
   .detail { display: flex; flex-direction: column; gap: 1.25rem; min-width: 0; }
   ul { list-style: none; display: flex; flex-direction: column; }
   .pick { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.5rem 0.25rem; background: none; border: 1px solid transparent; border-radius: var(--radius-md); color: inherit; font: inherit; text-align: left; cursor: pointer; }

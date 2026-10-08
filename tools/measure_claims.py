@@ -40,11 +40,20 @@ def split_of(items: list[dict], which: str) -> list[dict]:
     return [x for i, group in enumerate(groups.values()) if (i % 2 == 0) == (which == "dev") for x in group]
 
 
+def _context_of(message: dict) -> str:
+    """The context of a message of tools/claims_context.json, in the grammar of debate/context.py: the authors are anonymous, the author of the message to read is a new one."""
+    from dindon.debate.context import Said, render
+
+    ids: dict[str, int] = {}
+    before = [Said(n, ids.setdefault(who, len(ids) + 1), text) for n, (who, text) in enumerate(message.get("context") or [], 1)]
+    return render(before, len(ids) + 1) if before else ""
+
+
 def run_reading(args, reference) -> dict:
     llm, found, started = Ollama(args.ollama, timeout=300), {}, time.monotonic()
     for index, message in enumerate(split_of(reference["messages"], args.split)[: args.limit or None], 1):
         try:
-            found[message["id"]] = [r.claim for r in read_message(llm, args.model, message["text"])]
+            found[message["id"]] = [r.claim for r in read_message(llm, args.model, message["text"], _context_of(message) if args.with_context else "")]
         except OllamaError as error:
             sys.exit(f"the model cannot answer ({error}): is Ollama running, and `ollama pull {args.model}` done?")
         print(f"\r  {index}", end="", file=sys.stderr, flush=True)
@@ -102,6 +111,8 @@ def main() -> None:
         p.add_argument("--limit", type=int, default=0, help="only the first N (to try it)")
         p.add_argument("--split", choices=("dev", "test", "all"), default="all", help="dev: to tune the instructions; test: the figures to report (do not tune on it)")
         p.add_argument("--out", help="where to write what was predicted (default: political/measure-<kind>.json)")
+        if name == "reading":
+            p.add_argument("--with-context", action="store_true", help="give the model the messages written before (the `context` of each message of the set)")
         if name == "verify":
             p.add_argument("--searxng", help="address of your SearXNG")
             p.add_argument("--pause", type=float, default=4.0, help="seconds to wait between two claims")

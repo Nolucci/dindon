@@ -3,6 +3,7 @@
   import Themes from './Themes.svelte';
   import Positions from './Positions.svelte';
   import Coherence from './Coherence.svelte';
+  import Reread from './Reread.svelte';
 
   let { guild, section = $bindable('themes'), onAuthLost, onAutomate, onPerson } = $props();
 
@@ -29,6 +30,7 @@
   }
 
   function detailOf(step) {
+    if (!summary) return 'Chargement…';
     if (step.prefix === 'compacteur') return `${fmt.format(summary?.kept ?? 0)} conversations utiles`;
     if (step.prefix === 'partitionneur') return `${fmt.format(summary?.embedded ?? 0)} vecteurs · ${fmt.format(summary?.proposed ?? 0)} thèmes à examiner`;
     if (step.prefix === 'classeur') return `${fmt.format(summary?.read ?? 0)} / ${fmt.format(summary?.kept ?? 0)} conversations lues`;
@@ -94,7 +96,7 @@
 <main class="analysisPage" bind:this={page}>
   <div class="content">
     <header class="intro">
-      <span class="eyebrow">Vue d’ensemble</span>
+
       <h1>Analyse</h1>
       <p>{summary ? `${fmt.format(summary.messages)} messages importés · ${fmt.format(summary.conversations)} conversations` : 'Chargement de l’analyse…'}</p>
     </header>
@@ -103,14 +105,12 @@
       <p class="empty">Aucun serveur n’est encore importé. Utilisez « Importer » pour commencer l’analyse.</p>
     {:else}
       {#if problem}<p class="banner" role="alert">{problem}</p>{/if}
-      <div class="pipeline" aria-label="Progression de l’analyse">
-        {#each steps as step, index}
-          <button type="button" class:current={stateOf(step) === 'running'} class:complete={stateOf(step) === 'done'} onclick={() => select(step.section)}>
-            <span class="stepTop"><span class="stepNumber">{index + 1}</span><strong>{step.name}</strong><span class="stepState">{stateOf(step) === 'running' ? 'En cours' : stateOf(step) === 'done' ? 'Fait' : ''}</span></span>
-            <span class="stepDetail">{detailOf(step)}</span>
-          </button>
-        {/each}
-      </div>
+      <nav class="sections" aria-label="Sections de l’analyse">
+        <button type="button" class:active={section === 'themes'} aria-current={section === 'themes' ? 'page' : undefined} onclick={() => select('themes')}>Thèmes</button>
+        <button type="button" class:active={section === 'positions'} aria-current={section === 'positions' ? 'page' : undefined} onclick={() => select('positions')}>Positions</button>
+        <button type="button" class:active={section === 'coherence'} aria-current={section === 'coherence' ? 'page' : undefined} onclick={() => select('coherence')}>Contradictions</button>
+        <button type="button" class:active={section === 'reread'} aria-current={section === 'reread' ? 'page' : undefined} onclick={() => select('reread')}>Relecture</button>
+      </nav>
       {#if active && job?.guild === String(guild)}
         <div class="live" role="status" aria-live="polite">
           <strong>{job.stage}</strong>
@@ -121,6 +121,38 @@
       {:else if job?.state === 'failed' && job.guild === String(guild)}
         <p class="banner" role="alert">Analyse interrompue : {job.error}</p>
       {/if}
+
+      <section class="detail" aria-label={section === 'themes' ? 'Thèmes' : section === 'positions' ? 'Positions' : section === 'reread' ? 'Relecture' : 'Contradictions'}>
+        <div class="detailIntro">
+          {#if section === 'themes'}
+            <h2>Thèmes</h2>
+          {:else if section === 'positions'}
+            <h2>Positions</h2>
+          {:else if section === 'reread'}
+            <h2>Relecture</h2>
+          {:else}
+            <h2>Contradictions</h2>
+          {/if}
+        </div>
+        {#if section === 'themes'}
+          <Themes {guild} {onAuthLost} {onAutomate} embedded onUpdate={loadSummary} />
+        {:else if section === 'positions'}
+          <Positions {guild} {onAuthLost} {onAutomate} embedded onUpdate={loadSummary} />
+        {:else if section === 'reread'}
+          <Reread {guild} {onAuthLost} {onPerson} embedded />
+        {:else}
+          <Coherence {guild} {onAuthLost} {onPerson} embedded />
+        {/if}
+      </section>
+      <details class="analysisDetails"><summary>Suivi de l’analyse</summary>
+      <div class="pipeline" aria-label="Progression de l’analyse">
+        {#each steps as step, index}
+          <button type="button" class:current={stateOf(step) === 'running'} class:complete={stateOf(step) === 'done'} onclick={() => select(step.section)}>
+            <span class="stepTop"><span class="stepNumber">{index + 1}</span><strong>{step.name}</strong><span class="stepState">{stateOf(step) === 'running' ? 'En cours' : stateOf(step) === 'done' ? 'Fait' : ''}</span></span>
+            <span class="stepDetail">{detailOf(step)}</span>
+          </button>
+        {/each}
+      </div>
       {#if job?.computers?.length > 1 && job.guild === String(guild)}
         <section class="machines" aria-label="Activité de chaque ordinateur">
           <h2>Ordinateurs</h2>
@@ -143,7 +175,7 @@
                 </span>
                 <progress max="100" value={machine.observed} aria-label="Part des appels reçus"></progress>
                 {#if machine.round}
-                  <span class="numbers">Salve {machine.round.number} : {fmt.format(machine.round.calls)} calculs{machine.round.average !== null ? ` · ${String(machine.round.average).replace('.', ',')} s en moyenne` : ''}</span>
+                  <span class="numbers">Étape {machine.round.number} : {fmt.format(machine.round.calls)} calculs{machine.round.average !== null ? ` · ${String(machine.round.average).replace('.', ',')} s en moyenne` : ''}</span>
                 {/if}
                 {#if machine.errors}<span class="err">{machine.errors} erreur{machine.errors > 1 ? 's' : ''}{machine.last_error ? ` · ${machine.last_error}` : ''}</span>{/if}
               </li>
@@ -152,40 +184,20 @@
         </section>
       {/if}
 
-      <nav class="sections" aria-label="Sections de l’analyse">
-        <button type="button" class:active={section === 'themes'} aria-current={section === 'themes' ? 'page' : undefined} onclick={() => select('themes')}>Thèmes</button>
-        <button type="button" class:active={section === 'positions'} aria-current={section === 'positions' ? 'page' : undefined} onclick={() => select('positions')}>Positions</button>
-        <button type="button" class:active={section === 'coherence'} aria-current={section === 'coherence' ? 'page' : undefined} onclick={() => select('coherence')}>Contradictions</button>
-      </nav>
 
-      <section class="detail" aria-label={section === 'themes' ? 'Thèmes' : section === 'positions' ? 'Positions' : 'Contradictions'}>
-        <div class="detailIntro">
-          {#if section === 'themes'}
-            <h2>Thèmes</h2><p>Le compacteur retire le bruit ; le partitionneur regroupe les conversations. Validez les sujets utiles, corrigez ou rejetez les autres.</p>
-          {:else if section === 'positions'}
-            <h2>Positions</h2><p>Le classeur cherche des propositions précises dans chaque thème. Vérifiez les positions avec leurs citations.</p>
-          {:else}
-            <h2>Contradictions</h2><p>Le juge compare les rôles déclarés aux positions étayées. Ouvrez les citations avant de conclure.</p>
-          {/if}
-        </div>
-        {#if section === 'themes'}
-          <Themes {guild} {onAuthLost} {onAutomate} embedded onUpdate={loadSummary} />
-        {:else if section === 'positions'}
-          <Positions {guild} {onAuthLost} {onAutomate} embedded onUpdate={loadSummary} />
-        {:else}
-          <Coherence {guild} {onAuthLost} {onPerson} embedded />
-        {/if}
-      </section>
+
+      </details>
     {/if}
   </div>
 </main>
 
 <style>
+  .analysisDetails { color: var(--text-secondary); }
+  .analysisDetails[open] > summary { margin-bottom: .5rem; }
   .analysisPage { flex: 1; min-height: 0; overflow-y: auto; background: var(--bg-primary); }
-  .content { width: min(100%, 1120px); margin: 0 auto; padding: 2rem 2rem 3rem; display: flex; flex-direction: column; gap: 1.5rem; }
+  .content { width: 100%; margin: 0 auto; padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 2.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
   .intro h1 { margin: .25rem 0 .5rem; font-size: clamp(1.7rem, 2.5vw, 2.1rem); line-height: 1.1; color: var(--text-primary); }
-  .intro p, .detailIntro p { color: var(--text-secondary); max-width: 72ch; }
-  .eyebrow { color: var(--text-muted); font-size: .7rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+  .intro p { color: var(--text-secondary); max-width: 72ch; }
   .pipeline { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; }
   .pipeline button { display: flex; flex-direction: column; gap: .75rem; min-height: 6rem; text-align: left; padding: .85rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; font: inherit; }
   .pipeline button:hover, .pipeline button:focus-visible { border-color: var(--text-muted); }
@@ -219,5 +231,5 @@
   .detail { display: flex; flex-direction: column; gap: 1rem; }
   .detailIntro h2 { margin: 0 0 .35rem; font-size: 1.2rem; color: var(--text-primary); }
   .empty { padding: 1.25rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); color: var(--text-secondary); }
-  @media (max-width: 720px) { .content { padding: 1.25rem 1rem 2rem; } .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sections button { padding: .6rem .25rem; font-size: .8rem; } }
+  @media (max-width: 720px) { .content { padding: 1rem 1rem 2rem; } .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sections button { padding: .6rem .25rem; font-size: .8rem; } }
 </style>

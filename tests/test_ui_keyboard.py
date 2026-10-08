@@ -49,6 +49,7 @@ def test_the_search_the_card_and_the_filters_work_with_the_keyboard(ingest_db, i
         page.keyboard.press("Escape")                                                  # Escape closes the card
         wait_for_count(page, "aside h2", 0)
 
+        page.get_by_role("button", name="Filtres", exact=True).click()
         before = page.inner_text("footer")
         page.get_by_role("button", name="Mentions").click()                            # a filter applies at once, not after several seconds
         page.get_by_role("button", name="Réponses").click()

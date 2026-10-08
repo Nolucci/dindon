@@ -34,17 +34,19 @@ class FakeChecker:
     answers, or None: it is sure of nothing, and every claim goes to the Internet). `can_search`: whether there is a search service at all."""
 
     def __init__(self, results=(RESULT,), error=None, local=None, can_search=True):
-        self.texts, self.results, self.error, self.local, self.can_search = [], results, error, local, can_search
+        self.texts, self.contexts, self.results, self.error, self.local, self.can_search = [], [], results, error, local, can_search
         self.searched, self.search_result = [], RESULT                # the claims that the participants asked to be searched, and what the search finds
 
-    def check(self, text):
+    def check(self, text, context=""):
         self.texts.append(text)
+        self.contexts.append(context)
         if self.error is not None:
             raise self.error
         return list(self.results(text) if callable(self.results) else self.results)
 
-    def consider(self, text):
+    def consider(self, text, context=""):
         self.texts.append(text)
+        self.contexts.append(context)
         if self.error is not None:
             raise self.error
         answers = tuple(self.local(text)) if self.local else ()
@@ -204,7 +206,7 @@ def test_messages_are_read_oldest_first_once_the_ingestion_has_stored_them_and_e
 
 def test_the_reader_is_given_the_text_of_the_message_and_nothing_else(checked, ingest_db):
     """Blind: not the author, not the position, not the subject of the debate, not the camps."""
-    assert list(inspect.signature(Checker.check).parameters) == ["self", "text"]
+    assert list(inspect.signature(Checker.check).parameters) == ["self", "text", "context"]
     thread, debate = opened(checked, ingest_db)
     checked.click(BOB_ID, thread, debate.id, "pos", "for")
     checked.click(CAROL_ID, thread, debate.id, "pos", "against")

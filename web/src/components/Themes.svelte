@@ -1,4 +1,5 @@
 <script>
+  import ExportMenu from './ExportMenu.svelte';
   import { onDestroy } from 'svelte';
   import { api, makeGuard } from '../lib/api.js';
   import { day } from '../lib/format.js';
@@ -18,6 +19,8 @@
   let editing = $state(null);     // { id, label, description }
   let merging = $state(null);     // { id, into }
   let busy = $state(false);
+  let controlsOpen = $state(false);
+  $effect(() => { if (running) controlsOpen = true; });
   let selected = $state([]);
   let poll = null;
 
@@ -28,6 +31,7 @@
   let sort = $state('size');        // size | recent | name
   const order = (a, b) => (sort === 'name' ? a.label.localeCompare(b.label, 'fr') : sort === 'recent' ? (b.last_at ?? '').localeCompare(a.last_at ?? '') : b.conversations - a.conversations);
   const seen = $derived(topics.filter((t) => matches(q, t.label, t.description, t.keywords.join(' ')) && (statusFilter === 'all' || t.status === statusFilter)).sort(order));
+  const unnamed = (t) => /^(unknown subject|sujet inconnu|sans sujet)$/i.test(t.label.trim());
   const proposed = $derived(seen.filter((t) => t.status === 'proposed'));
   const validated = $derived(seen.filter((t) => t.status === 'validated'));
   const rejected = $derived(seen.filter((t) => t.status === 'rejected'));
@@ -163,91 +167,33 @@
 
   {#if !guild}
     <section class="panel status">
-      <p class="muted">Aucun serveur n’est encore importé : il n’y a rien à analyser. Importez d’abord un serveur (entrée <strong>Importer</strong> de la barre de gauche, ou <code>dindon backfill</code>).</p>
+      <p class="muted">Aucun serveur importé. Utilisez « Importer » pour commencer.</p>
     </section>
   {:else}
-  <section class="panel status">
-    <div class="statusHead">
-      <span class="eyebrow">Analyse</span>
-      {#if !info}
-        <span class="muted">Chargement…</span>
-      {:else if !ready.ollama}
-        <span class="badge danger">Ollama ne répond pas</span>
-      {:else if missing.length}
-        <span class="badge danger">Modèle à installer</span>
-      {:else}
-        <span class="badge success">Ollama prêt</span>
-      {/if}
-    </div>
-
-    {#if info}
-      {#if !ready.ollama}
-        <p class="banner">Ollama n’est pas lancé ou pas joignable : {ready.problem}. Installez-le et lancez-le (voir le README), puis rechargez cette page.</p>
-      {:else if missing.length}
-        <p class="banner">Il manque : {#each missing as name}<code>ollama pull {name}</code> {/each}</p>
-      {/if}
-
-      <dl class="counts">
-        <div class="metric"><dt>À examiner</dt><dd>{fmt.format(info.counts.topics.proposed ?? 0)}</dd></div>
-        <div class="metric"><dt>Validés</dt><dd>{fmt.format(info.counts.topics.validated ?? 0)}</dd></div>
-      </dl>
-
-      <div class="actions">
-        {#if running}
-          <button class="btn btn-danger" onclick={cancel} disabled={job.state === 'cancelling'}>Annuler l’analyse</button>
-        {:else}
-          <button class="btn btn-primary" onclick={start} disabled={!canStart || busy}>Lancer l’analyse</button>
-        {/if}
-        <button type="button" class="btn" onclick={onAutomate}>Automatiser les prochaines analyses</button>
-        <a class="btn" href={api.digestUrl(guild, 'md', 'themes')} download>Exporter les thèmes (.md)</a>
-        <a class="btn" href={api.digestUrl(guild, 'json', 'themes')} download>JSON</a>
-      </div>
-      <details class="advanced">
-        <summary>Réglages et détails de l’analyse</summary>
-        <p class="muted hint">{fmt.format(info.counts.messages)} messages · {fmt.format(info.counts.conversations)} conversations · {fmt.format(info.counts.kept)} retenues · {fmt.format(info.counts.embedded)} vecteurs</p>
-        <label class="inline">Nombre de thèmes
-          <input class="field-input small" type="number" min="2" max="80" placeholder="auto" bind:value={fixedTopics} aria-label="Nombre de thèmes" />
-        </label>
-        <p class="muted hint">Laissez vide pour laisser l’analyse choisir. Modèles : <code>{info.models.embeddings}</code> (vecteurs), <code>{info.models.naming}</code> (noms). Les ordinateurs d’analyse ajoutés dans Système peuvent recevoir le texte nécessaire au calcul.
-          {#if info.last_run} Dernière recherche : {when(info.last_run.at)}, {info.last_run.k} thèmes.{/if}</p>
-      </details>
-
-      {#if job.state !== 'idle'}
-        <div class="progress" aria-live="polite">
-          <span class="badge" class:success={job.state === 'done'} class:danger={job.state === 'failed'} class:accent={running}>{STATES[job.state]}</span>
-          {#if running && job.stage}<span class="muted">étape : {job.stage}</span>{/if}
-          {#if running && job.of}<progress max={job.of} value={job.done}></progress><span class="muted">{fmt.format(job.done)} / {fmt.format(job.of)}</span>{/if}
-          {#if job.error}<p class="banner" role="alert">{job.error}</p>{/if}
-          {#if job.lines.length}<details class="jobLog"><summary>Journal de l’analyse</summary><pre class="lines">{job.lines.join('\n')}</pre></details>{/if}
-        </div>
-      {/if}
-    {/if}
-  </section>
-
   {#snippet card(topic)}
     <article class="panel topic" class:isValidated={topic.status === 'validated'}>
       <header>
         {#if editing?.id === topic.id}
           <input class="field-input" bind:value={editing.label} aria-label="Nom du thème" minlength="2" maxlength="80" />
         {:else}
-          <h3>{topic.label}</h3>
+          <h3>{unnamed(topic) ? 'Sujet à préciser' : topic.label}</h3>
         {/if}
         <span class="badge" class:success={topic.status === 'validated'} class:accent={topic.status === 'proposed'}>
-          {topic.status === 'validated' ? 'validé' : topic.status === 'rejected' ? 'rejeté' : 'proposé'}
+          {unnamed(topic) ? 'À préciser' : topic.status === 'validated' ? 'validé' : topic.status === 'rejected' ? 'rejeté' : 'proposé'}
         </span>
       </header>
       <p class="size">{fmt.format(topic.conversations)} conversations{#if topic.last_at} · dernière le {when(topic.last_at)}{/if}</p>
       {#if editing?.id === topic.id}
         <textarea class="field-input" rows="2" bind:value={editing.description} aria-label="Description du thème" maxlength="400"></textarea>
       {:else if topic.description}
-        <p class="description">{topic.description}</p>
+        {#if topic.description.length > 150}<details class="descriptionDetails"><summary>{topic.description.slice(0, 147)}…</summary><p>{topic.description}</p></details>{:else}<p class="description">{topic.description}</p>{/if}
       {/if}
       {#if topic.keywords.length}
-        <p class="tags">{#each topic.keywords as word}<span>{word}</span>{/each}</p>
+        <p class="tags">{#each topic.keywords.slice(0, 3) as word}<span>{word}</span>{/each}</p>
       {/if}
       {#if topic.examples.length}
         <details>
-          <summary>Extraits typiques (sans les noms)</summary>
+          <summary>Voir les extraits</summary>
           <ul>{#each topic.examples as text}<li>{text}</li>{/each}</ul>
         </details>
       {/if}
@@ -271,16 +217,18 @@
           {/if}
           {#if topic.status === 'proposed'}<button class="btn btn-primary" onclick={() => change(topic, { status: 'validated' })}>Valider</button>{/if}
           {#if topic.status === 'validated'}<button class="btn" onclick={() => change(topic, { status: 'proposed' })}>Annuler la validation</button>{/if}
+          <details class="topicMenu"><summary class="btn">Modifier</summary><div class="secondaryActions">
           <button class="btn" onclick={() => (editing = { id: topic.id, label: topic.label, description: topic.description ?? '' })}>Renommer</button>
           <button class="btn" onclick={() => (merging = { id: topic.id, into: '' })}>Fusionner…</button>
           <button class="btn btn-danger" onclick={() => change(topic, { status: 'rejected' })}>Rejeter</button>
+          </div></details>
         {/if}
       </div>
     </article>
   {/snippet}
 
   <div class="toolbar" role="search" aria-label="Chercher dans les thèmes">
-    <input class="field-input" type="search" placeholder="Chercher un thème, un mot… (/)" bind:value={q} aria-label="Chercher un thème" use:slash />
+    <input class="field-input" type="search" placeholder="Chercher un thème…" bind:value={q} aria-label="Chercher un thème" use:slash />
     <select class="select" bind:value={statusFilter} aria-label="Filtrer par état">
       <option value="all">Tous les états</option>
       <option value="proposed">À examiner</option>
@@ -293,11 +241,12 @@
       <option value="name">Par nom</option>
     </select>
     {#if filtering}<button type="button" class="tool-btn reset" onclick={() => { q = ''; statusFilter = 'all'; }}>Effacer les filtres</button>{/if}
-    <span class="found" aria-live="polite">{seen.length} thème{seen.length > 1 ? 's' : ''}{filtering ? ` sur ${topics.length}` : ''}</span>
+    <ExportMenu {guild} part="themes" />
+    <span class="found" aria-live="polite">{loaded ? seen.length : '—'} thème{seen.length > 1 ? 's' : ''}{filtering ? ` sur ${topics.length}` : ''}</span>
   </div>
 
   <section>
-    <h2 class="eyebrow">À examiner <span class="count">{proposed.length}</span></h2>
+    <h2 class="eyebrow">À examiner <span class="count">{loaded ? proposed.length : '—'}</span></h2>
     {#if proposed.length > 1}
       <label class="check selectAll"><input type="checkbox" checked={allSelected} onchange={(e) => selectAll(e.currentTarget.checked)} /> Tout sélectionner ({proposed.length})</label>
     {/if}
@@ -307,7 +256,7 @@
     {#if !loaded}
       <p class="muted">Chargement…</p>
     {:else if !proposed.length}
-      <p class="muted empty">{filtering ? 'Aucun thème ne correspond à la recherche.' : 'Aucun thème à examiner. Lancez l’analyse : elle fait les conversations, leurs vecteurs, puis propose les thèmes.'}</p>
+      <p class="muted empty">{filtering ? 'Aucun thème ne correspond à la recherche.' : 'Aucun thème à examiner. Ouvrez « Analyse et réglages » pour lancer une analyse.'}</p>
     {:else}
       <div class="grid">{#each proposed as topic (topic.id)}{@render card(topic)}{/each}</div>
     {/if}
@@ -329,15 +278,74 @@
       <div class="grid">{#each rejected as topic (topic.id)}{@render card(topic)}{/each}</div>
     {/if}
   </section>
+  <details class="panel status" bind:open={controlsOpen}><summary>Analyse et réglages</summary>
+    <div class="statusHead">
+      <span class="eyebrow">Analyse</span>
+      {#if !info}
+        <span class="muted">Chargement…</span>
+      {:else if !ready.ollama}
+        <span class="badge danger">Ollama ne répond pas</span>
+      {:else if missing.length}
+        <span class="badge danger">Modèle à installer</span>
+      {:else}
+        <span class="badge success">Analyse disponible</span>
+      {/if}
+    </div>
+
+    {#if info}
+      {#if !ready.ollama}
+        <p class="banner">Ollama n’est pas lancé ou pas joignable : {ready.problem}. Installez-le et lancez-le (voir le README), puis rechargez cette page.</p>
+      {:else if missing.length}
+        <p class="banner">Il manque : {#each missing as name}<code>ollama pull {name}</code> {/each}</p>
+      {/if}
+
+      <dl class="counts">
+        <div class="metric"><dt>À examiner</dt><dd>{fmt.format(info.counts.topics.proposed ?? 0)}</dd></div>
+        <div class="metric"><dt>Validés</dt><dd>{fmt.format(info.counts.topics.validated ?? 0)}</dd></div>
+      </dl>
+
+      <div class="actions">
+        {#if running}
+          <button class="btn btn-danger" onclick={cancel} disabled={job.state === 'cancelling'}>Annuler l’analyse</button>
+        {:else}
+          <button class="btn btn-primary" onclick={start} disabled={!canStart || busy}>Analyser les conversations</button>
+        {/if}
+        <button type="button" class="btn" onclick={onAutomate}>Automatiser les prochaines analyses</button>
+
+      </div>
+      <details class="advanced">
+        <summary>Réglages et détails de l’analyse</summary>
+        <p class="muted hint">{fmt.format(info.counts.messages)} messages · {fmt.format(info.counts.conversations)} conversations · {fmt.format(info.counts.kept)} retenues · {fmt.format(info.counts.embedded)} vecteurs</p>
+        <label class="inline">Nombre de thèmes
+          <input class="field-input small" type="number" min="2" max="80" placeholder="auto" bind:value={fixedTopics} aria-label="Nombre de thèmes" />
+        </label>
+        <p class="muted hint">Laissez vide pour laisser l’analyse choisir. Modèles : <code>{info.models.embeddings}</code> (vecteurs), <code>{info.models.naming}</code> (noms). Les ordinateurs d’analyse ajoutés dans Système peuvent recevoir le texte nécessaire au calcul.
+          {#if info.last_run} Dernière recherche : {when(info.last_run.at)}, {info.last_run.k} thèmes.{/if}</p>
+      </details>
+
+      {#if job.state !== 'idle'}
+        <div class="progress" aria-live="polite">
+          <span class="badge" class:success={job.state === 'done'} class:danger={job.state === 'failed'} class:accent={running}>{STATES[job.state]}</span>
+          {#if running && job.stage}<span class="muted">étape : {job.stage}</span>{/if}
+          {#if running && job.of}<progress max={job.of} value={job.done}></progress><span class="muted">{fmt.format(job.done)} / {fmt.format(job.of)}</span>{/if}
+          {#if job.error}<p class="banner" role="alert">{job.error}</p>{/if}
+          {#if job.lines.length}<details class="jobLog"><summary>Journal de l’analyse</summary><pre class="lines">{job.lines.join('\n')}</pre></details>{/if}
+        </div>
+      {/if}
+    {/if}
+  </details>
+
   {/if}
 </div>
 
 <style>
+  .topicMenu { position: relative; }
+  .secondaryActions { display: flex; flex-wrap: wrap; gap: .5rem; padding-block: .5rem; }
   .page {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 1.5rem 1.75rem 2.5rem;
+    padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 2.5rem;
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
@@ -551,11 +559,6 @@
     color: var(--text-muted);
   }
 
-  .description {
-    font-size: 0.8125rem;
-    color: var(--text-secondary);
-    line-height: 1.5;
-  }
 
   .tags {
     display: flex;

@@ -48,6 +48,7 @@ class Settings:
     # The local models of the analysis (see docs/fonctionnement.md): the vectors of the conversations, and the names of the topics
     embed_model: str = "bge-m3"
     naming_model: str = "qwen3:14b"
+    reread_model: str = ""                      # the model of the reread (empty: the naming model); a stronger one is worth it, since a reread is rare and what it changes must be right
     # Who the members can write to about their data (shown by /dindon info and in docs/regles-du-bot.md), and how long messages are
     # kept (DINDON_RETENTION_DAYS, 0 = no limit; see docs/regles-du-bot.md)
     # Dindon's own exporter (export/exporter.py): requests in parallel, and who reacted (one request per reaction): `recent` (the last
@@ -138,6 +139,7 @@ def load_settings() -> Settings:
         follow_all=bool(env.get("DISCORD_TOKEN")) and env.get("DINDON_GUILD_IDS", "").strip().lower() in ("", "all", "*"),
         embed_model=env.get("DINDON_EMBED_MODEL", "bge-m3").strip(),
         naming_model=env.get("DINDON_NAMING_MODEL", "qwen3:14b").strip(),
+        reread_model=env.get("DINDON_REREAD_MODEL", "").strip(),
         export_workers=max(1, int(env.get("DINDON_EXPORT_WORKERS", "6") or 6)),
         export_reactions=env.get("DINDON_EXPORT_REACTIONS", "recent").strip().lower() if env.get("DINDON_EXPORT_REACTIONS", "recent").strip().lower() in ("all", "recent", "none") else "recent",
         export_reactions_days=max(1, int(env.get("DINDON_EXPORT_REACTIONS_DAYS", "30") or 30)),

@@ -120,8 +120,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 1.75rem;
-    height: 1.75rem;
+    width: 2.75rem;
+    height: 2.75rem;
     color: var(--text-muted);
     border-radius: var(--radius-sm);
     transition: color var(--transition-fast), background var(--transition-fast);

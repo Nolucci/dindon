@@ -142,9 +142,10 @@
       <span class="icon"><Icon name="themes" /></span>
       <span class="navLabel">Analyse</span>
     </button>
+    <span class="navGroup">Gestion</span>
     <button type="button" class="navItem" title="Importer l’historique de certains salons, de certaines personnes, d’une période" onclick={importing}>
       <span class="icon"><Icon name="import" /></span>
-      <span class="navLabel">Importer</span>
+      <span class="navLabel">Importer</span><span class="navHint" aria-hidden="true">↗</span>
     </button>
     <button type="button" class="navItem" class:active={view === 'system'} aria-current={view === 'system' ? 'page' : undefined} title="L’état du bot, de la base et de l’IA locale" onclick={() => showView('system')}>
       <span class="icon"><Icon name="system" /></span>
@@ -156,7 +157,7 @@
     </button>
     <button type="button" class="navItem" title="Ajouter le bot à un serveur Discord, et voir les serveurs où il est" onclick={inviting}>
       <span class="icon"><Icon name="invite" /></span>
-      <span class="navLabel">Inviter le bot</span>
+      <span class="navLabel">Inviter le bot</span><span class="navHint" aria-hidden="true">↗</span>
     </button>
   </div>
 
@@ -190,6 +191,8 @@
 
 <style>
   .tabBar { display: none; }
+  .navHint { margin-left: auto; font-size: .75rem; color: var(--text-muted); }
+  .navGroup { display: block; padding: 1.25rem .75rem .375rem; color: var(--text-muted); font-size: .75rem; }
 
   /* Navbar.module.css, class for class */
   .navbar {
@@ -297,7 +300,7 @@
   .guildPickerLabel {
     font-size: 0.625rem;
     font-weight: 700;
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.08em;
     color: var(--text-muted);
   }
@@ -644,7 +647,7 @@
       font-size: 0.625rem;
       font-weight: 700;
       letter-spacing: 0.08em;
-      text-transform: uppercase;
+      text-transform: none;
       color: var(--text-muted);
     }
 
@@ -703,8 +706,8 @@
       color: var(--text-secondary);
       font-size: 0.75rem;
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
+      text-transform: none;
+      letter-spacing: normal;
       text-align: left;
     }
 

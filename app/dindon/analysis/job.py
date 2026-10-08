@@ -48,6 +48,7 @@ class AnalysisJobs:
         self._state = self._idle()
         self._ready: dict | None = None
         self._lines: deque[str] = deque(maxlen=40)
+        self.blocked_by: Callable[[], bool] | None = None      # something that must not run at the same time (the reread): an analysis does not start while it is true
 
     @staticmethod
     def _idle() -> dict:
@@ -92,7 +93,7 @@ class AnalysisJobs:
 
     def start(self, guild_id: int, stages: tuple[str, ...] = STAGES, *, topics: int | None = None, rebuild: bool = False, limit: int | None = None,
               rounds: int | None = 1, keep: bool = False) -> None:
-        """Checks that the models are there, then starts. The positions are read in batches ("salves"): `limit` conversations each (None: all), `rounds` batches
+        """Checks that the models are there, then starts. The positions are read in steps ("étapes"): `limit` conversations each (None: all), `rounds` batches
         (None: until nothing is left to read), the positions being checked and linked to the axes after each batch so that results come as it goes. Raises NotReady or AnalysisBusy, before anything is started."""
         ready = self.readiness()
         needed = [m for stage, m in (("embeddings", self.embed_model), ("themes", self.name_model), ("claims", self.name_model), ("claims", self.embed_model), ("axes", self.name_model))
@@ -103,7 +104,7 @@ class AnalysisJobs:
         if missing:
             raise NotReady("modèle(s) à installer : " + ", ".join(f"ollama pull {m}" for m in missing))
         with self._lock:
-            if self._thread is not None and self._thread.is_alive():
+            if self._thread is not None and self._thread.is_alive() or (self.blocked_by is not None and self.blocked_by()):
                 raise AnalysisBusy()
             if isinstance(self.client, OllamaPool):
                 self.client.reset()
@@ -223,7 +224,7 @@ class AnalysisJobs:
                         with self._lock:
                             self._state.update(round=batch, rounds=rounds)
                         if rounds != 1:
-                            self._line(f"salve {batch}" + (f" sur {rounds}" if rounds else "") + (f" : {limit} conversations au plus" if limit else ""))
+                            self._line(f"étape {batch}" + (f" sur {rounds}" if rounds else "") + (f" : {limit} conversations au plus" if limit else ""))
                         if isinstance(self.client, OllamaPool):
                             self.client.begin_round()
                         self._stage("classeur : positions")
@@ -240,7 +241,7 @@ class AnalysisJobs:
                                 self._state["last_round"] = {"number": batch, "computers": computers}
                             for computer in computers:
                                 name = "Serveur" if computer["local"] else computer["url"]
-                                self._line(f"salve {batch} · {name} : {computer['calls']} calculs, {computer['seconds']} s"
+                                self._line(f"étape {batch} · {name} : {computer['calls']} calculs, {computer['seconds']} s"
                                            + (f", part suivante {computer['share']} %" if computer["share"] is not None else ""))
                         if r["left"] == 0 or (rounds is not None and batch >= rounds) or r["done"] + r["unread"] == 0:
                             break                                                  # nothing left, the batches asked for are done, or no conversation could be read

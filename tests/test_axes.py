@@ -325,3 +325,19 @@ def test_what_a_person_decided_is_shown_to_a_third_reading(ingest_db, client, ol
     shown = asked[2]["messages"][-1]["content"]
     assert "« Le rail doit rester public » → economie : Public (forte)" in shown and "« Je ne sais pas trop » → (aucun axe)" in shown    # « on no axis » is an example too
     assert shown.rstrip().endswith("Phrase : Les hôpitaux doivent rester publics")
+
+
+def test_positions_pagination_keeps_the_filtered_total_and_has_no_gaps(web, ingest_db):
+    debate(ingest_db)
+    for n in range(61):
+        pid = proposition(ingest_db, f"Pagination proposition {n:02}", "economie", -1)
+        takes(ingest_db, ALICE_ID, pid, 1)
+    first = web.get("/api/positions", params={"q": "Pagination", "limit": 50}).json()
+    last = web.get("/api/positions", params={"q": "Pagination", "limit": 50, "offset": 50}).json()
+    assert first["matching"] == last["matching"] == 61
+    assert len(first["propositions"]) == 50 and len(last["propositions"]) == 11
+    ids = [p["id"] for data in (first, last) for p in data["propositions"]]
+    assert len(set(ids)) == 61 and ids == sorted(ids)
+    filtered = web.get("/api/positions", params={"q": "Pagination proposition 60", "limit": 50}).json()
+    assert filtered["matching"] == 1 and filtered["offset"] == 0
+    assert web.get("/api/positions", params={"offset": -1}).status_code == 422

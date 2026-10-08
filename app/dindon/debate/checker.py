@@ -1,6 +1,6 @@
 """What checks the claims of a message, from the reading of the message to the verdicts (docs/regles-du-bot.md, « Vérification sur Internet »). Synchronous: the engine runs it in a thread.
 
-`Checker.check(text)` takes **the text of a message and nothing else** and returns the results for the claims found in it. Each claim gets a `Lookup` of its own, so that what one claim
+`Checker.check(text, context)` takes **the text of a message and, to understand it, what was said just before** (debate/context.py: anonymous authors, never a name, a position or a camp) and returns the results for the claims found in it. Each claim gets a `Lookup` of its own, so that what one claim
 found is not available to the next and the budget (2 queries, 3 pages) is per claim.
 
 `build_checker(settings)` returns None, and then nothing is ever read or sent, unless the owner switched the checks on (`DINDON_DEBATE_CHECKS`).
@@ -97,20 +97,20 @@ class Checker:
         self._ready()
         return verify_claim(self._make_lookup(), self.llm, self.model, self._trust, reading)
 
-    def check(self, text: str) -> list[ClaimResult]:
+    def check(self, text: str, context: str = "") -> list[ClaimResult]:
         """The results for the claims in one message (an empty list when it holds none), every one checked on the Internet. Raises what the local model raises when it cannot answer: the
         message stays unread and is tried later."""
         self._ready()
-        return [self.search(reading) for reading in read_message(self.llm, self.model, text)]
+        return [self.search(reading) for reading in read_message(self.llm, self.model, text, context)]
 
-    def consider(self, text: str) -> Considered:
+    def consider(self, text: str, context: str = "") -> Considered:
         """What Dindon does with a message when it answers first: for each claim, the local model says whether it is **certain** that it is true or false, with no Internet. True: noted, nothing
         is said. False: Dindon's answer, which the participants will judge. Not certain: the claim is checked on the Internet, if there is a search service, and noted. Raises what the model
         raises: the message stays unread and is tried later."""
         self._ready()
         answers: list[AnswerFound] = []
         results: list[ClaimResult] = []
-        for reading in read_message(self.llm, self.model, text):
+        for reading in read_message(self.llm, self.model, text, context):
             local = answer_claim(self.llm, self.model, reading)
             if local.verdict in (TRUE, FALSE):
                 answers.append(AnswerFound(reading.claim, reading.said, reading.query, local.verdict, local.answer, self.model))

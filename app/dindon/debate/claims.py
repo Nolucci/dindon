@@ -10,7 +10,7 @@
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 import psycopg
@@ -18,6 +18,7 @@ from psycopg.rows import tuple_row
 
 from dindon.clock import utc_now
 from dindon.debate import rules
+from dindon.debate.context import context_for
 
 VERDICTS = ("confirmed", "contradicted", "partly", "disputed", "likely_true", "likely_false", "unverifiable")   # likely_*: provisional, from pages of any source; never a correction, never a rating
 MAX_CHECKS_PER_HOUR = 20            # claims checked per debate and per hour: what a debate may ask of the Internet and of the local model, however chatty it is
@@ -74,6 +75,7 @@ class Unread:
     message_id: int
     author_id: int
     text: str
+    context: str = ""               # what was said just before, to understand the message (debate/context.py); '' when it stands alone
 
 
 GRACE_MINUTES = 5                  # a debate that just ended keeps reading what is left for this long, so that its statistics are complete (then they are posted as they are)
@@ -83,7 +85,7 @@ def next_unread(conn: psycopg.Connection, limit: int = 20, now: datetime | None 
     """The oldest messages of running debates (and of the one that ended less than 10 minutes ago, whose statistics wait for it) that were not read yet, whose text the ingestion has stored."""
     now = now or utc_now()
     with conn.cursor(row_factory=tuple_row) as cur:
-        return [Unread(*r) for r in cur.execute(
+        found = [Unread(*r) for r in cur.execute(
             """SELECT dm.debate_id, dm.message_id, dm.author_id, m.content
                FROM debate_messages dm
                JOIN debates d ON d.id = dm.debate_id AND (d.status = 'open' OR (d.status = 'closed' AND d.final_message_id IS NULL AND d.closed_at > %s - interval '10 minutes'))
@@ -91,6 +93,7 @@ def next_unread(conn: psycopg.Connection, limit: int = 20, now: datetime | None 
                WHERE dm.read_at IS NULL AND m.content IS NOT NULL
                  AND NOT EXISTS (SELECT 1 FROM privacy_subjects s WHERE s.user_id = dm.author_id)
                ORDER BY dm.message_id LIMIT %s""", (now, limit)).fetchall()]
+    return [replace(item, context=context_for(conn, item.message_id, item.author_id)) for item in found]
 
 
 STALE_MINUTES = 60                 # a message that waited this long is not read any more: in a busy channel the queue must not run for ever behind the conversation

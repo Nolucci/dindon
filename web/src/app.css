@@ -14,7 +14,7 @@
   /* Text */
   --text-primary: #dcdee1;
   --text-secondary: #b5bac1;
-  --text-muted: #80848e;
+  --text-muted: #a0a6b1;
   --text-link: #00a8fc;
 
   /* Accent & status */
@@ -37,7 +37,7 @@
 
   /* Surfaces */
   --surface-page: var(--bg-primary);
-  --surface-panel: linear-gradient(180deg, rgba(43, 45, 49, 0.96), rgba(36, 38, 43, 0.96));
+  --surface-panel: #2b2d31;
   --surface-panel-muted: rgba(43, 45, 49, 0.7);
   --surface-control: rgba(255, 255, 255, 0.04);
 
@@ -77,7 +77,7 @@
 /* The whole page is drawn at 80% of the browser's size: what was comfortable at a browser zoom of 80% is now 100%.
    Every size is in rem, so this one line scales them all (the map reads it too: see UI in lib/mapgraph.js). */
 html {
-  font-size: 80%;
+  font-size: 100%;
 }
 
 body {
@@ -456,3 +456,25 @@ input[type='date'] {
 .toolbar .reset {
   font-size: 0.75rem;
 }
+
+/* Consultation pages share one reading width and spacing. */
+.page:not(.embedded), .analysisPage > .content { padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 2.5rem; }
+.page:not(.embedded) > *, .analysisPage > .content > * { width: 100%; max-width: 1200px; margin-inline: auto; }
+.page.embedded { padding: 0; }
+.eyebrow { text-transform: none; letter-spacing: normal; font-size: .8125rem; }
+.toolbar { flex-wrap: wrap; }
+.toolbar > .field-input { flex: 1 1 16rem; min-width: 0; }
+.toolbar > select { max-width: 100%; }
+.panel { box-shadow: none; }
+summary { cursor: pointer; padding-block: .5rem; }
+blockquote { overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .page:not(.embedded), .analysisPage > .content { padding: 1rem 1rem 2rem; }
+  .toolbar > select { flex: 1 1 9rem; min-width: 0; }
+}
+
+.page .small, aside .small { font-size: .8125rem; }
+.page .badge.small { font-size: .75rem; }
+.page .eyebrow, .analysisPage .eyebrow { font-size: .8125rem; letter-spacing: normal; }
+
+.analysisPage > .content { max-width: none; }

@@ -791,10 +791,10 @@ class Debates:
                 if await self.db(lambda c, d=item.debate_id: claims.checks_last_hour(c, d, self.clock())) >= claims.MAX_CHECKS_PER_HOUR:
                     continue
                 if self.answering:
-                    considered = await asyncio.to_thread(self.checker.consider, item.text)
+                    considered = await asyncio.to_thread(self.checker.consider, item.text, item.context)
                     await self.db(lambda c, i=item, k=considered: claims.finish_reading(c, i, list(k.results), self.clock(), answers=k.answers))
                 else:
-                    results = await asyncio.to_thread(self.checker.check, item.text)
+                    results = await asyncio.to_thread(self.checker.check, item.text, item.context)
                     await self.db(lambda c, i=item, r=results: claims.finish_reading(c, i, r, self.clock()))
                 self._check_failing = False
                 return True

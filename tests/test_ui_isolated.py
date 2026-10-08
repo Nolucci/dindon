@@ -74,13 +74,14 @@ def test_people_without_a_link_can_be_shown_hidden_searched_and_opened(app_port)
         page.click("button[type=submit]")
         page.wait_for_selector("footer span:has-text('personne')", timeout=20000)
 
-        box = page.get_by_label("Sans lien")
+        page.get_by_role("button", name="Filtres", exact=True).click()
+        box = page.get_by_label("Personnes sans échange")
         assert not box.is_checked()                                                     # off by default
         page.wait_for_selector("footer span:has-text('2 personnes')", timeout=5000)
         assert "sans lien" not in page.inner_text("footer")
         box.check()
-        page.wait_for_selector("footer span:has-text('sans lien')")
-        assert "3 personnes (dont 1 sans lien)" in squeeze(page.inner_text("footer"))   # Bob and Carol linked, Alice alone
+        page.wait_for_selector("footer span:has-text('3 personnes')")
+        assert "3 personnes" in squeeze(page.inner_text("footer"))   # Bob and Carol linked, Alice alone
         assert "2 liens" not in squeeze(page.inner_text("footer")) and "1 lien" in squeeze(page.inner_text("footer")) and "1 liens" not in squeeze(page.inner_text("footer"))
         time.sleep(2)  # the points find their places
         if os.environ.get("DINDON_SHOTS"):
@@ -98,7 +99,7 @@ def test_people_without_a_link_can_be_shown_hidden_searched_and_opened(app_port)
         assert "sans lien" not in page.inner_text("footer")
         box.check()
         page.wait_for_selector("footer span:has-text('3 personnes')", timeout=5000)
-        assert "sans lien" in page.inner_text("footer")
+        assert "3 personnes" in page.inner_text("footer")
         browser.close()
     assert not outside, f"the page asked for things outside the application: {sorted(set(outside))[:3]}"
     assert not errors, f"errors in the page: {errors[:2]}"

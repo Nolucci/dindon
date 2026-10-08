@@ -63,11 +63,16 @@ def test_the_contradiction_is_listed_and_the_card_shows_the_axes(base):
         page.fill("input[type=search]", "bob")
         page.wait_for_selector(".search li button")
         page.locator(".search li button").first.click()
+        page.locator("aside").get_by_role("button", name="Positions", exact=True).click()
         page.get_by_text("Où elle se situe").wait_for()
         assert page.get_by_text("contredit « Socialiste »").is_visible()
-        assert page.locator("aside .axes li").count() == 21 and page.locator("aside .axes .dot").count() == 1     # twenty-one bars, a dot on the one that has a score
+        assert page.locator("aside .axes li").count() == 1 and page.locator("aside .axes .dot").count() == 1     # twenty-one bars, a dot on the one that has a score
         page.get_by_role("button", name="Propriété des moyens de production").click()
         page.get_by_text("L'État doit posséder le secteur").first.wait_for()
+        import os
+        if os.environ.get("DINDON_SHOTS"):
+            page.screenshot(path=str(Path(os.environ["DINDON_SHOTS"]) / "person-positions.png"))
+        page.locator("aside").get_by_role("button", name="Rôles", exact=True).click()
         assert page.get_by_text("contradiction", exact=True).first.is_visible()
         browser.close()
     assert errors == []

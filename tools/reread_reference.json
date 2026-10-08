@@ -1,0 +1,447 @@
+{
+ "version": 1,
+ "how": "positions that were read once by the analysis, with the messages around their proof: right ones (to be kept), wrong senses, things that are not an opinion of the person, a proposition that is not the right one. Labelled by Claude from the invented messages themselves.",
+ "cases": [
+  {
+   "id": "r01",
+   "category": "juste",
+   "lines": [
+    [
+     "A",
+     "Je pense qu'il faut augmenter le SMIC, les prix ont explosé."
+    ],
+    [
+     "B",
+     "Ça va tuer des emplois."
+    ]
+   ],
+   "evidence": [
+    0
+   ],
+   "person": "A",
+   "proposition": "L'État doit augmenter le salaire minimum",
+   "current": 1,
+   "expected": {
+    "own": true,
+    "stance": 1,
+    "fits": true
+   }
+  },
+  {
+   "id": "r02",
+   "category": "juste",
+   "lines": [
+    [
+     "A",
+     "Il faut arrêter le nucléaire, c'est dangereux et cher."
+    ],
+    [
+     "B",
+     "Tu rêves, on a besoin de cette énergie."
+    ]
+   ],
+   "evidence": [
+    1
+   ],
+   "person": "B",
+   "proposition": "La France doit continuer à développer le nucléaire",
+   "current": 1,
+   "expected": {
+    "own": true,
+    "stance": 1,
+    "fits": true
+   }
+  },
+  {
+   "id": "r03",
+   "category": "juste",
+   "lines": [
+    [
+     "A",
+     "La TVA sur le pain et le lait devrait être supprimée."
+    ],
+    [
+     "B",
+     "Je suis d'accord avec toi."
+    ]
+   ],
+   "evidence": [
+    0
+   ],
+   "person": "A",
+   "proposition": "L'État doit baisser la TVA sur les produits de première nécessité",
+   "current": 1,
+   "expected": {
+    "own": true,
+    "stance": 1,
+    "fits": true
+   }
+  },
+  {
+   "id": "w01",
+   "category": "signe",
+   "lines": [
+    [
+     "A",
+     "Il faut augmenter le SMIC à 2000 euros."
+    ],
+    [
+     "B",
+     "Ouais, c'est la seule solution, je suis pour."
+    ]
+   ],
+   "evidence": [
+    1
+   ],
+   "person": "B",
+   "proposition": "L'État doit augmenter le salaire minimum",
+   "current": -1,
+   "expected": {
+    "own": true,
+    "stance": 1,
+    "fits": true
+   }
+  },
+  {
+   "id": "w02",
+   "category": "signe",
+   "lines": [
+    [
+     "A",
+     "On devrait augmenter le SMIC de 20 %."
+    ],
+    [
+     "B",
+     "Non, c'est une mauvaise idée, les petites entreprises ne suivront pas."
+    ]
+   ],
+   "evidence": [
+    1
+   ],
+   "person": "B",
+   "proposition": "L'État doit augmenter le salaire minimum",
+   "current": 1,
+   "expected": {
+    "own": true,
+    "stance": -1,
+    "fits": true
+   }
+  },
+  {
+   "id": "w03",
+   "category": "négation",
+   "lines": [
+    [
+     "A",
+     "Je pense qu'on devrait arrêter le nucléaire."
+    ],
+    [
+     "B",
+     "Non, c'est faux, il faut continuer à construire des centrales."
+    ]
+   ],
+   "evidence": [
+    1
+   ],
+   "person": "B",
+   "proposition": "La France doit continuer à développer le nucléaire",
+   "current": -1,
+   "expected": {
+    "own": true,
+    "stance": 1,
+    "fits": true
+   }
+  },
+  {
+   "id": "w04",
+   "category": "réponse",
+   "lines": [
+    [
+     "A",
+     "Le nucléaire est l'avenir, il faut en construire plus."
+    ],
+    [
+     "B",
+     "Non, c'est faux."
+    ]
+   ],
+   "evidence": [
+    1
+   ],
+   "person": "B",
+   "proposition": "La France doit continuer à développer le nucléaire",
+   "current": 1,
+   "expected": {
+    "own": true,
+    "stance": -1,
+    "fits": true
+   }
+  },
+  {
+   "id": "w05",
+   "category": "réponse",
+   "lines": [
+    [
+     "A",
+     "Baisser la TVA sur les produits de base serait une erreur budgétaire."
+    ],
+    [
+     "B",
+     "Faux, au contraire ça aiderait les gens."
+    ]
+   ],
+   "evidence": [
+    1
+   ],
+   "person": "B",
+   "proposition": "L'État doit baisser la TVA sur les produits de première nécessité",
+   "current": -1,
+   "expected": {
+    "own": true,
+    "stance": 1,
+    "fits": true
+   }
+  },
+  {
+   "id": "n01",
+   "category": "ironie",
+   "lines": [
+    [
+     "A",
+     "Il faut augmenter le SMIC."
+    ],
+    [
+     "B",
+     "Bien sûr, et pourquoi pas le doubler tant qu'on y est, ça serait gratuit hein 🙄"
+    ]
+   ],
+   "evidence": [
+    1
+   ],
+   "person": "B",
+   "proposition": "L'État doit augmenter le salaire minimum",
+   "current": 1,
+   "expected": {
+    "own": false,
+    "stance": null,
+    "fits": true
+   }
+  },
+  {
+   "id": "n02",
+   "category": "citation",
+   "lines": [
+    [
+     "A",
+     "Mon oncle dit toujours qu'il faut supprimer le SMIC."
+    ],
+    [
+     "B",
+     "Ton oncle dit qu'il faut supprimer le SMIC ? Quelle idée."
+    ]
+   ],
+   "evidence": [
+    1
+   ],
+   "person": "B",
+   "proposition": "L'État doit augmenter le salaire minimum",
+   "current": 1,
+   "expected": {
+    "own": false,
+    "stance": null,
+    "fits": true
+   }
+  },
+  {
+   "id": "n03",
+   "category": "question",
+   "lines": [
+    [
+     "A",
+     "On parle d'augmenter le salaire minimum."
+    ],
+    [
+     "B",
+     "Quelqu'un sait si l'État doit augmenter le salaire minimum ou pas ?"
+    ]
+   ],
+   "evidence": [
+    1
+   ],
+   "person": "B",
+   "proposition": "L'État doit augmenter le salaire minimum",
+   "current": 1,
+   "expected": {
+    "own": false,
+    "stance": null,
+    "fits": true
+   }
+  },
+  {
+   "id": "n04",
+   "category": "humour",
+   "lines": [
+    [
+     "A",
+     "Le nucléaire c'est bien."
+    ],
+    [
+     "B",
+     "Mdr oui continuons à construire des centrales dans le salon."
+    ]
+   ],
+   "evidence": [
+    1
+   ],
+   "person": "B",
+   "proposition": "La France doit continuer à développer le nucléaire",
+   "current": 1,
+   "expected": {
+    "own": false,
+    "stance": null,
+    "fits": true
+   }
+  },
+  {
+   "id": "u01",
+   "category": "nuance",
+   "lines": [
+    [
+     "A",
+     "Il faut augmenter le SMIC."
+    ],
+    [
+     "B",
+     "Ça dépend : pour les grandes entreprises oui, mais pour les petites c'est compliqué."
+    ]
+   ],
+   "evidence": [
+    1
+   ],
+   "person": "B",
+   "proposition": "L'État doit augmenter le salaire minimum",
+   "current": 1,
+   "expected": {
+    "own": true,
+    "stance": 0,
+    "fits": true
+   }
+  },
+  {
+   "id": "p01",
+   "category": "proposition",
+   "lines": [
+    [
+     "A",
+     "On ferait mieux de réduire les impôts."
+    ],
+    [
+     "B",
+     "Je suis pour baisser l'impôt sur les sociétés, pas l'impôt sur le revenu."
+    ]
+   ],
+   "evidence": [
+    1
+   ],
+   "person": "B",
+   "proposition": "L'État doit baisser l'impôt sur le revenu",
+   "current": 1,
+   "expected": {
+    "own": true,
+    "stance": null,
+    "fits": false
+   }
+  },
+  {
+   "id": "p02",
+   "category": "proposition",
+   "lines": [
+    [
+     "A",
+     "Que pensez-vous de l'immigration ?"
+    ],
+    [
+     "B",
+     "Il faut régulariser les travailleurs sans papiers qui ont un emploi."
+    ]
+   ],
+   "evidence": [
+    1
+   ],
+   "person": "B",
+   "proposition": "L'État doit fermer les frontières",
+   "current": -1,
+   "expected": {
+    "own": true,
+    "stance": 1,
+    "fits": false
+   }
+  },
+  {
+   "id": "c01",
+   "category": "contexte",
+   "lines": [
+    [
+     "A",
+     "Il faut augmenter le SMIC."
+    ],
+    [
+     "C",
+     "Combien tu proposes ?"
+    ],
+    [
+     "A",
+     "2000 euros net."
+    ],
+    [
+     "B",
+     "Moi je suis d'accord avec A, c'est nécessaire."
+    ]
+   ],
+   "evidence": [
+    3
+   ],
+   "person": "B",
+   "proposition": "L'État doit augmenter le salaire minimum",
+   "current": 1,
+   "expected": {
+    "own": true,
+    "stance": 1,
+    "fits": true
+   }
+  },
+  {
+   "id": "c02",
+   "category": "contexte",
+   "lines": [
+    [
+     "A",
+     "Il faut baisser la TVA sur l'énergie."
+    ],
+    [
+     "B",
+     "Oui."
+    ],
+    [
+     "C",
+     "Pas du tout, ça coûte trop cher à l'État."
+    ],
+    [
+     "B",
+     "Tu as raison, finalement ça coûte trop cher."
+    ]
+   ],
+   "evidence": [
+    3
+   ],
+   "person": "B",
+   "proposition": "L'État doit baisser la TVA sur l'énergie",
+   "current": 1,
+   "expected": {
+    "own": true,
+    "stance": -1,
+    "fits": true
+   }
+  }
+ ]
+}

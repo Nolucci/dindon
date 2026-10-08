@@ -37,6 +37,7 @@ services:
       DINDON_ANALYSIS_WORKERS: ${DINDON_ANALYSIS_WORKERS:-}
       DINDON_EMBED_MODEL: ${DINDON_EMBED_MODEL:-bge-m3}
       DINDON_NAMING_MODEL: ${DINDON_NAMING_MODEL:-qwen3:14b}
+      DINDON_REREAD_MODEL: ${DINDON_REREAD_MODEL:-}
       # Collection from Discord: only active with a token and a server ID (see README.md)
       DISCORD_TOKEN: ${DISCORD_TOKEN:-}
       DINDON_GUILD_IDS: ${DINDON_GUILD_IDS:-}
