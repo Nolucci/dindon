@@ -146,6 +146,8 @@ def test_a_reread_corrects_what_is_wrong_keeps_what_it_was_and_recomputes_the_sc
     assert rows[BOB_ID][1] == -1 and rows[BOB_ID][6] == reread.VERSION
     assert ingest_db.execute("SELECT verdict, changes FROM claim_rereads WHERE claim_id = %s", (ids[ALICE_ID],)).fetchone() == ("corrected", {"stance": [-1, 1]})
     assert all("Alice" not in p and "Bobby" not in p for p in seen)                                          # the model never gets a name
+    context, people = ingest_db.execute("SELECT context, people FROM claim_rereads WHERE claim_id = %s", (ids[ALICE_ID],)).fetchone()
+    assert "EVIDENCE" in context and "Alice" not in context and people == {"U1": str(ALICE_ID)}   # what was read is kept, as the model got it, with who is who
     assert status["counts"]["audit"]["different"] == 0                                                       # the scores were recomputed and checked
 
 
@@ -247,6 +249,7 @@ def test_the_page_starts_a_reread_follows_it_lists_the_changes_and_undoes_one(me
     assert done["job"]["state"] == "done" and done["todo"]["waiting"] == 0 and done["runs"][0]["state"] == "done" and done["runs"][0]["counts"]["corrected"] == 2
     changes = me.get("/api/reread/changes").json()["changes"]
     assert len(changes) == 2 and changes[0]["changes"]["stance"][1] == "nuance" and changes[0]["reason"] == "il hésite" and changes[0]["quotes"]
+    assert "EVIDENCE" in changes[0]["context"] and set(changes[0]["people"].values()) == {"Alice", "Bobby"} and changes[0]["person_ref"] in changes[0]["people"]
     claim_id = changes[0]["claim"]
     assert me.post(f"/api/reread/undo/{claim_id}").status_code == 200
     assert me.post(f"/api/reread/undo/{claim_id}").status_code == 409

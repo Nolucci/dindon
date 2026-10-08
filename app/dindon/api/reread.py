@@ -67,7 +67,7 @@ def changes(request: Request, guild: int | None = None, run: int | None = None, 
     with request.app.state.pool.connection() as conn:
         guild_id = resolve_guild(conn, guild)
         rows = conn.execute(
-            """SELECT r.run_id, r.claim_id, r.verdict, r.changes, r.reason, r.certainty, r.undone_at, r.created_at, cl.user_id, cl.text AS claim, cl.stance, cl.kind,
+            """SELECT r.run_id, r.claim_id, r.verdict, r.changes, r.reason, r.certainty, r.undone_at, r.created_at, r.context, r.people, cl.user_id, cl.text AS claim, cl.stance, cl.kind,
                       p.text AS proposition, COALESCE(u.global_name, u.name) AS person
                FROM claim_rereads r JOIN reread_runs rr ON rr.id = r.run_id JOIN claims cl ON cl.id = r.claim_id LEFT JOIN propositions p ON p.id = cl.proposition_id
                JOIN users u ON u.id = cl.user_id
@@ -81,6 +81,8 @@ def changes(request: Request, guild: int | None = None, run: int | None = None, 
             "SELECT id, text FROM propositions WHERE id = ANY(%s)", ([v for r in rows for v in (r["changes"].get("proposition_id") or []) if isinstance(v, int)],))}
         topics = {r["id"]: r["label"] for r in conn.execute(
             "SELECT id, label FROM topics WHERE id = ANY(%s)", ([v for r in rows for v in (r["changes"].get("theme") or []) if isinstance(v, int)],))}
+        names = {str(r["id"]): r["person"] for r in conn.execute(
+            "SELECT id, COALESCE(global_name, name) AS person FROM users WHERE id = ANY(%s)", ([int(u) for r in rows for u in (r["people"] or {}).values()],))}
     words = {1: "accord", 0: "nuance", -1: "désaccord", None: "aucune"}
     out = []
     for r in rows:
@@ -95,7 +97,9 @@ def changes(request: Request, guild: int | None = None, run: int | None = None, 
         if "theme" in c:
             shown["theme"] = [topics.get(c["theme"][0]), topics.get(c["theme"][1])]
         out.append({"run": r["run_id"], "claim": r["claim_id"], "user": str(r["user_id"]), "person": r["person"], "text": r["claim"], "proposition": r["proposition"], "quotes": quotes.get(r["claim_id"], [])[:3],
-                    "verdict": r["verdict"], "changes": shown, "reason": r["reason"], "certainty": r["certainty"], "undone": r["undone_at"] is not None, "at": r["created_at"].isoformat()})
+                    "verdict": r["verdict"], "changes": shown, "reason": r["reason"], "certainty": r["certainty"], "context": r["context"], "people": {ref: names.get(user) for ref, user in (r["people"] or {}).items()},
+                    "person_ref": next((ref for ref, user in (r["people"] or {}).items() if user == str(r["user_id"])), None),
+                    "undone": r["undone_at"] is not None, "at": r["created_at"].isoformat()})
     return {"changes": out, "next": offset + len(out) if len(out) == limit else None}
 
 

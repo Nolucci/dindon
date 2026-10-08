@@ -126,6 +126,12 @@ def window(conn: psycopg.Connection, claim_id: int) -> list[Line]:
 
 def render(lines: list[Line], person_id: int) -> tuple[str, str | None]:
     """The window in the compact grammar, and who the person is in it (`U2`; None if they are not in it). Authors are numbered in order of appearance: never a name."""
+    text, person, _ = render_with_people(lines, person_id)
+    return text, person
+
+
+def render_with_people(lines: list[Line], person_id: int) -> tuple[str, str | None, dict[str, int]]:
+    """As `render`, and who each `Ux` is (kept with the decision, so that the owner can read the context with the names)."""
     users: dict[int, str] = {}
 
     def who(author_id: int | None, bot: bool = False) -> str:
@@ -153,7 +159,7 @@ def render(lines: list[Line], person_id: int) -> tuple[str, str | None]:
         out.append(" | ".join(parts))
     for label, text, author in outside.values():
         out.append(f"{label} | {who(author)} | {tidy(text or '', LINE_CHARS) or '[contenu indisponible]'}")
-    return "\n".join(out), users.get(person_id)
+    return "\n".join(out), users.get(person_id), {ref: author for author, ref in users.items() if ref != "Bot"}
 
 
 # --- themes -------------------------------------------------------------------------------------------------------------------------
@@ -221,6 +227,7 @@ class Item:
     person: str | None
     themes: list[tuple[int, str]]
     current_theme: int | None
+    people: dict[str, int] | None = None            # who each Ux of the context is
 
 
 def ask_model(client, model: str, item: Item) -> dict | None:
@@ -302,8 +309,10 @@ def apply(conn: psycopg.Connection, client, embed_model: str, model: str, run_id
                 conn.execute("""INSERT INTO claim_topics (claim_id, topic_id, run_id) VALUES (%s, %s, %s)
                                 ON CONFLICT (claim_id) DO UPDATE SET topic_id = excluded.topic_id, run_id = excluded.run_id, created_at = now()""", (item.claim_id, decision.new_theme, run_id))
         conn.execute("UPDATE claims SET reread_at = now(), reread_version = %s WHERE id = %s", (VERSION, item.claim_id))
-        conn.execute("""INSERT INTO claim_rereads (run_id, claim_id, verdict, changes, reason, certainty) VALUES (%s, %s, %s, %s::jsonb, %s, %s)
-                        ON CONFLICT (run_id, claim_id) DO NOTHING""", (run_id, item.claim_id, decision.verdict, json.dumps(changes), decision.reason, decision.certainty))
+        conn.execute("""INSERT INTO claim_rereads (run_id, claim_id, verdict, changes, reason, certainty, context, people) VALUES (%s, %s, %s, %s::jsonb, %s, %s, %s, %s::jsonb)
+                        ON CONFLICT (run_id, claim_id) DO NOTHING""",
+                     (run_id, item.claim_id, decision.verdict, json.dumps(changes), decision.reason, decision.certainty, item.context,
+                      json.dumps({ref: str(user) for ref, user in (item.people or {}).items()})))
     return created
 
 
@@ -543,12 +552,12 @@ class RereadJobs:
                     conn.execute("UPDATE claims SET reread_at = now(), reread_version = %s WHERE id = %s", (VERSION, claim_id))
                     self._count("skipped")
                     continue
-                context, person = render(lines, user_id)
+                context, person, people = render_with_people(lines, user_id)
                 if person is None:
                     self._count("skipped")
                     continue
                 current = current_theme(conn, claim_id)
-                yield Item(claim_id, user_id, kind, stance, proposition_id, text, context, person, candidates(conn, centres, proposition_id, embed_model, current), current)
+                yield Item(claim_id, user_id, kind, stance, proposition_id, text, context, person, candidates(conn, centres, proposition_id, embed_model, current), current, people)
 
         for item, answer, error in pipeline(items(), lambda it: ask_model(client, model, it), workers_for(client, model), cancel.is_set):
             if cancel.is_set():

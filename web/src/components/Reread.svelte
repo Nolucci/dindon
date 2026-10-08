@@ -208,6 +208,15 @@
                 {#if change.reason}<p class="muted small">{change.reason}</p>{/if}
               </details>
             {/if}
+            {#if change.context}
+              <details class="evidence context"><summary>Voir tout le contexte lu</summary>
+                <p class="muted small">Ce que le modèle a lu, tel quel : les auteurs y sont anonymes, <code>EVIDENCE</code> marque les messages cités comme preuve.</p>
+                <ul class="legend">
+                  {#each Object.entries(change.people) as [ref, name]}<li><code>{ref}</code> = {name ?? 'inconnu'}{ref === change.person_ref ? ' (la personne évaluée)' : ''}</li>{/each}
+                </ul>
+                <pre class="lines">{change.context}</pre>
+              </details>
+            {/if}
             {#if change.verdict === 'corrected'}
               {#if change.undone}<span class="badge small">annulée</span>{:else}<button type="button" class="btn small" onclick={() => undo(change)}>Annuler cette correction</button>{/if}
             {/if}
@@ -253,6 +262,8 @@
   .diff s { color: var(--text-secondary); }
   .link { padding: 0; color: var(--text-link); font: inherit; font-weight: 600; text-align: left; overflow-wrap: anywhere; }
   .small { font-size: .8125rem; }
+  .legend { list-style: none; display: flex; flex-wrap: wrap; gap: .25rem 1rem; margin: .25rem 0 .5rem; padding: 0; font-size: .8125rem; }
+  .context .lines { max-height: 18rem; }
   @media (max-width: 720px) { .metrics dt { font-size: .75rem; } }
   @media (max-width: 480px) { .options, .diff dl { grid-template-columns: 1fr; } }
 </style>

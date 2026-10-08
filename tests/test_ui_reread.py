@@ -28,8 +28,9 @@ def base(ingest_url, ingest_db, tmp_path):
     guild = ingest_db.execute("SELECT guild_id FROM claims LIMIT 1").fetchone()[0]
     run = ingest_db.execute("INSERT INTO reread_runs (guild_id, state, finished_at, model, version, counts) VALUES (%s, 'done', now(), 'qwen3:14b', 'reread-1', "
                             "'{\"confirmed\": 3, \"corrected\": 1, \"stance_changed\": 1, \"audit\": {\"checked\": 8, \"different\": 0}}'::jsonb) RETURNING id", (guild,)).fetchone()[0]
-    claim = ingest_db.execute("SELECT id FROM claims ORDER BY id LIMIT 1").fetchone()[0]
-    ingest_db.execute("INSERT INTO claim_rereads (run_id, claim_id, verdict, changes, reason, certainty) VALUES (%s, %s, 'corrected', '{\"stance\": [1, -1]}'::jsonb, 'il contredit ce qui précède', 88)", (run, claim))
+    claim, author = ingest_db.execute("SELECT id, user_id FROM claims ORDER BY id LIMIT 1").fetchone()
+    ingest_db.execute("INSERT INTO claim_rereads (run_id, claim_id, verdict, changes, reason, certainty, context, people) VALUES (%s, %s, 'corrected', '{\"stance\": [1, -1]}'::jsonb, "
+                      "'il contredit ce qui précède', 88, 'M1 | U1 | Il faut augmenter le SMIC.' || chr(10) || 'M2 | U2 | Non, c''est faux. | EVIDENCE', %s::jsonb)", (run, claim, '{"U1": "1", "U2": "%d"}' % author))
     settings = dataclasses.replace(settings_for(ingest_url, tmp_path, PASSWORD), web_dir=WEB)
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
@@ -72,6 +73,9 @@ def test_the_page_shows_what_there_is_to_reread_the_last_reread_and_its_correcti
         assert not item.get_by_text("il contredit ce qui précède").is_visible()
         item.get_by_text("Citations et motif", exact=True).click()
         assert "il contredit ce qui précède" in item.inner_text()
+        item.get_by_text("Voir tout le contexte lu", exact=True).click()
+        assert "EVIDENCE" in item.locator("pre").inner_text() and "Il faut augmenter le SMIC." in item.locator("pre").inner_text()
+        assert "(la personne évaluée)" in item.inner_text()
         item.get_by_role("button", name="Annuler cette correction").click()
         item.get_by_text("annulée", exact=True).wait_for()
         browser.close()
