@@ -1,4 +1,5 @@
 <script>
+  import Help from './Help.svelte';
   import { onMount } from 'svelte';
   import { api, AuthError } from '../lib/api.js';
 
@@ -51,11 +52,7 @@
     }
   }
 
-  onMount(() => {
-    load();
-
-
-  });
+  onMount(load);
 </script>
 
 <div class="page">
@@ -69,7 +66,7 @@
   {#if overview}
     <div class="layout" class:selected={chosen !== null}>
       <section class="panel card list" aria-label="Les débats">
-        <h2 class="eyebrow">Les derniers débats</h2>
+        <h2 class="eyebrow">{overview.debates.length} débats</h2>
         {#if overview.debates.length === 0}
           <p class="muted">Aucun débat pour l’instant.</p>
         {:else}
@@ -93,7 +90,7 @@
           <section class="panel card" aria-label="Résumé">
             <button type="button" class="tool-btn back" onclick={() => { chosen = null; detail = null; }}>← Tous les débats</button>
             <h2 class="debateTitle">{detail.debate.topic}</h2>
-            {#if detail.debate.axis}<p class="muted small">Question posée par Dindon · axe « {detail.debate.axis.name} »</p>{/if}
+            {#if detail.debate.axis}<p class="muted small">{detail.debate.axis.name}</p>{/if}
             <p class="muted small">{STATUS[detail.debate.status] ?? detail.debate.status} · {when(detail.debate.started_at)}</p>
             <details><summary>Détails du débat</summary>            <p class="muted small">
               {STATUS[detail.debate.status] ?? detail.debate.status}{detail.debate.close_reason ? ` (${REASON[detail.debate.close_reason] ?? detail.debate.close_reason})` : ''}
@@ -102,56 +99,51 @@
               · du {when(detail.debate.started_at)} au {when(detail.debate.closed_at)}
             </p>
 </details>
-            {#if detail.debate.context}<p class="muted small">Contexte : {detail.debate.context}</p>{/if}
+            {#if detail.debate.context}<details><summary>Contexte</summary><p class="muted small">{detail.debate.context}</p></details>{/if}
             <p>
               <strong>{detail.totals.participants}</strong> participant{detail.totals.participants > 1 ? 's' : ''} · <strong>{detail.totals.messages}</strong> message{detail.totals.messages > 1 ? 's' : ''}
-              · {detail.totals.changed_mind} ont changé de position
+              {#if detail.totals.changed_mind}· {detail.totals.changed_mind} changement{detail.totals.changed_mind > 1 ? 's' : ''} de position{/if}
             </p>
             <ul class="bars">
-              {#each Object.entries(detail.totals.final) as [position, n]}
+              {#each Object.entries(detail.totals.final).filter(([, n]) => n > 0) as [position, n]}
                 <li><span class="label">{POSITION[position]}</span><span class="count">{n}</span></li>
               {/each}
             </ul>
-            {#if detail.messages_waiting_to_be_read}<p class="muted small">{detail.messages_waiting_to_be_read} message(s) attendent d’être lus.</p>{/if}
+            {#if detail.messages_waiting_to_be_read}<p class="muted small">{detail.messages_waiting_to_be_read} message{detail.messages_waiting_to_be_read > 1 ? 's' : ''} à lire.</p>{/if}
             {#if detail.corrections.posted || detail.corrections.taken_back}
               <p class="muted small">Corrections publiées : {detail.corrections.posted} · retirées : {detail.corrections.taken_back}</p>
             {/if}
           </section>
 
+          {#if detail.participants.length}
           <section class="panel card" aria-label="Participants">
-            <h2 class="eyebrow">Participants</h2>
-            <table>
-              <thead><tr><th>Personne</th><th>Position</th><th>Messages</th><th>Message phare</th><th>Examinées</th></tr></thead>
-              <tbody>
-                {#each detail.participants as p (p.user_id)}
-                  <tr>
-                    <td>{p.name ?? p.user_id}</td>
-                    <td>{POSITION[p.position ?? 'none']}{p.changed && p.first_position !== p.position ? ` (avant : ${POSITION[p.first_position]})` : ''}</td>
-                    <td>{p.messages} ({pct(p.share)})</td>
-                    <td>
-                      {#if p.key_message}
-                        « {p.key_message.excerpt} »
-                        {#if p.key_message.url}<a href={p.key_message.url} target="_blank" rel="noopener noreferrer">Voir sur Discord</a>{/if}
-                        <span class="muted small">({p.key_message.replies} rép., {p.key_message.reactions} réact.)</span>
-                      {:else}—{/if}
-                    </td>
-                    <td>{Object.entries(p.claims).filter(([, n]) => n).map(([v, n]) => `${n} ${VERDICT[v][1]}`).join(', ') || '—'}</td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-            <p class="hint">Message phare : le plus commenté et le plus apprécié du fil (réponses ×3 + réactions), le même critère pour tout le monde.</p>
+            <header class="cardHead"><h2 class="eyebrow">Participants</h2><Help label="Comment est choisi le message phare ?">Le message qui reçoit le plus de réponses et de réactions (réponses × 3 + réactions). Le même critère pour tout le monde.</Help></header>
+            <ul class="participants">
+              {#each detail.participants as p (p.user_id)}
+                <li>
+                  <header class="cardHead"><strong>{p.name ?? p.user_id}</strong><span class="badge small">{POSITION[p.position ?? 'none']}</span></header>
+                  <p class="muted small">{p.messages} message{p.messages > 1 ? 's' : ''} · {pct(p.share)}{p.changed && p.first_position !== p.position ? ` · avant : ${POSITION[p.first_position]}` : ''}</p>
+                  {#if p.key_message}
+                    <details><summary>Message phare</summary><blockquote>{p.key_message.excerpt}</blockquote>
+                      {#if p.key_message.url}<a href={p.key_message.url} target="_blank" rel="noopener noreferrer">Voir sur Discord</a>{/if}
+                    </details>
+                  {/if}
+                  {#if Object.values(p.claims).some((n) => n)}<p class="muted small">{Object.entries(p.claims).filter(([, n]) => n).map(([v, n]) => `${n} ${VERDICT[v][1]}`).join(' · ')}</p>{/if}
+                </li>
+              {/each}
+            </ul>
           </section>
+
+          {/if}
 
           {#if detail.answers.some((a) => !detail.claims.some((c) => c.message_id === a.message_id && c.claim === a.claim))}
             <section class="panel card" aria-label="Réponses de Dindon">
-              <h2 class="eyebrow">Réponses de Dindon, sans Internet</h2>
-              <p class="muted small">Réponses provisoires, sans source.</p>
+              <header class="cardHead"><div class="answerTitle"><h2 class="eyebrow">Réponses de Dindon</h2><span class="badge small">Sans source</span></div><Help label="À propos des réponses de Dindon">Réponses provisoires, sans source. Les votes permettent de demander une vérification.</Help></header>
               <ul class="claims">
                 {#each detail.answers.filter((a) => !detail.claims.some((c) => c.message_id === a.message_id && c.claim === a.claim)) as a (a.id)}
                   <li>
                     <p>
-                      <span class="badge small {a.verdict === 'false' ? 'danger' : 'ok'}">{a.verdict === 'false' ? 'jugée fausse' : 'jugée exacte (rien dit)'}</span>
+                      <span class="badge small {a.verdict === 'false' ? 'danger' : 'ok'}">{a.verdict === 'false' ? 'jugée fausse' : 'jugée exacte'}</span>
                       <strong>« {a.claim} »</strong>
                       <a href={jump(a)} target="_blank" rel="noopener noreferrer">Voir sur Discord</a>
                     </p>
@@ -169,14 +161,14 @@
             <section class="panel card" aria-label="Affirmations examinées">
               <h2 class="eyebrow">Affirmations examinées</h2>
               {#if Object.keys(detail.parity).length}
-                <details><summary>Répartition par position</summary>                <table class="parity" aria-label="Parité par position">
+                <details><summary>Répartition par position</summary>                <div class="parityScroll"><table class="parity" aria-label="Parité par position">
                   <thead><tr><th>Position</th><th>Examinées</th>{#each detail.verdicts.filter((v) => detail.claims.some((c) => c.verdict === v)) as v}<th>{VERDICT[v][1]}</th>{/each}</tr></thead>
                   <tbody>
                     {#each Object.entries(detail.parity) as [position, row]}
                       <tr><td>{POSITION[position]}</td><td>{row.total}</td>{#each detail.verdicts.filter((v) => detail.claims.some((c) => c.verdict === v)) as v}<td>{row[v]}</td>{/each}</tr>
                     {/each}
                   </tbody>
-                </table></details>
+                </table></div></details>
               {/if}
               <ul class="claims">
                 {#each detail.claims as c (c.id)}
@@ -193,7 +185,7 @@
                     {#each c.sources as s}
                       <p class="source">
                         <a href={s.url} target="_blank" rel="noopener noreferrer">{host(s.url)}</a>
-                        <span class="muted small">({s.tier === 'official' ? 'source officielle' : s.tier === 'checker' ? 'vérification de presse' : 'autre source, non vérifiée par Dindon'}, {s.stance === 'supports' ? 'confirme' : s.stance === 'contradicts' ? 'contredit' : 'en partie'})</span>
+                        <span class="muted small">· {s.stance === 'supports' ? 'confirme' : s.stance === 'contradicts' ? 'contredit' : 'en partie'}</span><Help label="Nature de la source">{s.tier === 'official' ? 'Source officielle' : s.tier === 'checker' ? 'Vérification de presse' : 'Source non vérifiée par Dindon'}</Help>
                         : « {s.quote} »
                       </p>
                     {/each}
@@ -212,7 +204,17 @@
   .layout.selected { grid-template-columns: minmax(15rem, 20rem) minmax(0, 1fr); }
   .back { align-self: flex-start; }
   .debateTitle { font-size: 1.25rem; line-height: 1.35; }
-  .card { overflow-x: auto; }
+  .cardHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
+  .answerTitle { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+  .participants { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: .75rem; }
+  .participants > li { display: flex; flex-direction: column; gap: .5rem; padding: .875rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+  blockquote { margin: .5rem 0; padding-left: .75rem; border-left: 2px solid var(--border-subtle); color: var(--text-secondary); }
+  .parityScroll { overflow-x: auto; }
+  .layout.selected > .list { position: sticky; top: 0; max-height: calc(100dvh - 8rem); overflow-y: auto; }
+  .claims > li > p:first-child { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; }
+  .claims > li > p:first-child > strong { flex-basis: 100%; }
+  .source { overflow-wrap: anywhere; }
+
   @media (max-width: 900px) { .layout.selected { grid-template-columns: 1fr; } .layout.selected > .list { display: none; } }
   .page { flex: 1; min-height: 0; overflow-y: auto; padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 2.5rem; display: flex; flex-direction: column; gap: 1.25rem; animation: fadeIn var(--transition-slow) both; }
   h1 { font-size: clamp(1.5rem, 2vw, 1.9rem); line-height: 1.1; font-weight: 700; color: var(--text-primary); }
@@ -229,7 +231,7 @@
   th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
   th { color: var(--text-muted); font-weight: 600; }
   .claims li { padding: 0.5rem 0; border-bottom: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 0.25rem; }
-  .source { padding-left: 1rem; font-size: 0.8125rem; color: var(--text-secondary); }
+  .source { padding-left: .75rem; border-left: 2px solid var(--border-subtle); font-size: 0.8125rem; color: var(--text-secondary); }
   a { color: var(--accent, #5865f2); }
   .hint { font-size: 0.75rem; line-height: 1.5; color: var(--text-muted); }
   .small { font-size: 0.75rem; }

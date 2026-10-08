@@ -2,6 +2,7 @@
 
 Optional: skipped when Playwright or the built interface (make web) is missing."""
 import dataclasses
+import os
 import socket
 import threading
 import time
@@ -11,6 +12,7 @@ import pytest
 
 sync_api = pytest.importorskip("playwright.sync_api")
 
+from test_ui_agencement import assert_fits
 from dindon.api.main import create_app  # noqa: E402
 from synthetic import settings_for  # noqa: E402
 from test_debate_checks import EVIDENCE  # noqa: E402
@@ -73,8 +75,11 @@ def test_the_person_in_charge_reads_a_debate_with_its_checked_claims_and_their_l
         summary = page.get_by_label("Résumé").inner_text()
         assert "en cours" in summary and "dans un fil" in summary and "affirmations vérifiées" in summary and "fin si personne n’écrit pendant 24 heures" in summary
         assert "période" not in summary and "vote" not in summary
+        page.get_by_label("Participants").get_by_text("Message phare", exact=True).first.click()
+        page.get_by_role("button", name="Comment est choisi le message phare ?", exact=True).click()
         table = page.get_by_label("Participants").inner_text()
-        assert "Bobby" in table and "✅ Pour" in table and "❌ Contre" in table and "le même critère pour tout le monde" in table
+        assert "Bobby" in table and "✅ Pour" in table and "❌ Contre" in table and "Le même critère pour tout le monde" in table
+        page.keyboard.press("Escape")
         claims = page.get_by_label("Affirmations examinées")
         text = claims.inner_text()
         assert "contredite" in text and "non vérifiable" in text and EVIDENCE.quote in text and "insee.fr" in text
@@ -82,11 +87,30 @@ def test_the_person_in_charge_reads_a_debate_with_its_checked_claims_and_their_l
         assert link.get_attribute("href") == EVIDENCE.url and "noopener" in link.get_attribute("rel") and link.get_attribute("target") == "_blank"
         page.get_by_text("Répartition par position", exact=True).click()
         assert page.get_by_label("Parité par position").inner_text().count("✅ Pour") == 1
+        for width in (1440, 1024, 720, 390, 320):
+            page.set_viewport_size({"width": width, "height": 1000})
+            page.wait_for_timeout(400)
+            assert_fits(page, ("debate participants and claims", width))
+            if os.environ.get("DINDON_SHOTS"):
+                folder = Path(os.environ["DINDON_SHOTS"]); folder.mkdir(parents=True, exist_ok=True)
+                page.screenshot(path=str(folder / f"{width}-debates-participants.png"))
+        page.get_by_role("button", name="Tous les débats").click()
         page.get_by_role("button", name="Le pouvoir doit-il être réparti").click()
-        page.get_by_label("Résumé").get_by_text("Question posée par Dindon").wait_for()
+        page.get_by_label("Résumé").locator("p").filter(has_text="Structure de l").first.wait_for()
         summary = page.get_by_label("Résumé").inner_text()
-        assert "axe « Structure de l’État »" in summary.replace("'", "’") and "🔵 Fédéral" in summary and "🟠 Unitaire" in summary and "Pour" not in summary
-        answered = page.get_by_label("Réponses de Dindon").inner_text()
-        assert all(words in answered for words in ("jugée fausse", "d'environ 7 %", "✅ Valide 0 · ❌ Invalide 1", "sans source")), answered
+        assert "Structure de l’État" in summary.replace("'", "’") and "Pour" not in summary
+        assert page.get_by_label("Résumé").locator(".bars li").count() == 0
+        answered = page.get_by_label("Réponses de Dindon", exact=True).inner_text()
+        assert all(words in answered for words in ("jugée fausse", "d'environ 7 %", "✅ Valide 0 · ❌ Invalide 1")), answered
+        page.get_by_role("button", name="À propos des réponses de Dindon", exact=True).click()
+        assert "sans source" in page.locator("[popover]:popover-open").inner_text()
+        page.keyboard.press("Escape")
+        for width in (1440, 1024, 720, 390, 320):
+            page.set_viewport_size({"width": width, "height": 1000})
+            page.wait_for_timeout(400)
+            assert_fits(page, ("debate detail", width))
+            if os.environ.get("DINDON_SHOTS"):
+                folder = Path(os.environ["DINDON_SHOTS"]); folder.mkdir(parents=True, exist_ok=True)
+                page.screenshot(path=str(folder / f"{width}-debates-review.png"))
         browser.close()
     assert errors == []

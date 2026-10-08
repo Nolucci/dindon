@@ -56,3 +56,11 @@ Ces changements sont locaux et ne sont pas encore déployés sur dindon.serveurn
 | Exports | Menu déplié dans le flux sur téléphone pour rester dans l’écran |
 
 La validation couvre les pages de consultation et toutes les sections de Système à 320, 390, 720, 1 024 et 1 440 px. Elle contrôle aussi les débordements internes aux composants, y compris avec des noms, mots-clés et URLs très longs. Les tableaux et journaux conservent leur défilement volontaire.
+
+## Débats et analyse : affichage minimal
+
+- Débats : liste latérale persistante sur ordinateur ; fiches de participants à la place du tableau large ; message phare et contexte dépliables ; répartition sans positions vides ; citations et liens de sources conservés. Les explications du message phare et de la nature des sources sont accessibles avec « ? ».
+- Analyse : aide courte au niveau du titre de chaque section ; descriptions et mots-clés des thèmes dépliables ; instructions répétées retirées des réglages ; précision sur le traitement accessible à la demande.
+- Relecture : marges intérieures ajoutées aux cadres ; filtres alignés et empilés sur les petits téléphones ; compteurs distincts ; colonnes Avant/Après qui passent en lignes sur mobile ; libellés Pour/Contre/Nuancé ; citations et motif dépliables ; annulation de chaque correction conservée. Les aides précisent la préservation des décisions manuelles et des positions incertaines.
+
+Les infobulles s’ouvrent au clic ou au clavier, restent dans l’écran et se ferment avec Échap ou un clic extérieur. Les tableaux de répartition conservent un défilement propre, sans faire défiler tout le cadre. Les corrections locales sont vérifiées sur ordinateur et téléphone, y compris avec des résultats longs et l’annulation d’une correction.

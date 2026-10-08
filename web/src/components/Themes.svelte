@@ -1,5 +1,6 @@
 <script>
   import ExportMenu from './ExportMenu.svelte';
+  import Help from './Help.svelte';
   import { onDestroy } from 'svelte';
   import { api, makeGuard } from '../lib/api.js';
   import { day } from '../lib/format.js';
@@ -186,11 +187,9 @@
       {#if editing?.id === topic.id}
         <textarea class="field-input" rows="2" bind:value={editing.description} aria-label="Description du thème" maxlength="400"></textarea>
       {:else if topic.description}
-        {#if topic.description.length > 150}<details class="descriptionDetails"><summary>{topic.description.slice(0, 147)}…</summary><p>{topic.description}</p></details>{:else}<p class="description">{topic.description}</p>{/if}
+        <details class="descriptionDetails"><summary>Description</summary><p>{topic.description}</p>{#if topic.keywords.length}<p class="tags">{#each topic.keywords as word}<span>{word}</span>{/each}</p>{/if}</details>
       {/if}
-      {#if topic.keywords.length}
-        <p class="tags">{#each topic.keywords.slice(0, 3) as word}<span>{word}</span>{/each}</p>
-      {/if}
+      {#if !topic.description && topic.keywords.length}<details><summary>Mots-clés</summary><p class="tags">{#each topic.keywords as word}<span>{word}</span>{/each}</p></details>{/if}
       {#if topic.examples.length}
         <details>
           <summary>Voir les extraits</summary>
@@ -256,7 +255,7 @@
     {#if !loaded}
       <p class="muted">Chargement…</p>
     {:else if !proposed.length}
-      <p class="muted empty">{filtering ? 'Aucun thème ne correspond à la recherche.' : 'Aucun thème à examiner. Ouvrez « Analyse et réglages » pour lancer une analyse.'}</p>
+      <p class="muted empty">{filtering ? 'Aucun thème ne correspond à la recherche.' : 'Aucun thème à examiner.'}</p>
     {:else}
       <div class="grid">{#each proposed as topic (topic.id)}{@render card(topic)}{/each}</div>
     {/if}
@@ -294,7 +293,7 @@
 
     {#if info}
       {#if !ready.ollama}
-        <p class="banner">Ollama n’est pas lancé ou pas joignable : {ready.problem}. Installez-le et lancez-le (voir le README), puis rechargez cette page.</p>
+        <p class="banner">Analyse indisponible <Help label="Pourquoi l’analyse est indisponible">{ready.problem}</Help></p>
       {:else if missing.length}
         <p class="banner">Il manque : {#each missing as name}<code>ollama pull {name}</code> {/each}</p>
       {/if}
@@ -319,8 +318,7 @@
         <label class="inline">Nombre de thèmes
           <input class="field-input small" type="number" min="2" max="80" placeholder="auto" bind:value={fixedTopics} aria-label="Nombre de thèmes" />
         </label>
-        <p class="muted hint">Laissez vide pour laisser l’analyse choisir. Modèles : <code>{info.models.embeddings}</code> (vecteurs), <code>{info.models.naming}</code> (noms). Les ordinateurs d’analyse ajoutés dans Système peuvent recevoir le texte nécessaire au calcul.
-          {#if info.last_run} Dernière recherche : {when(info.last_run.at)}, {info.last_run.k} thèmes.{/if}</p>
+        <Help label="Choisir le nombre de thèmes">Laissez vide pour choisir automatiquement. Les ordinateurs configurés dans Système peuvent recevoir les conversations nécessaires à l’analyse.</Help>
       </details>
 
       {#if job.state !== 'idle'}

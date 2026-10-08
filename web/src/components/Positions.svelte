@@ -1,5 +1,6 @@
 <script>
   import ExportMenu from './ExportMenu.svelte';
+  import Help from './Help.svelte';
   import { onDestroy, untrack } from 'svelte';
   import { api, makeGuard } from '../lib/api.js';
   import { day } from '../lib/format.js';
@@ -269,7 +270,7 @@
       {#if data && !data.propositions.length && filtering}
         <p class="muted empty">Aucune proposition ne correspond.</p>
       {:else if data && !data.propositions.length}
-        <p class="muted empty">Aucune position pour l’instant. Ouvrez « Analyse et réglages » pour lancer une analyse.</p>
+        <p class="muted empty">Aucune position pour l’instant.</p>
       {/if}
       {#each groups as group (group.key)}
         <h3 class="theme">{group.theme} <span class="count">{group.items.length} proposition{group.items.length > 1 ? 's' : ''} · {group.people} positions</span></h3>
@@ -321,7 +322,7 @@
                           <button type="button" class="tool-btn" onclick={() => drop(l.axis)}>Retirer</button>
                         </div>
                       {:else}
-                        <p class="muted small">Aucun axe : cette proposition ne pèse sur aucun axe.</p>
+                        <p class="muted small">Aucun axe associé.</p>
                       {/each}
                       <div class="add">
                         <select class="select" bind:value={newAxis} aria-label="Ajouter un axe">
@@ -386,11 +387,11 @@
           <button type="button" class="btn" onclick={onAutomate}>Automatiser les prochaines lectures</button>
 
         </div>
-        <p class="muted hint">{fmt.format(remaining)} conversation{remaining > 1 ? 's' : ''} restante{remaining > 1 ? 's' : ''}. Les conversations déjà lues ne sont pas relues.</p>
+        <p class="muted hint">{fmt.format(remaining)} conversations restantes.</p>
         <details class="advanced"><summary>Options de lecture</summary>      {#if data?.axes_links?.total}
         <label class="check" title="Les liens que personne n'a relus sont ignorés dans les scores des personnes">
           <input type="checkbox" checked={data.axes_links.only_validated} onchange={(e) => onlyValidated(e.currentTarget.checked)} />
-          <span>Ne compter dans les scores que les liens validés ({data.axes_links.validated} sur {data.axes_links.total})</span>
+          <span>Liens validés uniquement ({data.axes_links.validated}/{data.axes_links.total})</span>
         </label>
       {/if}
 
@@ -401,9 +402,7 @@
             <input class="field-input num" type="number" min="1" max="10000" step="1" bind:value={batches} disabled={untilEnd} aria-label="Nombre d’étapes" />
           </label>
           <label class="check"><input type="checkbox" bind:checked={untilEnd} /> <span>Continuer jusqu’à la fin ({fmt.format(remaining)} restantes)</span></label>
-          <p class="muted hint">Après chaque étape, les positions sont vérifiées et reliées aux axes : les contradictions apparaissent au fur et à mesure.
-            {untilEnd ? 'Toutes les conversations restantes seront lues.' : `Jusqu’à ${fmt.format(Math.max(1, Math.floor(Number(perBatch)) || 1) * Math.max(1, Math.floor(Number(batches)) || 1))} conversations.`}</p>
-          <p class="muted hint">Environ 15 s par conversation. {fmt.format(data.claims.refused)} position{data.claims.refused > 1 ? 's' : ''} refusée{data.claims.refused > 1 ? 's' : ''} faute de preuve. Modèle : <code>{info?.models.naming}</code>. Les ordinateurs d’analyse ajoutés dans Système peuvent recevoir le texte nécessaire au calcul.</p>
+          <p class="muted hint">{untilEnd ? 'Toutes les conversations restantes.' : `Jusqu’à ${fmt.format(Math.max(1, Math.floor(Number(perBatch)) || 1) * Math.max(1, Math.floor(Number(batches)) || 1))} conversations.`} <Help label="À propos de l’analyse des positions">Les conversations déjà lues sont préservées. Les positions sans preuve sont écartées. Les ordinateurs configurés dans Système peuvent recevoir les conversations nécessaires à l’analyse.</Help></p>
         </details>
         {#if job && job.state !== 'idle'}
           <div class="progress" aria-live="polite">

@@ -1,5 +1,6 @@
 """The page Relecture, in a real browser: what there is to reread, the button, and what the reread corrected with its « Annuler ». Optional: skipped without Playwright or the built interface."""
 import dataclasses
+import os
 import socket
 import threading
 import time
@@ -11,6 +12,7 @@ sync_api = pytest.importorskip("playwright.sync_api")
 
 from dindon.api.main import create_app  # noqa: E402
 from synthetic import settings_for  # noqa: E402
+from test_ui_agencement import assert_fits
 from test_axes import a_socialist_and_a_liar  # noqa: E402
 
 WEB = Path(__file__).resolve().parents[1] / "web" / "dist"
@@ -61,12 +63,49 @@ def test_the_page_shows_what_there_is_to_reread_the_last_reread_and_its_correcti
         assert "à relire" in page.locator("section[aria-label='Lancer une relecture']").inner_text()
         last = page.locator("section[aria-label='Dernière relecture']")
         last.wait_for()
-        assert "1 corrigées" in last.inner_text().replace("\n", " ") or "corrigées" in last.inner_text()
+        assert "corrigées" in last.inner_text().lower()
+        last.get_by_text("Contrôle des scores", exact=True).click()
         assert "aucun écart" in last.inner_text()
         item = page.locator(".changes li").first
         item.wait_for()
-        assert "Position" in item.inner_text() and "il contredit ce qui précède" in item.inner_text()
+        assert "Position" in item.inner_text() and "Pour" in item.inner_text() and "Contre" in item.inner_text()
+        assert not item.get_by_text("il contredit ce qui précède").is_visible()
+        item.get_by_text("Citations et motif", exact=True).click()
+        assert "il contredit ce qui précède" in item.inner_text()
         item.get_by_role("button", name="Annuler cette correction").click()
-        page.get_by_text("annulée").first.wait_for()
+        item.get_by_text("annulée", exact=True).wait_for()
         browser.close()
     assert errors == []
+
+
+def test_reread_layout_and_help_fit_with_long_results(base, ingest_db):
+    long_text = 'OrganisationCollectiveEtConstitution' * 8
+    ingest_db.execute("UPDATE propositions SET text = %s", (long_text,))
+    ingest_db.execute("UPDATE users SET global_name = %s", (long_text,))
+    with sync_api.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+        page.goto(base + '/#/analyse/reread')
+        page.fill('#password', PASSWORD); page.click('button[type=submit]')
+        page.locator('.changes li').first.wait_for()
+        for width in (1440, 1024, 720, 390, 320):
+            page.set_viewport_size({'width': width, 'height': 1000})
+            page.wait_for_timeout(400)
+            assert_fits(page, ('reread', width))
+            assert page.locator('.card').first.evaluate('el => parseFloat(getComputedStyle(el).paddingLeft)') >= 12
+            help_button = page.get_by_role('button', name='À propos de la relecture', exact=True)
+            help_button.click()
+            bubble = page.locator('[popover]:popover-open')
+            sync_api.expect(bubble).to_be_visible()
+            box = bubble.bounding_box()
+            assert box['x'] >= 0 and box['x'] + box['width'] <= width
+            assert 'validées ou rejetées' in bubble.inner_text()
+            page.keyboard.press('Escape')
+            sync_api.expect(bubble).to_have_count(0)
+            help_button.focus(); page.keyboard.press('Enter')
+            sync_api.expect(page.locator('[popover]:popover-open')).to_be_visible()
+            page.keyboard.press('Escape')
+            if os.environ.get('DINDON_SHOTS'):
+                folder = Path(os.environ['DINDON_SHOTS']); folder.mkdir(parents=True, exist_ok=True)
+                page.screenshot(path=str(folder / f'{width}-reread-review.png'))
+        browser.close()

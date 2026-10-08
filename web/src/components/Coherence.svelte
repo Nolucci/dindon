@@ -57,7 +57,7 @@
   {:else}
     <section class="panel card" aria-label="Résumé">
       <dl class="counts">
-        <div class="metric"><dt>Personnes avec un rôle d’idées</dt><dd>{data.totals.people}</dd></div>
+        <div class="metric"><dt>Personnes</dt><dd>{data.totals.people}</dd></div>
         <div class="metric"><dt>À examiner</dt><dd class="bad">{data.totals.discordant}</dd></div>
         <div class="metric"><dt>Sans contradiction repérée</dt><dd>{data.totals.concordant}</dd></div>
         <div class="metric"><dt>Pas assez de propos</dt><dd>{data.totals.not_verifiable}</dd></div>
@@ -91,14 +91,14 @@
       {#each shown as p (p.id)}
         <li class="panel person">
           <header><strong>{p.label}</strong>{#if p.role_conflict}<span class="badge small danger">rôles qui s’excluent</span>{/if}<button type="button" class="btn evidence" aria-expanded={evidenceFor.includes(p.id)} onclick={() => evidenceFor = evidenceFor.includes(p.id) ? evidenceFor.filter((id) => id !== p.id) : [...evidenceFor, p.id]}>Voir les citations</button><button type="button" class="tool-btn" onclick={() => onPerson(p.id)}>Voir le profil</button></header>
-          {#if p.role_conflict}<p class="small">Cette personne porte aussi des rôles d’idées incompatibles entre eux.</p>{/if}
+          {#if p.role_conflict}<p class="small">Rôles incompatibles.</p>{/if}
           {#each p.roles as r}
             {#if verdictFilter !== 'discordant' || r.verdict === 'discordant'}
             <div class="role">
               <div class="roleHead"><span class="roleName">{r.role}</span><span class="badge small" class:success={r.verdict === 'concordant'} class:danger={r.verdict === 'discordant'}>{VERDICT[r.verdict][0]}</span></div>
               {#each r.against as a}
                 <div class="against">
-                  <p class="small">« {a.axis} » : {a.positions} position{a.positions > 1 ? 's' : ''} lue{a.positions > 1 ? 's' : ''} {a.positions === 1 ? 'va' : 'vont'} à l’encontre de ce rôle.</p>
+                  <p class="small">{a.axis} · {a.positions} position{a.positions > 1 ? 's' : ''} en contradiction.</p>
                     {#if evidenceFor.includes(p.id)}<ul class="said">
                       {#each a.contributions as c}
                         <li>

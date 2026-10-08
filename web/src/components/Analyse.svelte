@@ -1,4 +1,5 @@
 <script>
+  import Help from './Help.svelte';
   import { api, AuthError } from '../lib/api.js';
   import Themes from './Themes.svelte';
   import Positions from './Positions.svelte';
@@ -98,11 +99,11 @@
     <header class="intro">
 
       <h1>Analyse</h1>
-      <p>{summary ? `${fmt.format(summary.messages)} messages importés · ${fmt.format(summary.conversations)} conversations` : 'Chargement de l’analyse…'}</p>
+      <p>{summary ? `${fmt.format(summary.messages)} message${summary.messages > 1 ? 's' : ''} · ${fmt.format(summary.conversations)} conversation${summary.conversations > 1 ? 's' : ''}` : 'Chargement de l’analyse…'}</p>
     </header>
 
     {#if !guild}
-      <p class="empty">Aucun serveur n’est encore importé. Utilisez « Importer » pour commencer l’analyse.</p>
+      <p class="empty">Aucun serveur importé.</p>
     {:else}
       {#if problem}<p class="banner" role="alert">{problem}</p>{/if}
       <nav class="sections" aria-label="Sections de l’analyse">
@@ -133,6 +134,7 @@
           {:else}
             <h2>Contradictions</h2>
           {/if}
+          {#if section !== 'reread'}<Help label="Comprendre cette section">{section === 'themes' ? 'Regroupe les conversations par sujet. Validez les thèmes qui vous semblent pertinents.' : section === 'positions' ? 'Ouvrez une proposition pour voir les positions et leurs citations.' : 'Compare les rôles déclarés aux propos disponibles. Une contradiction reste à vérifier dans les citations.'}</Help>{/if}
         </div>
         {#if section === 'themes'}
           <Themes {guild} {onAuthLost} {onAutomate} embedded onUpdate={loadSummary} />
@@ -230,6 +232,7 @@
   .sections button:hover, .sections button:focus-visible { color: var(--text-primary); background: var(--bg-secondary); }
   .sections button.active { color: var(--text-primary); background: var(--bg-secondary); box-shadow: inset 0 0 0 1px var(--border-subtle); }
   .detail { display: flex; flex-direction: column; gap: 1rem; }
+  .detailIntro { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
   .detailIntro h2 { margin: 0 0 .35rem; font-size: 1.2rem; color: var(--text-primary); }
   .empty { padding: 1.25rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); color: var(--text-secondary); }
   @media (max-width: 720px) { .content { padding: 1rem 1rem 2rem; } .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sections button { padding: .6rem .25rem; font-size: .8rem; } }
