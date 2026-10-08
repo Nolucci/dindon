@@ -56,6 +56,8 @@ Le mode `live` dépend de `DINDON_DEBATE_PRECISION` et du seuil `DINDON_DEBATE_M
 
 La recherche envoie une **phrase neutre**, pas le message Discord entier ni le nom de son auteur, à Google Fact Check Tools ou à un SearXNG configuré. Le vérificateur limite chaque affirmation à deux recherches et trois pages. `answer` peut fonctionner sans service de recherche, mais ne peut alors approfondir un vote défavorable. Les modes avec recherche font donc sortir cette phrase de la machine ; l'activité normale du bot communique aussi avec Discord.
 
+**Avis provisoire.** Quand aucune source de confiance ne tranche, le vérificateur peut lire, dans la limite des mêmes trois pages et seulement parmi celles que la recherche a renvoyées, des pages d'autres sources (presse, encyclopédie, blogs). Il en tire au mieux un avis **provisoire** (« probablement vraie / fausse »), avec la citation retrouvée sur la page et le lien. Cet avis est affiché comme provisoire dans l'interface et dans les statistiques ; il ne fonde **jamais** une correction publique ni une note du verdict. Deux sources qui se contredisent, ou une citation introuvable, ne donnent aucun avis. Les participants peuvent le contester et le corriger.
+
 Les interactions réelles avec Discord, la fiabilité du modèle et la pertinence des sources demandent une validation sur le serveur concerné. Les tests du dépôt couvrent le protocole et les règles avec un faux Discord et des données inventées.
 
 ### Sondages et axes des cartes

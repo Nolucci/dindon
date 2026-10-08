@@ -9,7 +9,9 @@ The path of a claim, with what each step is allowed to do:
 3. **Read** each page through the model, on the passages that look like the claim only (a few hundred words, chosen by the program), and ask a narrow question: does this support the claim,
    contradict it, show it true for another period or only in part, or tell nothing? The answer must come with **a quotation copied word for word, and the program verifies that it is on the
    page** (`web.contains_quote`). A stance without a verified quotation is thrown away. The text of the page is given as data, with the instruction not to obey it.
-4. **Decide** (`decide`, no model): the same bar both ways. Confirmed needs a verified quotation from a trusted source that supports it; contradicted needs one that contradicts it; trusted
+4. **Provisional opinion** (`_provisional`): only when nothing trusted settled the claim, pages of other sources may give an opinion marked *provisional* (`likely_true` / `likely_false`), with the
+   same verified quotation, the same page budget and the same ban on following links. It never grounds a public correction nor a rating: people judge it, and correct it.
+5. **Decide** (`decide`, no model): the same bar both ways. Confirmed needs a verified quotation from a trusted source that supports it; contradicted needs one that contradicts it; trusted
    sources that disagree make it *disputed*; true for another period, or incomplete, is *partly*; nothing that settles it is *unverifiable* (and says whether it is for lack of a source or
    because something failed). Dindon never settles a claim on its own knowledge.
 
@@ -27,7 +29,7 @@ from dindon.debate.claims import ClaimResult, Evidence
 from dindon.debate.reading import Chat, Reading
 from dindon.debate.scope import Lookup, OutOfScope
 from dindon.debate.search import SearchError
-from dindon.debate.trust import OFFICIAL, Trust
+from dindon.debate.trust import OFFICIAL, OTHER, Trust
 from dindon.debate.web import WebError, contains_quote
 
 PROMPT_VERSION = "verify-2"
@@ -178,9 +180,50 @@ def verify_claim(lookup: Lookup, llm: Chat, model: str, trust: Trust, reading: R
         run.evidence.append(Evidence(page.url, page.title or hit.title, trust.tier(page.url), stance, " ".join(quote.split()), period, hit.via, page.sha256))
         proven_sources.add(trust.source_key(page.url) or page.url)
     verdict, period = decide(run.evidence)
+    if verdict == "unverifiable":
+        verdict, period = _provisional(lookup, llm, model, trust, reading, run, resemblance, read_page, seen)
     spent = lookup.spent()
     reason = None if verdict != "unverifiable" else ("error" if run.errors else "no_source")
     return ClaimResult(reading.claim, reading.said, verdict, reason, period, spent["queries"], spent["pages"], model, tuple(run.evidence))
+
+
+def _provisional(lookup: Lookup, llm: Chat, model: str, trust: Trust, reading: Reading, run: _Run, resemblance: Callable, read_page: Callable | None, seen: set[str]) -> tuple[str, str | None]:
+    """When no trusted source settled the claim: the pages of the other sources that the search returned (never one it did not return, and the same page budget) may give an opinion, which is
+    **provisional** (`likely_true` / `likely_false`). It needs a verified quotation like any other stance; sources that disagree, or only a partial one, give no opinion. It is never a correction."""
+    others = sorted((h for h in lookup.offered if not trust.can_condemn(h.url)), key=lambda h: -resemblance(h))
+    found: list[Evidence] = []
+    for hit in others:
+        try:
+            page = lookup.read(hit.url)
+        except OutOfScope:
+            break
+        except WebError:
+            continue
+        if page.url in seen:
+            continue
+        seen.add(page.url)
+        shown = passages(page.text, reading.claim)
+        if not shown:
+            continue
+        try:
+            answer = (read_page or _read_page)(llm, model, reading.claim, shown)
+        except OllamaError:
+            run.errors += 1
+            continue
+        stance, quote = answer.get("stance"), str(answer.get("quote") or "")
+        if answer.get("same_subject") is not True or stance not in ("supports", "contradicts") or not contains_quote(page.text, quote):
+            continue
+        period = " ".join(str(answer.get("period") or "").split())[:100] or None
+        found.append(Evidence(page.url, page.title or hit.title, OTHER, stance, " ".join(quote.split()), period, hit.via, page.sha256))
+    stances = {e.stance for e in found}
+    if stances == {"supports"}:
+        verdict = "likely_true"
+    elif stances == {"contradicts"}:
+        verdict = "likely_false"
+    else:
+        return "unverifiable", None
+    run.evidence.extend(found)
+    return verdict, next((e.page_period for e in found if e.page_period), None)
 
 
 def _fallback_query(claim: str) -> str:

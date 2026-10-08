@@ -65,7 +65,7 @@ def test_the_detail_has_the_people_with_names_the_claims_with_their_sources_and_
     assert contradicted["sources"] == [{"url": EVIDENCE.url, "title": "Taux de chômage", "tier": "official", "stance": "contradicts", "quote": EVIDENCE.quote, "page_period": "T2 2026", "via": "searxng"}]
     assert unverifiable["verdict"] == "unverifiable" and unverifiable["reason"] == "no_source" and unverifiable["sources"] == []
     assert detail["parity"]["for"]["total"] == 2 and detail["messages_waiting_to_be_read"] == 1 and detail["corrections"] == {"posted": 0, "taken_back": 0}
-    assert detail["verdicts"] == ["confirmed", "contradicted", "partly", "disputed", "unverifiable"]
+    assert detail["verdicts"] == ["confirmed", "contradicted", "partly", "disputed", "likely_true", "likely_false", "unverifiable"]
 
 
 def test_the_detail_says_how_the_debate_was_set_up_and_knows_nothing_of_a_timer_or_a_vote(api):

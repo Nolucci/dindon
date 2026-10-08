@@ -19,16 +19,16 @@ from psycopg.rows import tuple_row
 from dindon.clock import utc_now
 from dindon.debate import rules
 
-VERDICTS = ("confirmed", "contradicted", "partly", "disputed", "unverifiable")
+VERDICTS = ("confirmed", "contradicted", "partly", "disputed", "likely_true", "likely_false", "unverifiable")   # likely_*: provisional, from pages of any source; never a correction, never a rating
 MAX_CHECKS_PER_HOUR = 20            # claims checked per debate and per hour: what a debate may ask of the Internet and of the local model, however chatty it is
 
 
 @dataclass(frozen=True)
 class Evidence:
-    """A page that grounds a verdict: trusted, and quoted word for word (verified)."""
+    """A page that grounds a verdict, quoted word for word (verified). `other`: not a trusted source, so it only grounds a provisional verdict."""
     url: str
     title: str
-    tier: str                       # official | checker
+    tier: str                       # official | checker | other
     stance: str                     # supports | contradicts | partly
     quote: str
     page_period: str | None

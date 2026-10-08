@@ -159,10 +159,12 @@ SEARCH_RESULT = {                                # what Dindon says of its own a
     "confirmed": "Les sources de confiance **confirment** l'affirmation : **ma réponse était fausse**.",
     "partly": "Les sources de confiance confirment l'affirmation **en partie** (ou pour une autre période) : ma réponse était trop catégorique.",
     "disputed": "Des sources de confiance **se contredisent** : je ne peux pas trancher.",
+    "likely_false": "Aucune source de confiance ne tranche, mais d'**autres sources** laissent penser que l'affirmation est **fausse**. **Avis provisoire** : à vérifier vous-même.",
+    "likely_true": "Aucune source de confiance ne tranche, mais d'**autres sources** laissent penser que l'affirmation est **vraie**. **Avis provisoire** : à vérifier vous-même.",
     "unverifiable": "Je n'ai **pas trouvé de source de confiance** qui tranche : ma réponse reste sans source, à prendre avec prudence.",
     None: "Je **ne peux pas chercher sur Internet** (aucun service de recherche n'est réglé) : ma réponse reste sans source, à prendre avec prudence.",
 }
-SEARCH_STANCE = {"contradicted": ("contradicts",), "confirmed": ("supports",), "partly": ("partly",), "disputed": ("supports", "contradicts"), "unverifiable": (), None: ()}
+SEARCH_STANCE = {"contradicted": ("contradicts",), "confirmed": ("supports",), "partly": ("partly",), "disputed": ("supports", "contradicts"), "likely_false": ("contradicts",), "likely_true": ("supports",), "unverifiable": (), None: ()}
 
 
 def after_search(claim: str, answer: str, verdict: str | None, period: str | None, evidence: list) -> dict:
@@ -178,7 +180,9 @@ def after_search(claim: str, answer: str, verdict: str | None, period: str | Non
             lines.append(f"• [{_plain(_source_name(e.url))}]({link}) : « {_plain(e.quote)} »")
     lines += ["", f"*Ma première réponse, sans recherche : {_plain(answer)}*"]
     title = "🔎 Recherche impossible" if verdict is None else "🔎 Dindon a cherché sur Internet"
-    footer = ("Dindon ne prend pas parti : il rapporte ce que disent des sources de confiance. Cliquez pour vérifier par vous-même."
+    footer = ("Dindon ne prend pas parti : ces sources ne sont pas dans sa liste de confiance, l'avis est provisoire. Cliquez pour vérifier par vous-même."
+              if shown and verdict in ("likely_true", "likely_false") else
+              "Dindon ne prend pas parti : il rapporte ce que disent des sources de confiance. Cliquez pour vérifier par vous-même."
               if shown else "Dindon ne prend pas parti. Aucune source n'étaye cette réponse.")
     embed = {"title": title, "description": "\n".join(lines)[:4000], "color": BLURPLE, "footer": {"text": footer}}
     buttons = [{"type": 2, "style": LINK, "label": _source_name(e.url)[:80], "url": e.url} for e in shown if len(e.url) <= 512]
@@ -341,7 +345,7 @@ def ticked(values: dict, name: str) -> bool:
 
 PEOPLE_PER_PAGE = 6
 CLAIMS_PER_PAGE = 6
-VERDICT_LABEL = {"confirmed": ("✅", "confirmée"), "contradicted": ("❌", "contredite"), "partly": ("🟡", "en partie vraie"), "disputed": ("⚖️", "contestée"), "unverifiable": ("❔", "non vérifiable")}
+VERDICT_LABEL = {"confirmed": ("✅", "confirmée"), "contradicted": ("❌", "contredite"), "partly": ("🟡", "en partie vraie"), "disputed": ("⚖️", "contestée"), "likely_true": ("🔎", "probablement vraie (provisoire)"), "likely_false": ("🔎", "probablement fausse (provisoire)"), "unverifiable": ("❔", "non vérifiable")}
 KEY_RULE = "Message phare : le plus commenté et le plus apprécié du fil (réponses ×3 + réactions), le même critère pour tout le monde."
 
 

@@ -229,7 +229,7 @@ def test_what_is_found_is_kept_with_its_sources_and_nothing_is_published(checked
     assert (found["message_id"], found["claim"], found["said"], found["verdict"], found["period"], found["queries"], found["pages"]) == (
         str(message_id), RESULT.claim, RESULT.said, "contradicted", "T2 2026", 1, 1)
     assert found["sources"] == [{"url": EVIDENCE.url, "title": "Taux de chômage", "tier": "official", "stance": "contradicts", "quote": QUOTE, "page_period": "T2 2026", "via": "searxng"}]
-    assert claims.parity(ingest_db, debate.id) == {"for": {"confirmed": 0, "contradicted": 1, "partly": 0, "disputed": 0, "unverifiable": 0, "total": 1}}
+    assert claims.parity(ingest_db, debate.id) == {"for": {"confirmed": 0, "contradicted": 1, "partly": 0, "disputed": 0, "likely_true": 0, "likely_false": 0, "unverifiable": 0, "total": 1}}
     assert ingest_db.execute("SELECT read_at IS NOT NULL FROM debate_messages WHERE message_id = %s", (message_id,)).fetchone()[0] is True
 
 

@@ -10,7 +10,7 @@
   // A debate opened from an axis is answered with the two poles of the axis (never ✅ / ❌, which would make one of them the right one)
   const names = (axis) => (axis ? { ...POSITIONS, for: `🔵 ${axis.for}`, against: `🟠 ${axis.against}` } : POSITIONS);
   const POSITION = $derived(names(detail?.debate.axis));
-  const VERDICT = { confirmed: ['✅', 'confirmée', 'ok'], contradicted: ['❌', 'contredite', 'danger'], partly: ['🟡', 'en partie vraie', ''], disputed: ['⚖️', 'contestée', ''], unverifiable: ['❔', 'non vérifiable', ''] };
+  const VERDICT = { confirmed: ['✅', 'confirmée', 'ok'], contradicted: ['❌', 'contredite', 'danger'], partly: ['🟡', 'en partie vraie', ''], disputed: ['⚖️', 'contestée', ''], likely_true: ['🔎', 'probablement vraie (provisoire)', ''], likely_false: ['🔎', 'probablement fausse (provisoire)', ''], unverifiable: ['❔', 'non vérifiable', ''] };
   const STATUS = { open: 'en cours', closed: 'terminé' };
   const REASON = { ended: 'terminé avec le bouton', silence: 'personne n’a écrit depuis longtemps', no_participants: 'personne n’a participé', failed: 'n’a pas pu être mené' };
   const QUIET = { 3600: '1 heure', 21600: '6 heures', 86400: '24 heures', 259200: '3 jours', 604800: '7 jours' };
@@ -241,7 +241,7 @@
                     {#each c.sources as s}
                       <p class="source">
                         <a href={s.url} target="_blank" rel="noopener noreferrer">{host(s.url)}</a>
-                        <span class="muted small">({s.tier === 'official' ? 'source officielle' : 'vérification de presse'}, {s.stance === 'supports' ? 'confirme' : s.stance === 'contradicts' ? 'contredit' : 'en partie'})</span>
+                        <span class="muted small">({s.tier === 'official' ? 'source officielle' : s.tier === 'checker' ? 'vérification de presse' : 'autre source, non vérifiée par Dindon'}, {s.stance === 'supports' ? 'confirme' : s.stance === 'contradicts' ? 'contredit' : 'en partie'})</span>
                         : « {s.quote} »
                       </p>
                     {/each}

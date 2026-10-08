@@ -124,7 +124,7 @@ def fake_stats(people=14, claims_n=0, **overrides):
                      "messages": 20 - n, "share": round((20 - n) / 200, 3), "claims": dict.fromkeys(claims.VERDICTS, 0),
                      "key_message": {"message_id": str(9000 + n), "excerpt": f"Le *propos* numéro {n} du participant", "replies": n, "reactions": 1, "url": f"https://discord.com/channels/1/2/{9000 + n}"}}
                     for n in range(people)]
-    checked_claims = [{"id": n, "message_id": str(8000 + n), "author_id": "1000", "claim": f"Une affirmation numéro {n} de _test_", "said": "x", "verdict": claims.VERDICTS[n % 5], "reason": None,
+    checked_claims = [{"id": n, "message_id": str(8000 + n), "author_id": "1000", "claim": f"Une affirmation numéro {n} de _test_", "said": "x", "verdict": ("confirmed", "contradicted", "partly", "disputed", "unverifiable")[n % 5], "reason": None,
                        "period": "2026" if n % 2 else None, "queries": 1, "pages": 1, "model": "m", "checked_at": "2026-10-05T12:00:00",
                        "sources": [{"url": f"https://www.insee.fr/fr/{n}(a)", "title": "t", "tier": "official", "stance": "supports", "quote": "q" * 30, "page_period": None, "via": "x"}]}
                       for n in range(claims_n)]
