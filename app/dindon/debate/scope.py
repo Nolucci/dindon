@@ -5,7 +5,7 @@ shape of the code instead of being promised in a text. Whatever reads the claim 
 
 * answers **one claim**: it is made for it and thrown away after;
 * sends **at most `max_queries` queries** (2; a deeper check that a person asked for: 4), each to every search service, a failed query included (no hidden retries);
-* reads **at most `max_pages` pages** (5; a deeper check that a person asked for: 8), and **only pages that the search itself returned**: never an address that a member wrote in a message, never a link found inside a
+* reads **at most `max_pages` pages** (5; a deeper check that a person asked for: 12), and **only pages that the search itself returned**: never an address that a member wrote in a message, never a link found inside a
   page, never an address the model made up. Nothing is crawled, nothing is followed from page to page;
 * refuses an empty query (nothing is sent for it);
 * **counts** what it did (`spent`), so that it can be shown and audited: how many queries, how many pages. Never what they contained.
@@ -24,7 +24,8 @@ from dindon.debate.web import Fetcher, Page
 MAX_QUERIES = 2
 MAX_PAGES = 5                  # reads, an unreadable or empty page included; `verify` stops sooner, at USEFUL_PAGES pages that had something to read
 DEEP_QUERIES = 4               # a check that a person asked for (the button « Vérifier »): the claim itself is searched too
-DEEP_PAGES = 8
+DEEP_PAGES = 12
+DEEP_HITS = 20                 # results asked of each search service for a deeper check (8 otherwise)
 
 
 class OutOfScope(Exception):
@@ -43,9 +44,9 @@ def _key(url: str) -> str:
 
 
 class Lookup:
-    def __init__(self, searchers: Sequence[Searcher], fetcher: Fetcher, *, max_queries: int = MAX_QUERIES, max_pages: int = MAX_PAGES, language: str = "fr"):
+    def __init__(self, searchers: Sequence[Searcher], fetcher: Fetcher, *, max_queries: int = MAX_QUERIES, max_pages: int = MAX_PAGES, hits: int = 8, language: str = "fr"):
         self._searchers, self._fetcher, self._language = tuple(searchers), fetcher, language
-        self._max_queries, self._max_pages = max_queries, max_pages
+        self._max_queries, self._max_pages, self._hits = max_queries, max_pages, hits
         self._queries = self._pages = 0
         self._offered: dict[str, Hit] = {}                     # every page that a search returned for this claim, and only those
 
@@ -60,7 +61,7 @@ class Lookup:
         answered, failure, found = 0, None, {}
         for service in self._searchers:
             try:
-                hits = service.search(cleaned, self._language)
+                hits = service.search(cleaned, self._language, self._hits)
             except SearchError as error:                       # one service may be down while the other answers
                 failure = error
                 continue

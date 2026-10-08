@@ -24,7 +24,7 @@ from dindon.config import Settings
 from dindon.debate.claims import AnswerFound, ClaimResult, Considered
 from dindon.debate.local import FALSE, TRUE, answer_claim
 from dindon.debate.reading import Chat, Reading, read_message
-from dindon.debate.scope import DEEP_PAGES, DEEP_QUERIES, Lookup
+from dindon.debate.scope import DEEP_HITS, DEEP_PAGES, DEEP_QUERIES, Lookup
 from dindon.debate.search import FactCheckSearch, SearxSearch
 from dindon.debate.trust import Trust
 from dindon.debate.verify import verify_claim
@@ -96,7 +96,7 @@ class Checker:
 
     def search(self, reading: Reading, deep: bool = False) -> ClaimResult:
         """The claim checked on the Internet, with a budget of its own (2 searches, 5 reads): the sources and the verdict. Needs a search service. `deep`: a person asked for it (the button
-        « Vérifier »): 4 searches, among them the sentence itself, and 8 reads."""
+        « Vérifier »): 4 searches, among them the sentence itself, and 12 reads."""
         self._ready()
         lookup = self._make_lookup(deep=True) if deep else self._make_lookup()
         return verify_claim(lookup, self.llm, self.model, self._trust, reading, deep=deep)
@@ -171,9 +171,9 @@ def build_checker(settings: Settings, load_helpers: Callable[[], tuple[str, ...]
         log.warning("no search service is set (DINDON_FACTCHECK_API_KEY or DINDON_SEARXNG_URL): Dindon answers from its local model only, and cannot look anything up on the Internet")
     fetcher = Fetcher()                                           # public addresses only, ports 80 and 443, robots.txt respected (debate/web.py)
     if downgraded:
-        log.warning("the corrections that sources make by themselves are NOT on (%s). Dindon answers and the participants judge, or the claims are noted", downgraded)
+        log.warning("DINDON_DEBATE_CHECKS=live asks for a measured precision that is missing (%s): it runs as `answer`, which now does the same (corrections by trusted sources, answers marked not reliable)", downgraded)
     log.info("the claims of the debates are checked in %s mode (%d search service(s))%s", mode, len(searchers), "; nothing is published" if mode == "observe" else "")
-    make_lookup = (lambda deep=False: Lookup(searchers, fetcher, max_queries=DEEP_QUERIES, max_pages=DEEP_PAGES) if deep else Lookup(searchers, fetcher)) if searchers else None
+    make_lookup = (lambda deep=False: Lookup(searchers, fetcher, max_queries=DEEP_QUERIES, max_pages=DEEP_PAGES, hits=DEEP_HITS) if deep else Lookup(searchers, fetcher)) if searchers else None
     helpers: tuple[str, ...] = tuple(settings.analysis_workers or ())
     if load_helpers is not None:
         try:

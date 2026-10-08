@@ -3,7 +3,7 @@
 * A claim that the local model is **certain** is true is noted and nothing is said or searched. Any other claim is searched on the Internet (debate/checker.py). Where a trusted source contradicts it,
   that is a correction (debate/claims.py), not an answer. Where **no trusted source settles it** but the model is certain that it is false, or pages that are not trusted sources suggest it, Dindon
   **answers** (`debate_answers`, written with the reading): the message says that it is **not reliable**, shows the pages that the first search found, and has one button, **Vérifier**.
-* Pressing **Vérifier** (`request_search`) makes Dindon look on the Internet once more (`searches_due`), deeper (4 searches, 8 reads), and write the result in its own message, whatever it is.
+* Pressing **Vérifier** (`request_search`) makes Dindon look on the Internet once more (`searches_due`), deeper (4 searches, 12 reads), and write the result in its own message, whatever it is.
   (The messages posted before had **Valide** and **Invalide**: with more Invalide than Valide they still make Dindon search, and `vote` still counts them.)
 * The message that Dindon posts is a row of `debate_corrections` (posted once, tried again if it failed, taken back when the answer goes, and counted in the same hourly limit).
 * Never a person who asked not to be recorded: their clicks are not counted, their claims are not answered.

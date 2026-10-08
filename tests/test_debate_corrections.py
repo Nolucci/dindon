@@ -22,7 +22,7 @@ from test_bot import event, flush
 from test_debate_bot import BOB_ID, CAROL_ID, World, run
 from test_debate_checks import EVIDENCE, QUOTE, RESULT, SAYS, FakeChecker, check, claims_in, info, opened, said
 
-TITLE = "🔎 Vérification"
+TITLE = "✅ Vérification : information fausse"
 
 
 def corrections(world, thread):
@@ -133,7 +133,7 @@ def test_a_quotation_is_shown_as_written_a_long_address_is_still_a_link_and_a_pe
     payload = texts.correction("Une affirmation *avec* des _marques_", None, sources, 5)
     description = payload["embeds"][0]["description"]
     assert "Une affirmation \\*avec\\* des \\_marques\\_" in description and "\\*est\\* de \\_7,3\\_ % \\> de \\[la\\] population \\|active\\|" in description
-    assert "(T" not in description.split("Ce que disent les sources**")[1].split("\n")[0] and "x%281%29" in description
+    assert "(T" not in description.split("Correction")[1].split("\n")[0] and "x%281%29" in description
     assert [b["url"] for b in payload["components"][0]["components"]] == ["https://www.insee.fr/fr/x(1)"]    # too long for a button (512): in the text only
     assert "components" not in texts.correction("Une affirmation", None, [sources[1]], 5)
 
@@ -317,7 +317,7 @@ def test_the_bot_runs_live_only_when_the_lock_is_open_and_says_so_to_the_members
     service = PrivacyService(ingest_url, ())
     with caplog.at_level(logging.WARNING, logger="dindon.bot.debate"):
         locked, _ = build_interactions(base, service)
-    assert (locked.verification, locked.live) == (True, "answer") and "NOT on" in caplog.text                  # answering, and it says why the rest is off
+    assert (locked.verification, locked.live) == (True, "answer") and "runs as `answer`" in caplog.text            # answering, and it says why it is not `live`
     assert build_checker(dataclasses.replace(base, debate_precision=0.8)).mode == "answer"
     opened_lock, debates = build_interactions(dataclasses.replace(base, debate_precision=0.95), service)
     assert (opened_lock.live, debates.live, debates.checker.mode) == ("live", True, "live")
@@ -327,6 +327,6 @@ def test_the_notice_to_the_members_says_what_is_posted_when_corrections_are_on(l
     thread, _ = opened(live, ingest_db)
     [question] = live.discord.posted(thread)
     assert texts.notice_short("live") in question["embeds"][0]["description"]
-    assert "sur lesquelles vous pouvez cliquer" in texts.NOTICE_LIVE and "sans rien publier" not in texts.NOTICE_LIVE and "sans rien publier" in texts.NOTICE
+    assert "avec la source" in texts.NOTICE_LIVE and "sans rien publier" not in texts.NOTICE_LIVE and "sans rien publier" in texts.NOTICE
     first, second = info(live)
     assert second[2]["content"].endswith(texts.NOTICE_LIVE) and len(second[2]["content"]) < 2000 and first[1].endswith("/callback")

@@ -58,7 +58,7 @@ def title(message):
 
 def dindon_messages(world, place):
     """(number, message) of what Dindon wrote about its own answers, in the order it was posted: the answer, or what it became after the search."""
-    return [(mid, m) for (t, mid), m in sorted(world.discord.messages.items(), key=lambda item: item[0][1]) if t == place and ("Réponse de Dindon" in title(m) or "Dindon a cherché" in title(m) or "Recherche impossible" in title(m))]
+    return [(mid, m) for (t, mid), m in sorted(world.discord.messages.items(), key=lambda item: item[0][1]) if t == place and ("Information non fiable" in title(m) or "Dindon a cherché" in title(m) or "Recherche impossible" in title(m))]
 
 
 def wrong(world, db, content=SAYS, author=BOB):
@@ -87,8 +87,8 @@ def test_a_claim_that_dindon_is_certain_is_false_is_answered_under_the_message_a
     assert ingest_db.execute("SELECT count(*) FROM debate_claims").fetchone()[0] == 0                              # nothing was checked, so nothing is claimed
     [(_, message)] = dindon_messages(answering, place)
     embed = message["embeds"][0]
-    assert embed["title"] == "⚠️ Réponse de Dindon (non fiable)" and CLAIM in embed["description"] and WRONG.answer in embed["description"]
-    assert "Non fiable" in embed["description"] and "sans source" in embed["description"] and "elle peut se tromper" in embed["description"] and "ne prend pas parti" in embed["footer"]["text"]
+    assert embed["title"] == "⚠️ Information non fiable" and f"L'affirmation « {CLAIM} » est fausse." in embed["description"] and f"Correction : {WRONG.answer}" in embed["description"]
+    assert "**" not in embed["description"] and "sans source" in embed["footer"]["text"] and "elle peut se tromper" in embed["footer"]["text"] and "appuyer sur Vérifier" in embed["footer"]["text"]
     assert message["message_reference"] == {"message_id": str(message_id), "fail_if_not_exists": False} and message["allowed_mentions"] == {"parse": [], "replied_user": False}
     [check_button] = message["components"][0]["components"]
     assert len(message["components"]) == 1 and (check_button["label"], check_button["emoji"]["name"], check_button["custom_id"]) == ("Vérifier", "🔎", f"dindon:debat:val:{answer_id}:check")
@@ -116,7 +116,7 @@ def test_a_claim_that_a_trusted_source_contradicts_is_corrected_as_certain_with_
     answering.tick(seconds=30)
     assert ingest_db.execute("SELECT count(*) FROM debate_answers").fetchone()[0] == 0 and ingest_db.execute("SELECT verdict FROM debate_claims").fetchall() == [("contradicted",)]
     [message] = answering.discord.posted(place, "Vérification")
-    assert dindon_messages(answering, place) == [] and "Sûr" in message["embeds"][0]["description"] and QUOTE in message["embeds"][0]["description"] and "insee.fr" in message["embeds"][0]["description"]
+    assert dindon_messages(answering, place) == [] and "Sûr" in message["embeds"][0]["footer"]["text"] and "est fausse." in message["embeds"][0]["description"] and "**" not in message["embeds"][0]["description"] and QUOTE in message["embeds"][0]["description"] and "insee.fr" in message["embeds"][0]["description"]
 
 
 def test_in_observation_dindon_never_answers_it_only_notes_what_the_internet_says(ingest_url, tmp_path, ingest_db):
@@ -423,7 +423,7 @@ def test_an_answer_that_rests_on_pages_shows_them_as_not_official_and_says_that_
     assert ingest_db.execute("SELECT verdict FROM debate_claims").fetchall() == [("likely_false",)] and answering.discord.posted(place, "Vérification") == []   # provisional: never a correction
     [(_, message)] = dindon_messages(answering, place)
     description = message["embeds"][0]["description"]
-    assert "Non fiable" in description and "Premier avis" in description and "pas une source de confiance" in description
+    assert "probablement fausse" in description and "pas une source de confiance" in description and "Vérifier" in message["embeds"][0]["footer"]["text"]
     assert [b["label"] for b in message["components"][0]["components"]] == ["Vérifier"]
 
 

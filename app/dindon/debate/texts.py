@@ -76,7 +76,7 @@ REFUSALS = {                                    # what a person is told when a r
 NOTICE_ANSWER = ("Pour vérifier ce qu'une personne affirme dans un débat, Dindon demande à son IA locale si l'affirmation est sûrement vraie : alors il ne fait rien. Sinon il cherche sur Internet "
                  "(il envoie à un moteur de recherche une phrase neutre — sans votre nom, sans votre message — et lit au plus cinq des pages trouvées). Si une source de confiance contredit l'affirmation, "
                  "avec une citation vérifiée sur sa page, il le dit comme sûr, avec la source. Si aucune source de confiance ne tranche, il peut donner sa réponse en la marquant non fiable, "
-                 "avec un bouton Vérifier qui lance une recherche plus profonde (huit pages au plus) ; sinon il ne dit rien. Il ne vérifie rien de ce qui concerne une personne privée, n'ouvre pas "
+                 "avec un bouton Vérifier qui lance une recherche plus profonde (douze pages au plus) ; sinon il ne dit rien. Il ne vérifie rien de ce qui concerne une personne privée, n'ouvre pas "
                  "les liens que vous écrivez et ne prend pas parti. Rien d'autre ne quitte cet ordinateur, à part ce que Dindon écrit dans les débats de ce serveur.")
 NOTICE_LIVE = NOTICE_ANSWER                       # `live` used to add the corrections by trusted sources, which are now part of `answer`
 NOTICE_LOCAL = ("Pour vérifier ce qu'une personne affirme dans un débat, Dindon demande à son IA locale : quand elle est certaine qu'une affirmation est fausse, il le dit sous le message, "
@@ -119,16 +119,16 @@ def _source_name(url: str) -> str:
 
 
 def correction(claim: str, period: str | None, evidence: list, reply_to: int) -> dict:
-    """What Dindon posts when trusted sources contradict a claim. The same words for everybody and whatever the subject: what was checked, what the sources say with their exact words, and links to
-    click. It names nobody, mentions nobody (it answers the message), gives no opinion and says nothing of who is right in the debate."""
+    """What Dindon posts when trusted sources contradict a claim, with the same layout as its other answers: a panel, « the claim is false », « Correction » with what the sources say in their exact
+    words and links to click, and, small at the end, why it can be trusted. The same words for everybody and whatever the subject. It names nobody, mentions nobody (it answers the message),
+    gives no opinion and says nothing of who is right in the debate."""
     shown = evidence[:3]
-    lines = [f"**Affirmation vérifiée** : « {_plain(claim)} »", "", "✅ **Sûr : des sources de confiance contredisent cette affirmation.**", "",
-             "**Ce que disent les sources**" + (f" ({_plain(period)})" if period else "") + " :"]
+    lines = [f"L'affirmation « {_plain(claim)} » est fausse.", "", "Correction" + (f" ({_plain(period)})" if period else "") + " :"]
     for e in shown:
         link = e.url.replace("(", "%28").replace(")", "%29")
         lines.append(f"• [{_plain(_source_name(e.url))}]({link}) : « {_plain(e.quote)} »")
-    embed = {"title": "🔎 Vérification", "description": "\n".join(lines)[:4000], "color": BLURPLE,
-             "footer": {"text": "Dindon ne prend pas parti : il rapporte ce que disent des sources de confiance. Cliquez pour vérifier par vous-même."}}
+    embed = {"title": "✅ Vérification : information fausse", "description": "\n".join(lines)[:4000], "color": BLURPLE,
+             "footer": {"text": "Sûr : des sources de confiance contredisent cette affirmation, citations vérifiées sur leur page. Dindon ne prend pas parti ; cliquez pour vérifier par vous-même."}}
     buttons = [{"type": 2, "style": LINK, "label": _source_name(e.url)[:80], "url": e.url} for e in shown if len(e.url) <= 512]
     payload = {"content": "", "embeds": [embed], "allowed_mentions": {"parse": [], "replied_user": False},
                "message_reference": {"message_id": str(reply_to), "fail_if_not_exists": False}}
@@ -144,21 +144,23 @@ def answer_buttons(answer_id: int, requested: bool = False) -> list[dict]:
 
 
 def local_answer(claim: str, answer: str, answer_id: int, reply_to: int, evidence: list | tuple = (), basis: str = "model", requested: bool = False) -> dict:
-    """What Dindon says under a message when no trusted source settled a claim but it has something to say: the claim, what it knows, and, first of all, that **this is not reliable**. `basis`
-    `model`: its local model alone, without a source; `pages`: a page that is not a trusted source. `evidence`: the pages that the first search found against the claim, to click. Under it, the
-    button « Vérifier ». It answers the message, names nobody, mentions nobody."""
-    lines = [f"**Affirmation** : « {_plain(claim)} »", "", "⚠️ **Non fiable : aucune source de confiance n'a pu confirmer ou contredire cette affirmation.**", "", _plain(answer), ""]
-    lines.append("*Premier avis tiré de pages qui ne sont pas des sources de confiance : à vérifier vous-même.*" if basis == "pages"
-                 else "*Réponse de l'IA locale de Dindon, **sans source** : elle peut se tromper.*")
+    """What Dindon says under a message when no trusted source settled a claim but it has something to say. A panel that says it is not reliable, then « the claim is false » and « Correction : … »,
+    and, small at the end, that the button « Vérifier » makes it look on the Internet. `basis` `model`: its local model alone, without a source; `pages`: a page that is not a trusted source.
+    `evidence`: the pages that the first search found against the claim, to click. It answers the message, names nobody, mentions nobody."""
+    if basis == "pages":
+        lines = [f"L'affirmation « {_plain(claim)} » est probablement fausse.", "", _plain(answer)]
+        footer = "Une seule page, qui n'est pas une source de confiance. Vous pouvez appuyer sur Vérifier pour chercher plus largement sur Internet."
+    else:
+        lines = [f"L'affirmation « {_plain(claim)} » est fausse.", "", f"Correction : {_plain(answer)}"]
+        footer = "Réponse de l'IA de Dindon, sans source : elle peut se tromper. Vous pouvez appuyer sur Vérifier pour chercher sur Internet."
     shown = [e for e in evidence if e.stance == "contradicts"][:3]
     buttons = [{"type": 2, "style": LINK, "label": _source_name(e.url)[:80], "url": e.url} for e in shown if len(e.url) <= 512]
     if shown and basis != "pages":
-        lines += ["", "**Pages trouvées qui vont dans ce sens (non officielles, à vérifier)** :"]
+        lines += ["", "Pages trouvées dans ce sens (non officielles) :"]
         for e in shown:
             link = e.url.replace("(", "%28").replace(")", "%29")
             lines.append(f"• [{_plain(_source_name(e.url))}]({link}) : « {_plain(e.quote)} »")
-    lines += ["", "Appuyez sur 🔎 **Vérifier** : Dindon cherchera cette phrase sur Internet, plus en profondeur."]
-    embed = {"title": "⚠️ Réponse de Dindon (non fiable)", "description": "\n".join(lines)[:4000], "color": GREY, "footer": {"text": "Dindon ne prend pas parti. Cette réponse n'est pas une vérification."}}
+    embed = {"title": "⚠️ Information non fiable", "description": "\n".join(lines)[:4000], "color": GREY, "footer": {"text": footer}}
     rows = answer_buttons(answer_id, requested)
     if buttons:
         rows = rows + _row(buttons)
@@ -167,14 +169,14 @@ def local_answer(claim: str, answer: str, answer_id: int, reply_to: int, evidenc
 
 
 SEARCH_RESULT = {                                # what Dindon says of its own answer once it has looked on the Internet, by what it found
-    "contradicted": "Les sources de confiance **contredisent** l'affirmation. Ma première réponse, donnée sans source, peut aussi contenir des erreurs.",
-    "confirmed": "Les sources de confiance **confirment** l'affirmation : **ma réponse était fausse**.",
-    "partly": "Les sources de confiance confirment l'affirmation **en partie** (ou pour une autre période) : ma réponse était trop catégorique.",
-    "disputed": "Des sources de confiance **se contredisent** : je ne peux pas trancher.",
-    "likely_false": "Aucune source de confiance ne tranche, mais d'**autres sources** laissent penser que l'affirmation est **fausse**. **Avis provisoire** : à vérifier vous-même.",
-    "likely_true": "Aucune source de confiance ne tranche, mais d'**autres sources** laissent penser que l'affirmation est **vraie**. **Avis provisoire** : à vérifier vous-même.",
-    "unverifiable": "Même en cherchant plus loin, je n'ai **pas trouvé de source de confiance** qui tranche : ma réponse reste **non fiable**, à prendre avec prudence.",
-    None: "Je **ne peux pas chercher sur Internet** (aucun service de recherche n'est réglé) : ma réponse reste sans source, à prendre avec prudence.",
+    "contradicted": "Les sources de confiance contredisent l'affirmation. Ma première réponse, donnée sans source, peut aussi contenir des erreurs.",
+    "confirmed": "Les sources de confiance confirment l'affirmation : ma réponse était fausse.",
+    "partly": "Les sources de confiance confirment l'affirmation en partie (ou pour une autre période) : ma réponse était trop catégorique.",
+    "disputed": "Des sources de confiance se contredisent : je ne peux pas trancher.",
+    "likely_false": "Aucune source de confiance ne tranche, mais d'autres sources laissent penser que l'affirmation est fausse. Avis provisoire : à vérifier vous-même.",
+    "likely_true": "Aucune source de confiance ne tranche, mais d'autres sources laissent penser que l'affirmation est vraie. Avis provisoire : à vérifier vous-même.",
+    "unverifiable": "Même en cherchant plus loin, je n'ai pas trouvé de source de confiance qui tranche : ma réponse reste non fiable, à prendre avec prudence.",
+    None: "Je ne peux pas chercher sur Internet (aucun service de recherche n'est réglé) : ma réponse reste sans source, à prendre avec prudence.",
 }
 SEARCH_STANCE = {"contradicted": ("contradicts",), "confirmed": ("supports",), "partly": ("partly",), "disputed": ("supports", "contradicts"), "likely_false": ("contradicts",), "likely_true": ("supports",), "unverifiable": (), None: ()}
 
@@ -184,9 +186,9 @@ def after_search(claim: str, answer: str, verdict: str | None, period: str | Non
     words. The buttons are gone: the answer has been checked. It says plainly when the first answer was wrong."""
     wanted = SEARCH_STANCE.get(verdict, ())
     shown = [e for e in evidence if e.stance in wanted][:3]
-    lines = [f"**Affirmation** : « {_plain(claim)} »", "", SEARCH_RESULT.get(verdict, SEARCH_RESULT["unverifiable"])]
+    lines = [f"Affirmation : « {_plain(claim)} »", "", SEARCH_RESULT.get(verdict, SEARCH_RESULT["unverifiable"])]
     if shown:
-        lines += ["", "**Ce que disent les sources**" + (f" ({_plain(period)})" if period else "") + " :"]
+        lines += ["", "Ce que disent les sources" + (f" ({_plain(period)})" if period else "") + " :"]
         for e in shown:
             link = e.url.replace("(", "%28").replace(")", "%29")
             lines.append(f"• [{_plain(_source_name(e.url))}]({link}) : « {_plain(e.quote)} »")

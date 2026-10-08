@@ -822,7 +822,7 @@ class Debates:
                 continue
             result = None
             if getattr(self.checker, "can_search", True):
-                result = await asyncio.to_thread(self.checker.search, Reading(due.claim, due.said, due.query), True)          # deeper than the first time: 4 searches, 8 reads
+                result = await asyncio.to_thread(self.checker.search, Reading(due.claim, due.said, due.query), True)          # deeper than the first time: 4 searches, 12 reads
             await self.db(lambda c, d=due, r=result: answers.finish_search(c, d, r, self.clock()))
             self._owing = True
             return True

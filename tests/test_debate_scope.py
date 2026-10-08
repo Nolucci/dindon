@@ -116,7 +116,7 @@ def test_a_check_that_a_person_asked_for_may_search_and_read_more_but_never_with
         lookup.search(query)
     with pytest.raises(OutOfScope):
         lookup.search("i j")
-    assert (scope.DEEP_QUERIES, scope.DEEP_PAGES) == (4, 8)
+    assert (scope.DEEP_QUERIES, scope.DEEP_PAGES) == (4, 12)
 
 
 def test_the_limits_can_be_made_stricter_never_looser_by_accident():
