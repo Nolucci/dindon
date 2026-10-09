@@ -15,13 +15,14 @@ Avant de le déployer auprès de vraies personnes, définir la durée de conserv
 | `/dindon reprendre` | autorise les enregistrements futurs, sans restaurer les données effacées |
 | `/dindon card pseudo:@personne` | publie une fiche dans le salon si la personne est enregistrée |
 | `/dindon mycard` | écran privé pour régler sa propre card : le contenu de chaque partie (blocs, positions montrées, petite note), avec les suggestions de Dindon |
+| `/dindon politimetre [personne]` | publie une image verticale des positions de l'auteur, ou du membre choisi : tous les axes actifs renseignés pour la personne avec leur incertitude (la fiche s’allonge selon leur nombre) et trois prises de position sourcées en bas. Suit les blocs et positions épinglées de `mycard`. Nécessite la carte et sa section positions activées, avec confirmation que les membres sont informés. Les citations proviennent uniquement du salon de publication, de messages de la personne ; les boutons permettent de retrouver chaque source. |
 | `/dindon map [periode] [personne] [forme]` | publie l'image de la carte si l'administrateur l'a activée. Avec une personne : seulement ses propres liens (pas ceux des autres entre eux), ceux avec qui elle échange le plus sont plus gros (jamais plus qu'elle) ; forme au choix : normale, spirale, étoile, carré, cœur, tête de dindon (aussi par un menu sous l'image) |
 | `/dindon debat [sujet]` | ouvre les paramètres ; un sujet libre est reformulé avec une description par l’IA, puis confirmé en privé avant toute création ; un axe actif peut aussi être choisi |
 | `/dindon terminer [debat]` | clôture le débat de ce fil ou votre débat ouvert ; numéro facultatif ; réservé à son auteur ou à un modérateur |
 | `/dindon suivi [debat]` | affiche en privé l’état, les votes et les statistiques ; depuis le fil, le débat est choisi automatiquement ; ailleurs, les débats en cours sont proposés |
 | `/dindon param` | montre ou règle le forum des débats et le salon des sondages ; modification réservée aux modérateurs |
 
-Les actions sur les données personnelles portent seulement sur l'auteur de la commande, identifié par Discord. Leurs réponses sont privées ; `card` et `map` sont volontairement publiques. Une personne ayant choisi `stop` ou `effacer` n'est plus enregistrée ni incluse dans les débats. L'effacement touche aussi les fichiers d'import, mais une ancienne sauvegarde doit être gérée séparément.
+Les actions sur les données personnelles portent seulement sur l'auteur de la commande, identifié par Discord. Leurs réponses sont privées ; `card`, `map` et `politimetre` sont volontairement publiques. Une personne ayant choisi `stop` ou `effacer` n'est plus enregistrée ni incluse dans les débats. L'effacement touche aussi les fichiers d'import, mais une ancienne sauvegarde doit être gérée séparément.
 
 ## Ma card
 

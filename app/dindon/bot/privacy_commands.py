@@ -38,7 +38,7 @@ log = logging.getLogger("dindon.bot.privacy")
 EPHEMERAL = 64
 CHANNEL_MESSAGE, DEFERRED_MESSAGE, UPDATE_MESSAGE, MODAL = 4, 5, 7, 9
 DEFERRED_UPDATE = 6
-SUBCOMMANDS = ("info", "mes-donnees", "stop", "effacer", "reprendre", "card", "mycard", "map", "debat", "suivi", "terminer", "param")
+SUBCOMMANDS = ("info", "mes-donnees", "stop", "effacer", "reprendre", "card", "mycard", "map", "politimetre", "debat", "suivi", "terminer", "param")
 COOLDOWN_SECONDS = 15
 MAX_FILE_BYTES = 7_000_000          # under every limit of Discord for an attachment
 
@@ -61,6 +61,8 @@ COMMAND = {
                      {"type": 6, "name": "personne", "description": "Se centrer sur une personne : ses liens les plus forts", "required": False},
                      {"type": 3, "name": "forme", "description": "La forme du graphique autour de la personne (normale par défaut)", "required": False,
                       "choices": [{"name": label, "value": key} for key, label in discord_map.SHAPES.items()]}]},
+        {"type": 1, "name": "politimetre", "description": "Vos positions en image, avec vos meilleures prises de position en bas",
+         "options": [{"type": 6, "name": "personne", "description": "La personne (vous par défaut)", "required": False}]},
         {"type": 1, "name": "debat", "description": "Créer un débat : choisir ses paramètres et confirmer la question proposée",
          "options": [{"type": 3, "name": "sujet", "description": "La question débattue (vide : vous pourrez choisir un axe dans la fenêtre)", "required": False, "min_length": 3, "max_length": 200}]},
         {"type": 1, "name": "suivi", "description": "Voir où en est un débat, ses votes et ses statistiques",
@@ -127,6 +129,7 @@ def _text(retention_days: int = 0) -> dict[str, str]:
                  "• `/dindon reprendre` : vous acceptez de nouveau l'enregistrement\n"
                  "• `/dindon card @quelqu'un` : poste la carte (le résumé) d'une personne dans ce salon\n"
                  "• `/dindon map` : poste l'image de la carte du serveur (qui parle avec qui), si les administrateurs l'ont activée\n"
+                 "• `/dindon politimetre` : vos positions en image, ou celles du membre choisi avec `personne`\n"
                  "• `/dindon debat sujet` : ouvre un débat ; vos messages et votre position y sont comptés, et à la fin des statistiques sont publiées (`/dindon stop` vous en exclut)"),
         "no_debates": "Les débats ne sont pas disponibles pour le moment.",
         "card_none": "Dindon n'a rien à montrer pour cette personne (jamais vue, un bot, ou elle a demandé à ne pas être enregistrée).",
@@ -279,6 +282,30 @@ class PrivacyService:
             rows.append({"type": 1, "components": [{"type": 3, "custom_id": f"dindon:shape:{focus}:{period}", "placeholder": "Changer la forme",
                                                     "options": [{"label": label, "value": key, "default": key == shape} for key, label in discord_map.SHAPES.items()]}]})
         return Reply(title, file=("carte.png", discord_map.render(data, cfg["names"], pictures, card, shape)), components=rows)
+
+    def politimetre(self, guild_id: int, user_id: int, channel_id: int) -> Reply:
+        from dindon import politimetre
+
+        if str(user_id) in self.blocked:
+            return Reply(_text()["card_none"])
+        try:
+            with self._lock:
+                conn = self._connection()
+                cfg = discord_map.load(conn)
+                if not cfg["enabled"] or not cfg["acknowledged"] or "axes" not in cfg["sections"]:
+                    return Reply("Le politimètre n'est pas activé : dans « Carte sur Discord », activez la carte et les positions, avec la confirmation que les membres sont informés.")
+                data = politimetre.collect(conn, guild_id, user_id, channel_id)
+            if data is None:
+                return Reply("Dindon n'a pas de positions à montrer pour cette personne.")
+            pictures = self._pictures(guild_id, {user_id: data["avatar"]}) if data["avatar"] else {}
+            sources = [{"type": 2, "style": 5, "label": f"Source {i + 1}", "url": p["url"]} for i, p in enumerate(data["positions"])]
+            return Reply("", file=("politimetre.png", politimetre.render(data, pictures.get(user_id))),
+                         components=[{"type": 1, "components": sources}] if sources else [])
+        except (psycopg.OperationalError, psycopg.InterfaceError):
+            self._conn = None
+        except Exception as error:
+            log.error("a politimetre could not be made (%s)", type(error).__name__)
+        return Reply("Le politimètre n'a pas pu être créé. Réessayez dans un instant.")
 
     def run(self, user_id: int, sub: str) -> Reply:
         """Does what a member asked, and returns what to tell them."""
@@ -519,6 +546,8 @@ class Interactions:
             await self._mycard(data, user_id, text)
         elif sub == "map":
             await self._map(data, user_id, options[0], text)
+        elif sub == "politimetre":
+            await self._politimetre(data, user_id, options[0], text)
         elif sub in ("debat", "suivi", "terminer", "param"):
             if self.debates is None:
                 await self._callback(data, CHANNEL_MESSAGE, text["no_debates"])
@@ -648,6 +677,20 @@ class Interactions:
         except (IndexError, ValueError, TypeError):
             return
         await self._mycard_screen(data, user_id, page, ("note", key, note), "Note enregistrée." if note else "Note retirée.", update=True)
+
+    async def _politimetre(self, data: dict, user_id: int, option: dict, text: dict) -> None:
+        given = {o.get("name"): o.get("value") for o in option.get("options") or []}
+        try:
+            target = int(given.get("personne", user_id))
+            guild_id, channel_id = int(data["guild_id"]), int(data["channel_id"])
+        except (KeyError, ValueError, TypeError):
+            await self._callback(data, CHANNEL_MESSAGE, "Utilisez le politimètre dans un salon du serveur.")
+            return
+        if self.service.too_soon(user_id):
+            await self._callback(data, CHANNEL_MESSAGE, text["wait"])
+            return
+        await self._callback(data, DEFERRED_MESSAGE, public=True)
+        await self._edit(data, await asyncio.to_thread(self.service.politimetre, guild_id, target, channel_id))
 
     async def _map(self, data: dict, user_id: int, option: dict, text: dict) -> None:
         """`/dindon map [periode] [personne] [forme]`: the picture is posted in the channel. Only the choices that the command offers are taken."""
