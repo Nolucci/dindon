@@ -1,6 +1,7 @@
 """Private helper configuration and two independent Ollama instances (synthetic data only)."""
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
 
@@ -15,6 +16,33 @@ from fake_ollama import FakeOllama
 from synthetic import settings_for
 from test_analysis import NOW, SAYS, Talk, ingest
 from test_extraction import ALICE, BOB, GUILD_ID, debate
+
+
+def test_worker_discovery_is_parallel_and_keeps_the_previous_catalogue_until_complete(monkeypatch):
+    pool = OllamaPool("http://local:11434", ("http://helper:11434",))
+    pool._models = {"http://local:11434": {"previous"}}
+    pool._digests = {"http://local:11434": {"previous": "old"}}
+    entered = threading.Barrier(3)
+    release = threading.Event()
+
+    def tags(client, path, **kwargs):
+        assert path == "/api/tags"
+        entered.wait(timeout=5)
+        assert release.wait(timeout=5)
+        return {"models": [{"name": "bge-m3:latest", "digest": "same-build"}]}
+
+    monkeypatch.setattr(Ollama, "_call", tags)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        pending = executor.submit(pool.models)
+        try:
+            entered.wait(timeout=5)
+            assert pool.known_models() == {"http://local:11434": ["previous"]}
+            assert pool._digests == {"http://local:11434": {"previous": "old"}}
+        finally:
+            release.set()
+        assert pending.result(timeout=5) == ["bge-m3:latest"]
+    assert len(pool.known_models()) == 2
+    assert len(pool._eligible("bge-m3")) == 2
 
 
 def test_only_tailscale_addresses_can_be_added(ingest_db):

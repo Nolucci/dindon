@@ -59,19 +59,29 @@ def analysis(request: Request, guild: int | None = None) -> dict:
         guild_id = resolve_guild(conn, guild)
         counts = conn.execute(
             """SELECT count(*) AS conversations, count(*) FILTER (WHERE c.kept) AS kept,
+                      count(*) FILTER (WHERE c.kept AND EXISTS (SELECT 1 FROM conversation_extractions x WHERE x.conversation_id = c.id)) AS read,
                       count(*) FILTER (WHERE c.kept AND EXISTS (SELECT 1 FROM conversation_embeddings e WHERE e.conversation_id = c.id AND e.model = %s)) AS embedded
                FROM conversations c JOIN channels ch ON ch.id = c.channel_id WHERE ch.guild_id = %s""",
             (state.analysis.embed_model, guild_id)).fetchone()
         topics = {r["status"]: r["n"] for r in conn.execute("SELECT status, count(*) AS n FROM topics WHERE guild_id = %s GROUP BY status", (guild_id,))}
         messages = conn.execute("SELECT count(*) AS n FROM messages m JOIN channels c ON c.id = m.channel_id WHERE c.guild_id = %s", (guild_id,)).fetchone()["n"]
         run = conn.execute("SELECT id, model, created_at, parameters FROM topic_runs WHERE guild_id = %s ORDER BY id DESC LIMIT 1", (guild_id,)).fetchone()
+        contradictions = conn.execute("""SELECT count(DISTINCT s.user_id) AS n FROM claimed_ideology_summary s
+                                         JOIN users u ON u.id = s.user_id
+                                         WHERE s.guild_id = %s AND s.verdict = 'discordant' AND NOT u.is_bot""", (guild_id,)).fetchone()["n"]
     return {
         "guild": str(guild_id), "ready": state.analysis.readiness(), "job": state.analysis.status(),
         "models": {"embeddings": state.analysis.embed_model, "naming": state.analysis.name_model},
-        "counts": {"messages": messages, **counts, "topics": topics},
+        "counts": {"messages": messages, **counts, "topics": topics, "contradictions": contradictions},
         "last_run": None if run is None else {"id": run["id"], "model": run["model"], "at": run["created_at"].isoformat(),
                                               "k": run["parameters"].get("k"), "chosen_by": run["parameters"].get("chosen_by")},
     }
+
+
+@router.get("/analysis/status")
+def status(request: Request) -> dict:
+    """Progress only: no database counts, position lists or calls to Ollama."""
+    return {"job": request.app.state.analysis.status()}
 
 
 @router.get("/analysis/live")

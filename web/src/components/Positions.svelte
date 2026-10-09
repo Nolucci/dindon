@@ -6,7 +6,7 @@
   import { day } from '../lib/format.js';
   import { matches, slash } from '../lib/text.js';
 
-  let { guild, onAuthLost, onAutomate, embedded = false, onUpdate = () => {} } = $props();
+  let { guild, onAuthLost, onAutomate, embedded = false, onUpdate = () => {}, analysisInfo = null, analysisJob = null, onJob = () => {} } = $props();
 
   const fmt = new Intl.NumberFormat('fr-FR');
   const STATES = { idle: '', running: 'Lecture en cours…', cancelling: 'Arrêt en cours…', done: 'Terminée', cancelled: 'Annulée', failed: 'Échec' };
@@ -14,7 +14,8 @@
   const dayOrNothing = (iso) => day(iso, '');
 
   let data = $state(null);        // /api/positions
-  let info = $state(null);        // /api/analysis (ready, job)
+  let localInfo = $state(null);
+  const info = $derived(embedded ? analysisInfo : localInfo);        // /api/analysis (ready, job)
   let opened = $state(null);      // { id, loading, people }
   let problem = $state('');
   // The choice of the batches (« étapes ») is kept in this browser, so that a reload does not undo it
@@ -31,6 +32,8 @@
   let controlsOpen = $state(false);
   $effect(() => { if (running) controlsOpen = true; });
   let poll = null;
+  let disposed = false;
+  let followedJob = null;
 
   // Search and filters: asked of the server (it knows the names of the people who take each position)
   let q = $state('');
@@ -60,61 +63,84 @@
   const catalog = $derived(data?.axes_catalog ?? []);
   const strengthWord = (loading) => (Math.abs(loading) >= 0.8 ? 'forte' : 'moyenne');
 
-  const job = $derived(info?.job);
+  const job = $derived(embedded ? analysisJob : localInfo?.job);
   const running = $derived(job?.state === 'running' || job?.state === 'cancelling');
   const ready = $derived(info?.ready);
   const missing = $derived(ready?.ollama ? Object.entries(ready.models).filter(([, there]) => !there).map(([name]) => name) : []);
-  const remaining = $derived(data ? data.conversations.kept - data.conversations.read : 0);
-  const canStart = $derived(!running && ready?.ollama && missing.length === 0 && remaining > 0);
+  const remaining = $derived(data ? Math.max(0, data.conversations.kept - data.conversations.read)
+    : info?.counts ? Math.max(0, info.counts.kept - info.counts.read) : null);
+  const canStart = $derived(!!guild && !running && (!ready || (ready.ollama && missing.length === 0)) && remaining !== 0);
 
   const guard = makeGuard(() => onAuthLost(), (message) => (problem = message));
 
   const filters = () => ({ offset, limit: pageSize, q: q.trim() || undefined, theme: themeFilter || undefined, stance: stanceFilter || undefined, sort,
     rejected: showRejected ? 'true' : undefined });
 
-  async function load() {
+  async function loadInfo() {
+    if (embedded) return;
     const server = guild;
-    const current = ++listRequest;
-    const [d, i] = await Promise.all([guard(() => api.positions(guild, filters())), guard(() => api.analysis(guild))]);
-    if (server !== guild || current !== listRequest) return null;
-    listLoading = false;
-    if (d) {
-      data = d;
-      themes = d.themes;
-      onUpdate();
-    }
-    if (i) info = i;
-    if (d && i) problem = '';
-    return i;
+    const answer = await guard(() => api.analysis(server));
+    if (answer && server === guild && !disposed) localInfo = answer;
+  }
+
+  async function load() {
+    await Promise.all([loadList(), loadInfo()]);
+  }
+
+  function receiveJob(answer) {
+    if (embedded) onJob(answer);
+    else localInfo = { ...localInfo, job: answer };
   }
 
   function stopPolling() {
-    clearInterval(poll);
+    clearTimeout(poll);
     poll = null;
   }
 
   function startPolling() {
-    if (poll) return;
-    poll = setInterval(async () => {
-      const i = await load();
-      if (i && !['running', 'cancelling'].includes(i.job.state)) stopPolling();
-    }, 2500);
+    if (embedded || poll || disposed) return;
+    const server = guild;
+    const follow = async () => {
+      const answer = await guard(() => api.analysisStatus());
+      if (server !== guild || disposed) return;
+      if (answer) {
+        const previous = job;
+        receiveJob(answer.job);
+        if (!['running', 'cancelling'].includes(answer.job.state)) {
+          stopPolling();
+          await load();
+          return;
+        }
+        if (answer.job.round !== previous?.round) loadList();
+      }
+      poll = setTimeout(follow, 2000);
+    };
+    poll = setTimeout(follow, 2000);
   }
 
   $effect(() => {
-    if (!guild) return;
+    const server = guild;
+    stopPolling();
     opened = null;
     offset = 0;
     data = null;
-    (async () => {
-      await untrack(load);
-      if (running) startPolling();
-    })();
+    localInfo = null;
+    followedJob = null;
+    if (server) untrack(() => {
+      loadList();
+      if (!embedded) loadInfo().then(() => { if (server === guild && running) startPolling(); });
+    });
+    return () => { listRequest += 1; stopPolling(); clearTimeout(timer); };
   });
-  onDestroy(() => {
-    stopPolling();
-    clearTimeout(timer);
+  $effect(() => {
+    const next = analysisJob;
+    if (!embedded || !next) return;
+    const previous = followedJob;
+    followedJob = next;
+    if (previous && ['running', 'cancelling'].includes(previous.state)
+      && (!['running', 'cancelling'].includes(next.state) || next.round !== previous.round)) untrack(loadList);
   });
+  onDestroy(() => { disposed = true; stopPolling(); clearTimeout(timer); });
 
   // The list follows what is typed, a moment after the last key
   async function loadList() {
@@ -122,10 +148,11 @@
     const server = guild;
     listLoading = true;
     const d = await guard(() => api.positions(server, filters()));
-    if (current !== listRequest || server !== guild) return;
+    if (current !== listRequest || server !== guild || disposed) return;
     listLoading = false;
     if (d) {
       data = d;
+      themes = d.themes;
       if (!d.propositions.some((p) => p.id === opened?.id)) opened = null;
     }
   }
@@ -154,14 +181,15 @@
     const answer = await guard(() => api.analysisStart(body));
     busy = false;
     if (answer) {
-      await load();
+      receiveJob(answer);
       startPolling();
+      if (!['running', 'cancelling'].includes(answer.state)) { loadList(); onUpdate(); }
     }
   }
 
   async function cancel() {
-    await guard(() => api.analysisCancel());
-    load();
+    const answer = await guard(() => api.analysisCancel());
+    if (answer) receiveJob(answer);
   }
 
   async function toggle(proposition) {
@@ -225,7 +253,8 @@
     const answer = await guard(() => api.positionsReview(opened.id, guild, rejected));
     if (answer) {
       opened = null;
-      await load();
+      await loadList();
+      onUpdate();
     }
   }
 
@@ -252,6 +281,63 @@
   {#if !guild}
     <section class="panel card"><p class="muted">Aucun serveur n’est encore importé.</p></section>
   {:else}
+    <section class="panel card" aria-label="Lecture">
+        <div class="actions">
+          {#if running}
+            <button class="btn btn-danger" onclick={cancel} disabled={job.state === 'cancelling'}>Arrêter la lecture</button>
+          {:else}
+            <button class="btn btn-primary" onclick={start} disabled={!canStart || busy}>Analyser les conversations restantes</button>
+          {/if}
+          <button type="button" class="btn" onclick={onAutomate}>Automatiser les prochaines lectures</button>
+        </div>
+    <details bind:open={controlsOpen}><summary>Analyse et réglages</summary>
+      <div class="head">
+        <span class="eyebrow">Lecture</span>
+        {#if !info}<span class="muted">Chargement…</span>
+        {:else if ready && !ready.ollama}<span class="badge danger">Analyse indisponible</span>
+        {:else if missing.length}<span class="badge danger">Modèle à installer</span>
+        {:else}<span class="badge success">Analyse disponible</span>{/if}
+      </div>
+      {#if ready && !ready.ollama}<p class="banner">Ollama n’est pas joignable : {ready.problem}</p>{/if}
+      {#if ready?.ollama && missing.length}<p class="banner">Il manque : {#each missing as name}<code>ollama pull {name}</code> {/each}</p>{/if}
+
+      {#if data}
+        <dl class="counts">
+          <div class="metric"><dt>Conversations lues</dt><dd>{fmt.format(data.conversations.read)} <span class="unit">/ {fmt.format(data.conversations.kept)}</span></dd></div>
+          <div class="metric"><dt>Personnes</dt><dd>{fmt.format(data.claims.people)}</dd></div>
+          <div class="metric"><dt>Positions retenues</dt><dd>{fmt.format(data.claims.positions)}</dd></div>
+          <div class="metric"><dt>Propositions</dt><dd>{fmt.format(data.propositions_total)}</dd></div>
+        </dl>
+      {/if}
+
+        <p class="muted hint">{remaining === null ? '—' : fmt.format(remaining)} conversations restantes.</p>
+        <details class="advanced"><summary>Options de lecture</summary>      {#if data?.axes_links?.total}
+        <label class="check" title="Les liens que personne n'a relus sont ignorés dans les scores des personnes">
+          <input type="checkbox" checked={data.axes_links.only_validated} onchange={(e) => onlyValidated(e.currentTarget.checked)} />
+          <span>Liens validés uniquement ({data.axes_links.validated}/{data.axes_links.total})</span>
+        </label>
+      {/if}
+
+          <label class="inline">Conversations par étape
+            <input class="field-input num" type="number" min="1" max="100000" step="1" bind:value={perBatch} aria-label="Nombre de conversations lues par étape" />
+          </label>
+          <label class="inline">Nombre d’étapes
+            <input class="field-input num" type="number" min="1" max="10000" step="1" bind:value={batches} disabled={untilEnd} aria-label="Nombre d’étapes" />
+          </label>
+          <label class="check"><input type="checkbox" bind:checked={untilEnd} /> <span>Continuer jusqu’à la fin {remaining === null ? '' : `(${fmt.format(remaining)} restantes)`}</span></label>
+          <p class="muted hint">{untilEnd ? 'Toutes les conversations restantes.' : `Jusqu’à ${fmt.format(Math.max(1, Math.floor(Number(perBatch)) || 1) * Math.max(1, Math.floor(Number(batches)) || 1))} conversations.`} <Help label="À propos de l’analyse des positions">Les conversations déjà lues sont préservées. Les positions sans preuve sont écartées. Les ordinateurs configurés dans Système peuvent recevoir les conversations nécessaires à l’analyse.</Help></p>
+        </details>
+        {#if job && job.state !== 'idle'}
+          <div class="progress" aria-live="polite">
+            <span class="badge" class:success={job.state === 'done'} class:danger={job.state === 'failed'} class:accent={running}>{STATES[job.state]}</span>
+            {#if running && job.round && (job.rounds !== 1)}<span class="muted">étape {job.round}{job.rounds ? ` / ${job.rounds}` : ''}</span>{/if}
+            {#if running && job.of}<progress max={job.of} value={job.done}></progress><span class="muted">{job.done} / {job.of}</span>{/if}
+            {#if job.error}<p class="banner" role="alert">{job.error}</p>{/if}
+            {#if job.lines.length}<details class="jobLog"><summary>Journal de lecture</summary><pre class="lines">{job.lines.join('\n')}</pre></details>{/if}
+          </div>
+        {/if}
+    </details>
+    </section>
     <section id="positions-results" aria-label="Propositions" aria-busy={listLoading}>
       <div class="toolbar" role="search" aria-label="Chercher dans les propositions">
         <input class="field-input" type="search" placeholder="Proposition ou personne…" bind:value={q} oninput={changed} aria-label="Chercher une proposition ou une personne" use:slash />
@@ -377,61 +463,6 @@
         </nav>
       {/if}
     </section>
-    <details class="panel card" bind:open={controlsOpen} aria-label="Lecture"><summary>Analyse et réglages</summary>
-      <div class="head">
-        <span class="eyebrow">Lecture</span>
-        {#if !info}<span class="muted">Chargement…</span>
-        {:else if !ready.ollama}<span class="badge danger">Analyse indisponible</span>
-        {:else if missing.length}<span class="badge danger">Modèle à installer</span>
-        {:else}<span class="badge success">Analyse disponible</span>{/if}
-      </div>
-      {#if info && !ready.ollama}<p class="banner">Ollama n’est pas joignable : {ready.problem}</p>{/if}
-      {#if info && ready.ollama && missing.length}<p class="banner">Il manque : {#each missing as name}<code>ollama pull {name}</code> {/each}</p>{/if}
-
-      {#if data}
-        <dl class="counts">
-          <div class="metric"><dt>Conversations lues</dt><dd>{fmt.format(data.conversations.read)} <span class="unit">/ {fmt.format(data.conversations.kept)}</span></dd></div>
-          <div class="metric"><dt>Personnes</dt><dd>{fmt.format(data.claims.people)}</dd></div>
-          <div class="metric"><dt>Positions retenues</dt><dd>{fmt.format(data.claims.positions)}</dd></div>
-          <div class="metric"><dt>Propositions</dt><dd>{fmt.format(data.propositions_total)}</dd></div>
-        </dl>
-        <div class="actions">
-          {#if running}
-            <button class="btn btn-danger" onclick={cancel} disabled={job.state === 'cancelling'}>Arrêter la lecture</button>
-          {:else}
-            <button class="btn btn-primary" onclick={start} disabled={!canStart || busy}>Analyser les conversations restantes</button>
-          {/if}
-          <button type="button" class="btn" onclick={onAutomate}>Automatiser les prochaines lectures</button>
-
-        </div>
-        <p class="muted hint">{fmt.format(remaining)} conversations restantes.</p>
-        <details class="advanced"><summary>Options de lecture</summary>      {#if data?.axes_links?.total}
-        <label class="check" title="Les liens que personne n'a relus sont ignorés dans les scores des personnes">
-          <input type="checkbox" checked={data.axes_links.only_validated} onchange={(e) => onlyValidated(e.currentTarget.checked)} />
-          <span>Liens validés uniquement ({data.axes_links.validated}/{data.axes_links.total})</span>
-        </label>
-      {/if}
-
-          <label class="inline">Conversations par étape
-            <input class="field-input num" type="number" min="1" max="100000" step="1" bind:value={perBatch} aria-label="Nombre de conversations lues par étape" />
-          </label>
-          <label class="inline">Nombre d’étapes
-            <input class="field-input num" type="number" min="1" max="10000" step="1" bind:value={batches} disabled={untilEnd} aria-label="Nombre d’étapes" />
-          </label>
-          <label class="check"><input type="checkbox" bind:checked={untilEnd} /> <span>Continuer jusqu’à la fin ({fmt.format(remaining)} restantes)</span></label>
-          <p class="muted hint">{untilEnd ? 'Toutes les conversations restantes.' : `Jusqu’à ${fmt.format(Math.max(1, Math.floor(Number(perBatch)) || 1) * Math.max(1, Math.floor(Number(batches)) || 1))} conversations.`} <Help label="À propos de l’analyse des positions">Les conversations déjà lues sont préservées. Les positions sans preuve sont écartées. Les ordinateurs configurés dans Système peuvent recevoir les conversations nécessaires à l’analyse.</Help></p>
-        </details>
-        {#if job && job.state !== 'idle'}
-          <div class="progress" aria-live="polite">
-            <span class="badge" class:success={job.state === 'done'} class:danger={job.state === 'failed'} class:accent={running}>{STATES[job.state]}</span>
-            {#if running && job.round && (job.rounds !== 1)}<span class="muted">étape {job.round}{job.rounds ? ` / ${job.rounds}` : ''}</span>{/if}
-            {#if running && job.of}<progress max={job.of} value={job.done}></progress><span class="muted">{job.done} / {job.of}</span>{/if}
-            {#if job.error}<p class="banner" role="alert">{job.error}</p>{/if}
-            {#if job.lines.length}<details class="jobLog"><summary>Journal de lecture</summary><pre class="lines">{job.lines.join('\n')}</pre></details>{/if}
-          </div>
-        {/if}
-      {/if}
-    </details>
 
   {/if}
 </div>

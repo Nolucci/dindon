@@ -58,17 +58,19 @@ def overview(request: Request, guild: int | None = None, limit: int = Query(250,
         # The theme of a proposition: the one where most of the conversations that it was read in were put (a merged theme counts for the one it joined)
         words = [w for w in q.replace("%", " ").replace("_", " ").split() if w]
         props = conn.execute(
-            """SELECT p.id, p.text, p.status, count(*) AS people, count(*) FILTER (WHERE s.stance = 1) AS pour,
-                      count(*) FILTER (WHERE s.stance = 0) AS nuance, count(*) FILTER (WHERE s.stance = -1) AS contre,
-                      th.topic_id, tt.label AS theme, max(s.stated_at) AS last_at
-               FROM current_stances s JOIN propositions p ON p.id = s.proposition_id
+            """SELECT p.id, p.text, p.status, s.people, s.pour, s.nuance, s.contre,
+                      th.topic_id, tt.label AS theme, s.last_at
+               FROM (SELECT proposition_id, count(*) AS people, count(*) FILTER (WHERE stance = 1) AS pour,
+                            count(*) FILTER (WHERE stance = 0) AS nuance, count(*) FILTER (WHERE stance = -1) AS contre,
+                            max(stated_at) AS last_at
+                     FROM current_stances WHERE guild_id = %(guild)s GROUP BY proposition_id) s
+               JOIN propositions p ON p.id = s.proposition_id
                LEFT JOIN LATERAL (
                    SELECT COALESCE(t.merged_into, t.id) AS topic_id FROM claims c
                    JOIN claim_themes a ON a.claim_id = c.id JOIN topics t ON t.id = a.topic_id
                    WHERE c.proposition_id = p.id GROUP BY 1 ORDER BY count(*) DESC, 1 LIMIT 1) th ON true
                LEFT JOIN topics tt ON tt.id = th.topic_id
-               WHERE s.guild_id = %(guild)s AND p.status <> 'merged' AND (p.status <> 'rejected' OR %(rejected)s)
-               GROUP BY p.id, th.topic_id, tt.label""", {"guild": guild_id, "rejected": rejected}).fetchall()
+               WHERE p.status <> 'merged' AND (p.status <> 'rejected' OR %(rejected)s)""", {"guild": guild_id, "rejected": rejected}).fetchall()
         named: dict[str, set[int]] = {}
         if words:                                           # the people whose name has the word: the propositions they take a position on
             for w in set(words):

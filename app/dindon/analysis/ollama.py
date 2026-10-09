@@ -242,21 +242,33 @@ class OllamaPool:
 
     def models(self, timeout: float = 5) -> list[str]:
         found: set[str] = set()
-        self._models = {}
-        self._digests = {}
+        models = {}
+        digests = {}
         errors = []
-        for client in self.clients:
+        def probe(client):
             try:
                 # Health checks must not inherit the cancellation callback of an
                 # analysis request running (or just stopped) on this client.
                 listed = Ollama(client.base_url, timeout=client.timeout)._call("/api/tags", timeout=timeout).get("models", [])
-                names = {m["name"] for m in listed}
-                self._models[client.base_url] = names
-                self._digests[client.base_url] = {m["name"]: m.get("digest", "") for m in listed}
-                found.update(names)
+                return client.base_url, listed, None
             except OllamaError as error:
-                errors.append(str(error))
-        if not self._models:
+                return client.base_url, [], str(error)
+
+        # One unavailable helper must not delay checks of every other computer.
+        # Publish the complete snapshot together so ongoing work never sees a
+        # partially cleared model/digest catalogue.
+        with ThreadPoolExecutor(max_workers=min(8, len(self.clients))) as executor:
+            for url, listed, error in executor.map(probe, self.clients):
+                if error is not None:
+                    errors.append(error)
+                    continue
+                names = {m["name"] for m in listed}
+                models[url] = names
+                digests[url] = {m["name"]: m.get("digest", "") for m in listed}
+                found.update(names)
+        with self._lock:
+            self._models, self._digests = models, digests
+        if not models:
             raise OllamaError("Aucun ordinateur d'analyse ne répond : " + "; ".join(errors))
         return sorted(found)
 

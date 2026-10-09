@@ -50,7 +50,7 @@ def me(app):
 def finished(client, timeout=60) -> dict:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        job = client.get("/api/analysis").json()["job"]
+        job = client.get("/api/analysis/status").json()["job"]
         if job["state"] not in ("running", "cancelling"):
             return job
         time.sleep(0.1)
@@ -62,7 +62,7 @@ def analyze(client, **body) -> dict:
     return finished(client)
 
 
-@pytest.mark.parametrize("method, path", [("get", "/api/analysis"), ("post", "/api/analysis"), ("post", "/api/analysis/cancel"), ("get", "/api/topics"), ("get", "/api/digest"),
+@pytest.mark.parametrize("method, path", [("get", "/api/analysis"), ("get", "/api/analysis/status"), ("post", "/api/analysis"), ("post", "/api/analysis/cancel"), ("get", "/api/topics"), ("get", "/api/digest"),
                                           ("patch", "/api/topics/1"), ("post", "/api/topics/1/merge"), ("post", "/api/topics/validate-batch")])
 def test_nothing_of_the_analysis_is_available_without_the_session(app, method, path):
     assert getattr(app, method)(path, **({"json": {}} if method != "get" else {})).status_code == 401
@@ -73,6 +73,19 @@ def test_the_state_says_what_is_possible_and_what_is_done(me):
     assert state["ready"] == {"ollama": True, "problem": None, "models": {"bge-m3": True, "qwen3:14b": True}}
     assert state["counts"]["messages"] > 2000 and state["counts"]["conversations"] == 0 and state["last_run"] is None
     assert state["job"]["state"] == "idle"
+    assert state["counts"]["read"] == state["counts"]["contradictions"] == 0
+
+
+def test_progress_does_not_wait_for_database_or_workers(me, monkeypatch):
+    expected = me.app.state.analysis.status()
+
+    def unavailable(*args, **kwargs):
+        raise AssertionError("Progress must not query the database or Ollama")
+
+    monkeypatch.setattr(me.app.state.pool, "connection", unavailable)
+    monkeypatch.setattr(me.app.state.analysis, "readiness", unavailable)
+    response = me.get("/api/analysis/status")
+    assert response.status_code == 200 and response.json() == {"job": expected}
 
 
 def test_the_analysis_makes_the_conversations_the_vectors_and_proposes_topics(me):

@@ -10,6 +10,8 @@
   let { guild, section = $bindable('themes'), onAuthLost, onAutomate, onPerson } = $props();
 
   let summary = $state(null);
+  let info = $state(null);
+  let jobRevision = 0;
   let job = $state(null);
   let problem = $state('');
   let page;
@@ -43,20 +45,19 @@
     if (!server) return;
     const current = ++request;
     try {
-      const [analysis, positions, coherence] = await Promise.all([
-        api.analysis(server), api.positions(server), api.coherence(server),
-      ]);
+      const analysis = await api.analysis(server);
       if (current !== request || server !== guild) return;
+      info = analysis;
       summary = {
         messages: analysis.counts.messages,
         conversations: analysis.counts.conversations,
         embedded: analysis.counts.embedded,
         proposed: analysis.counts.topics.proposed ?? 0,
-        read: positions.conversations.read,
-        kept: positions.conversations.kept,
-        contradictions: coherence.totals.discordant,
+        read: analysis.counts.read,
+        kept: analysis.counts.kept,
+        contradictions: analysis.counts.contradictions,
       };
-      job = analysis.job;
+      if (!job) job = analysis.job;
       problem = '';
     } catch (error) {
       if (current !== request) return;
@@ -65,33 +66,43 @@
     }
   }
 
+  function updateJob(answer) {
+    jobRevision += 1;
+    job = answer;
+  }
+
   $effect(() => {
     const server = guild;
+    const controller = new AbortController();
     summary = null;
+    info = null;
     job = null;
     problem = '';
+    let stopped = false;
+    let timer;
     if (server) loadSummary(server);
-    const timer = setInterval(async () => {
-      if (!server || server !== guild) return;
+    async function follow() {
+      const revision = jobRevision;
       try {
-        const answer = await api.analysis(server);
-        if (server !== guild) return;
+        const answer = await api.analysisStatus({ signal: controller.signal });
+        if (stopped || server !== guild || revision !== jobRevision) return;
         const wasActive = job?.state === 'running' || job?.state === 'cancelling';
+        const changedRound = wasActive && answer.job.round && answer.job.round !== job?.round;
         job = answer.job;
-        summary = summary ? { ...summary, messages: answer.counts.messages, conversations: answer.counts.conversations,
-          kept: answer.counts.kept, embedded: answer.counts.embedded, proposed: answer.counts.topics.proposed ?? 0 } : summary;
-        if (wasActive && !['running', 'cancelling'].includes(job.state)) loadSummary(server);
+        if ((wasActive && !['running', 'cancelling'].includes(job.state)) || changedRound) loadSummary(server);
       } catch (error) {
         if (error instanceof AuthError) onAuthLost();
+      } finally {
+        if (!stopped) timer = setTimeout(follow, 2000);
       }
-    }, 2000);
-    return () => clearInterval(timer);
+    }
+    if (server) follow();
+    return () => { stopped = true; request += 1; controller.abort(); clearTimeout(timer); };
   });
 
   function select(name) {
     section = name;
     page?.scrollTo({ top: 0, behavior: 'instant' });
-    loadSummary();
   }
 </script>
 
@@ -141,9 +152,9 @@
           {#if section !== 'reread' && section !== 'live'}<Help label="Comprendre cette section">{section === 'themes' ? 'Regroupe les conversations par sujet. Validez les thèmes qui vous semblent pertinents.' : section === 'positions' ? 'Ouvrez une proposition pour voir les positions et leurs citations.' : 'Compare les rôles déclarés aux propos disponibles. Une contradiction reste à vérifier dans les citations.'}</Help>{/if}
         </div>
         {#if section === 'themes'}
-          <Themes {guild} {onAuthLost} {onAutomate} embedded onUpdate={loadSummary} />
+          <Themes {guild} {onAuthLost} {onAutomate} embedded analysisInfo={info} analysisJob={job} onJob={updateJob} onUpdate={loadSummary} />
         {:else if section === 'positions'}
-          <Positions {guild} {onAuthLost} {onAutomate} embedded onUpdate={loadSummary} />
+          <Positions {guild} {onAuthLost} {onAutomate} embedded analysisInfo={info} analysisJob={job} onJob={updateJob} onUpdate={loadSummary} />
         {:else if section === 'reread'}
           <Reread {guild} {onAuthLost} {onPerson} embedded />
         {:else if section === 'live'}

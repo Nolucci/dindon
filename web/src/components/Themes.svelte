@@ -1,17 +1,18 @@
 <script>
   import ExportMenu from './ExportMenu.svelte';
   import Help from './Help.svelte';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import { api, makeGuard } from '../lib/api.js';
   import { day } from '../lib/format.js';
   import { matches, slash } from '../lib/text.js';
 
-  let { guild, onAuthLost, onAutomate, embedded = false, onUpdate = () => {} } = $props();
+  let { guild, onAuthLost, onAutomate, embedded = false, onUpdate = () => {}, analysisInfo = null, analysisJob = null, onJob = () => {} } = $props();
 
   const fmt = new Intl.NumberFormat('fr-FR');
   const STATES = { idle: '', running: 'En cours…', cancelling: 'Arrêt en cours…', done: 'Terminée', cancelled: 'Annulée', failed: 'Échec' };
 
-  let info = $state(null);        // /api/analysis: ready, job, models, counts, last_run
+  let localInfo = $state(null);
+  const info = $derived(embedded ? analysisInfo : localInfo);        // /api/analysis: ready, job, models, counts, last_run
   let topics = $state([]);
   let loaded = $state(false);
   let problem = $state('');
@@ -24,8 +25,11 @@
   $effect(() => { if (running) controlsOpen = true; });
   let selected = $state([]);
   let poll = null;
+  let topicRequest = 0;
+  let disposed = false;
+  let followedJob = null;
 
-  const job = $derived(info?.job);
+  const job = $derived(embedded ? analysisJob : localInfo?.job);
   const running = $derived(job?.state === 'running' || job?.state === 'cancelling');
   let q = $state('');              // search: the name, the description, the keywords
   let statusFilter = $state('all'); // all | proposed | validated | rejected
@@ -39,58 +43,79 @@
   const filtering = $derived(q.trim() !== '' || statusFilter !== 'all');
   const ready = $derived(info?.ready);
   const missing = $derived(ready?.ollama ? Object.entries(ready.models).filter(([, there]) => !there).map(([name]) => name) : []);
-  const canStart = $derived(!running && ready?.ollama && missing.length === 0 && (info?.counts.messages ?? 0) > 0);
+  const canStart = $derived(!!guild && !running && (!ready || (ready.ollama && missing.length === 0)) && (!info?.counts || info.counts.messages > 0));
 
   const guard = makeGuard(() => onAuthLost(), (message) => (problem = message));
 
   async function refresh() {
-    const answer = await guard(() => api.analysis(guild));
-    if (answer) {
-      info = answer;
-      problem = '';
-    }
+    if (embedded) { onUpdate(); return; }
+    const server = guild;
+    const answer = await guard(() => api.analysis(server));
+    if (answer && server === guild && !disposed) localInfo = answer;
     return answer;
   }
 
   async function loadTopics() {
-    const list = await guard(() => api.topics(guild, showRejected));
+    const server = guild;
+    const current = ++topicRequest;
+    const list = await guard(() => api.topics(server, showRejected));
+    if (server !== guild || current !== topicRequest || disposed) return;
     if (list) {
       topics = list;
       selected = selected.filter((id) => list.some((t) => t.id === id && t.status === 'proposed'));
     }
     loaded = true;
-    onUpdate();
+  }
+
+  function receiveJob(answer) {
+    if (embedded) onJob(answer);
+    else localInfo = { ...localInfo, job: answer };
   }
 
   function startPolling() {
-    if (poll) return;
-    poll = setInterval(async () => {
-      const answer = await refresh();
-      if (answer && !['running', 'cancelling'].includes(answer.job.state)) {
-        stopPolling();
-        loadTopics();
+    if (embedded || poll || disposed) return;
+    const server = guild;
+    const follow = async () => {
+      const answer = await guard(() => api.analysisStatus());
+      if (server !== guild || disposed) return;
+      if (answer) {
+        receiveJob(answer.job);
+        if (!['running', 'cancelling'].includes(answer.job.state)) {
+          stopPolling();
+          loadTopics();
+          refresh();
+          return;
+        }
       }
-    }, 1500);
+      poll = setTimeout(follow, 2000);
+    };
+    poll = setTimeout(follow, 2000);
   }
 
-  function stopPolling() {
-    clearInterval(poll);
-    poll = null;
-  }
+  function stopPolling() { clearTimeout(poll); poll = null; }
 
-  // At the start, and again when another server is picked in the left bar
   $effect(() => {
-    if (!guild) {                  // no server imported yet: nothing to ask
-      loaded = true;
-      return;
-    }
-    (async () => {
-      await refresh();
-      await loadTopics();
-      if (running) startPolling();
-    })();
+    const server = guild;
+    stopPolling();
+    localInfo = null;
+    topics = [];
+    selected = [];
+    loaded = !server;
+    followedJob = null;
+    if (server) untrack(() => {
+      loadTopics();
+      if (!embedded) refresh().then(() => { if (server === guild && running) startPolling(); });
+    });
+    return () => { topicRequest += 1; stopPolling(); };
   });
-  onDestroy(stopPolling);
+  $effect(() => {
+    const next = analysisJob;
+    if (!embedded || !next) return;
+    const previous = followedJob;
+    followedJob = next;
+    if (previous && ['running', 'cancelling'].includes(previous.state) && !['running', 'cancelling'].includes(next.state)) untrack(loadTopics);
+  });
+  onDestroy(() => { disposed = true; topicRequest += 1; stopPolling(); });
 
   async function start() {
     busy = true;
@@ -98,19 +123,20 @@
     const answer = await guard(() => api.analysisStart(body));
     busy = false;
     if (answer) {
-      await refresh();
+      receiveJob(answer);
       startPolling();
+      if (!['running', 'cancelling'].includes(answer.state)) { loadTopics(); refresh(); }
     }
   }
 
   async function cancel() {
-    await guard(() => api.analysisCancel());
-    refresh();
+    const answer = await guard(() => api.analysisCancel());
+    if (answer) receiveJob(answer);
   }
 
   async function change(topic, body) {
     const answer = await guard(() => api.topicChange(topic.id, body));
-    if (answer) await loadTopics();
+    if (answer) { await loadTopics(); refresh(); }
   }
 
   function selectTopic(id, checked) {
@@ -146,7 +172,7 @@
     merging = null;
     if (!into) return;
     const answer = await guard(() => api.topicMerge(id, Number(into)));
-    if (answer) await loadTopics();
+    if (answer) { await loadTopics(); refresh(); }
   }
 
   const when = day;
@@ -171,6 +197,62 @@
       <p class="muted">Aucun serveur importé. Utilisez « Importer » pour commencer.</p>
     </section>
   {:else}
+  <section class="panel status">
+      <div class="actions">
+        {#if running}
+          <button class="btn btn-danger" onclick={cancel} disabled={job.state === 'cancelling'}>Annuler l’analyse</button>
+        {:else}
+          <button class="btn btn-primary" onclick={start} disabled={!canStart || busy}>Analyser les conversations</button>
+        {/if}
+        <button type="button" class="btn" onclick={onAutomate}>Automatiser les prochaines analyses</button>
+      </div>
+  <details bind:open={controlsOpen}><summary>Analyse et réglages</summary>
+    <div class="statusHead">
+      <span class="eyebrow">Analyse</span>
+      {#if !info}
+        <span class="muted">Chargement…</span>
+      {:else if ready && !ready.ollama}
+        <span class="badge danger">Ollama ne répond pas</span>
+      {:else if missing.length}
+        <span class="badge danger">Modèle à installer</span>
+      {:else}
+        <span class="badge success">Analyse disponible</span>
+      {/if}
+    </div>
+
+    {#if info?.counts}
+      {#if ready && !ready.ollama}
+        <p class="banner">Analyse indisponible <Help label="Pourquoi l’analyse est indisponible">{ready.problem}</Help></p>
+      {:else if missing.length}
+        <p class="banner">Il manque : {#each missing as name}<code>ollama pull {name}</code> {/each}</p>
+      {/if}
+
+      <dl class="counts">
+        <div class="metric"><dt>À examiner</dt><dd>{fmt.format(info.counts.topics.proposed ?? 0)}</dd></div>
+        <div class="metric"><dt>Validés</dt><dd>{fmt.format(info.counts.topics.validated ?? 0)}</dd></div>
+      </dl>
+    {/if}
+
+      <details class="advanced">
+        <summary>Réglages et détails de l’analyse</summary>
+        <p class="muted hint">{info?.counts ? `${fmt.format(info.counts.messages)} messages · ${fmt.format(info.counts.conversations)} conversations · ${fmt.format(info.counts.kept)} retenues · ${fmt.format(info.counts.embedded)} vecteurs` : 'Chargement…'}</p>
+        <label class="inline">Nombre de thèmes
+          <input class="field-input small" type="number" min="2" max="80" placeholder="auto" bind:value={fixedTopics} aria-label="Nombre de thèmes" />
+        </label>
+        <Help label="Choisir le nombre de thèmes">Laissez vide pour choisir automatiquement. Les ordinateurs configurés dans Système peuvent recevoir les conversations nécessaires à l’analyse.</Help>
+      </details>
+
+      {#if job && job.state !== 'idle'}
+        <div class="progress" aria-live="polite">
+          <span class="badge" class:success={job.state === 'done'} class:danger={job.state === 'failed'} class:accent={running}>{STATES[job.state]}</span>
+          {#if running && job.stage}<span class="muted">étape : {job.stage}</span>{/if}
+          {#if running && job.of}<progress max={job.of} value={job.done}></progress><span class="muted">{fmt.format(job.done)} / {fmt.format(job.of)}</span>{/if}
+          {#if job.error}<p class="banner" role="alert">{job.error}</p>{/if}
+          {#if job.lines.length}<details class="jobLog"><summary>Journal de l’analyse</summary><pre class="lines">{job.lines.join('\n')}</pre></details>{/if}
+        </div>
+      {/if}
+  </details>
+  </section>
   {#snippet card(topic)}
     <article class="panel topic" class:isValidated={topic.status === 'validated'}>
       <header>
@@ -277,61 +359,6 @@
       <div class="grid">{#each rejected as topic (topic.id)}{@render card(topic)}{/each}</div>
     {/if}
   </section>
-  <details class="panel status" bind:open={controlsOpen}><summary>Analyse et réglages</summary>
-    <div class="statusHead">
-      <span class="eyebrow">Analyse</span>
-      {#if !info}
-        <span class="muted">Chargement…</span>
-      {:else if !ready.ollama}
-        <span class="badge danger">Ollama ne répond pas</span>
-      {:else if missing.length}
-        <span class="badge danger">Modèle à installer</span>
-      {:else}
-        <span class="badge success">Analyse disponible</span>
-      {/if}
-    </div>
-
-    {#if info}
-      {#if !ready.ollama}
-        <p class="banner">Analyse indisponible <Help label="Pourquoi l’analyse est indisponible">{ready.problem}</Help></p>
-      {:else if missing.length}
-        <p class="banner">Il manque : {#each missing as name}<code>ollama pull {name}</code> {/each}</p>
-      {/if}
-
-      <dl class="counts">
-        <div class="metric"><dt>À examiner</dt><dd>{fmt.format(info.counts.topics.proposed ?? 0)}</dd></div>
-        <div class="metric"><dt>Validés</dt><dd>{fmt.format(info.counts.topics.validated ?? 0)}</dd></div>
-      </dl>
-
-      <div class="actions">
-        {#if running}
-          <button class="btn btn-danger" onclick={cancel} disabled={job.state === 'cancelling'}>Annuler l’analyse</button>
-        {:else}
-          <button class="btn btn-primary" onclick={start} disabled={!canStart || busy}>Analyser les conversations</button>
-        {/if}
-        <button type="button" class="btn" onclick={onAutomate}>Automatiser les prochaines analyses</button>
-
-      </div>
-      <details class="advanced">
-        <summary>Réglages et détails de l’analyse</summary>
-        <p class="muted hint">{fmt.format(info.counts.messages)} messages · {fmt.format(info.counts.conversations)} conversations · {fmt.format(info.counts.kept)} retenues · {fmt.format(info.counts.embedded)} vecteurs</p>
-        <label class="inline">Nombre de thèmes
-          <input class="field-input small" type="number" min="2" max="80" placeholder="auto" bind:value={fixedTopics} aria-label="Nombre de thèmes" />
-        </label>
-        <Help label="Choisir le nombre de thèmes">Laissez vide pour choisir automatiquement. Les ordinateurs configurés dans Système peuvent recevoir les conversations nécessaires à l’analyse.</Help>
-      </details>
-
-      {#if job.state !== 'idle'}
-        <div class="progress" aria-live="polite">
-          <span class="badge" class:success={job.state === 'done'} class:danger={job.state === 'failed'} class:accent={running}>{STATES[job.state]}</span>
-          {#if running && job.stage}<span class="muted">étape : {job.stage}</span>{/if}
-          {#if running && job.of}<progress max={job.of} value={job.done}></progress><span class="muted">{fmt.format(job.done)} / {fmt.format(job.of)}</span>{/if}
-          {#if job.error}<p class="banner" role="alert">{job.error}</p>{/if}
-          {#if job.lines.length}<details class="jobLog"><summary>Journal de l’analyse</summary><pre class="lines">{job.lines.join('\n')}</pre></details>{/if}
-        </div>
-      {/if}
-    {/if}
-  </details>
 
   {/if}
 </div>
@@ -558,7 +585,6 @@
     font-size: 0.75rem;
     color: var(--text-muted);
   }
-
 
   .tags {
     display: flex;

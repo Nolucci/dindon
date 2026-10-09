@@ -270,6 +270,9 @@ def test_the_pages_show_the_positions_with_their_proof(web, ingest_db, client, o
     read(ingest_db, client, ollama, GOOD)
     o = web.get("/api/positions", params={"guild": GUILD}).json()
     assert o["conversations"] == {"kept": 1, "read": 1} and o["claims"] == {"total": 2, "positions": 2, "people": 2, "refused": 0}
+    counts = web.get("/api/analysis", params={"guild": GUILD}).json()["counts"]
+    assert {key: counts[key] for key in ("kept", "read")} == o["conversations"]
+    assert counts["contradictions"] == web.get("/api/positions/coherence", params={"guild": GUILD}).json()["totals"]["discordant"]
     assert [(p["people"], p["for"], p["against"], p["nuanced"]) for p in o["propositions"]] == [(2, 1, 1, 0)]
     pid = o["propositions"][0]["id"]
     detail = web.get(f"/api/positions/proposition/{pid}", params={"guild": GUILD}).json()
