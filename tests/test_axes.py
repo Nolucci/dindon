@@ -144,6 +144,9 @@ def test_reading_again_replaces_what_an_earlier_reading_proposed_but_keeps_what_
 
 def test_the_page_of_a_person_gives_a_score_on_every_axis_and_the_role_they_gave_themselves(web, ingest_db):
     a_socialist_and_a_liar(ingest_db)
+    claim_id = ingest_db.execute("SELECT id FROM claims WHERE user_id = %s ORDER BY id LIMIT 1", (ALICE_ID,)).fetchone()[0]
+    message_id, channel_id, content = ingest_db.execute("SELECT id, channel_id, content FROM messages WHERE author_id = %s ORDER BY id LIMIT 1", (ALICE_ID,)).fetchone()
+    ingest_db.execute("INSERT INTO claim_evidence (claim_id, message_id, quote) VALUES (%s, %s, %s)", (claim_id, message_id, content))
     card = web.get(f"/api/positions/person/{ALICE_ID}", params={"guild": GUILD}).json()
     assert len(card["axes"]) == 21                                         # every active axis, with or without a score
     eco = next(a for a in card["axes"] if a["code"] == "economie")
@@ -151,6 +154,8 @@ def test_the_page_of_a_person_gives_a_score_on_every_axis_and_the_role_they_gave
     assert eco["expected"] == [{"role": "Socialiste", "min": -1.0, "max": -0.2, "verdict": "confirmed"}] or eco["expected"][0]["verdict"] in ("confirmed", "compatible")
     assert next(a for a in card["axes"] if a["code"] == "immigration")["score"] is None                                # nothing was said about it
     assert eco["contributions"][0]["proposition"].startswith("L'État doit posséder") and eco["contributions"][0]["loading"] == -1.0
+    proof = next(c["evidence"][0] for c in eco["contributions"] if c["evidence"])
+    assert proof["quote"] == content and proof["url"] == f"https://discord.com/channels/{GUILD}/{channel_id}/{message_id}"
     assert [(r["role"], r["verdict"]) for r in card["roles"]] == [("Socialiste", "concordant")]
 
 

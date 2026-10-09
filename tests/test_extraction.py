@@ -280,6 +280,10 @@ def test_the_pages_show_the_positions_with_their_proof(web, ingest_db, client, o
     assert detail["people"][0]["evidence"][0]["quote"] == SAYS_A and detail["people"][0]["evidence"][0]["channel"]
     mine = web.get(f"/api/positions/person/{ALICE_ID}", params={"guild": GUILD}).json()
     assert [(p["proposition"], p["stance"]) for p in mine["positions"]] == [("L'État doit augmenter le salaire minimum", 1)]
+    proof = mine["positions"][0]["evidence"][0]
+    channel_id = ingest_db.execute("SELECT channel_id FROM messages WHERE id = %s", (int(proof["message_id"]),)).fetchone()[0]
+    assert proof["url"] == f"https://discord.com/channels/{GUILD}/{channel_id}/{proof['message_id']}"
+    assert mine["themes"][0]["positions"][0]["evidence"] == mine["positions"][0]["evidence"]
     assert web.get("/api/positions/proposition/999999", params={"guild": GUILD}).status_code == 404
 
 

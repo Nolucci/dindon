@@ -27,11 +27,12 @@ def _evidence(conn, claim_ids: list[int]) -> dict[int, list[dict]]:
     if not claim_ids:
         return out
     for r in conn.execute(
-            """SELECT e.claim_id, e.quote, m.id AS message_id, m.sent_at, c.name AS channel FROM claim_evidence e
+            """SELECT e.claim_id, e.quote, m.id AS message_id, m.sent_at, c.name AS channel, c.id AS channel_id, c.guild_id FROM claim_evidence e
                JOIN messages m ON m.id = e.message_id JOIN channels c ON c.id = m.channel_id
                WHERE e.claim_id = ANY(%s) ORDER BY m.sent_at, m.id""", (claim_ids,)):
         out.setdefault(r["claim_id"], []).append({"message_id": str(r["message_id"]), "quote": (r["quote"] or "")[:QUOTE_CHARS], "at": iso(r["sent_at"]),
-                                                  "channel": r["channel"]})
+                                                  "channel": r["channel"],
+                                                  "url": f"https://discord.com/channels/{r['guild_id']}/{r['channel_id']}/{r['message_id']}"})
     return out
 
 
@@ -279,6 +280,10 @@ def person(request: Request, user_id: int, guild: int | None = None) -> dict:
                    AND review_status <> 'rejected' ORDER BY stated_at""", (guild_id, user_id)):
             earlier.setdefault(r["proposition_id"], []).append({"stance": r["stance"], "at": iso(r["stated_at"])})
         evidence = _evidence(conn, [r["claim_id"] for r in rows])
+        by_proposition = {r["proposition_id"]: evidence.get(r["claim_id"], []) for r in rows}
+        for items in contributions.values():
+            for contribution in items:
+                contribution["evidence"] = by_proposition.get(contribution["proposition_id"], [])
         conversations = sorted({r["conversation_id"] for r in rows if r["conversation_id"]})
         others: dict[int, dict[int, dict]] = {}
         if conversations:

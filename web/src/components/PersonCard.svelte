@@ -97,7 +97,13 @@
                 <ul class="contrib">
                   {#each axis.contributions as c}
                     <li><span class="badge small" class:success={c.stance === 1} class:danger={c.stance === -1}>{stanceName[c.stance]}</span> {c.proposition}
-                      <span class="muted small" title="Poids de la proposition sur l’axe : négatif = pôle de gauche, positif = pôle de droite">#{c.proposition_id} · lien {c.loading > 0 ? '+' : ''}{c.loading}{c.validated ? ' · validé' : ''}</span></li>
+                      <span class="muted small" title="Poids de la proposition sur l’axe : négatif = pôle de gauche, positif = pôle de droite">#{c.proposition_id} · lien {c.loading > 0 ? '+' : ''}{c.loading}{c.validated ? ' · validé' : ''}</span>
+                      {#each c.evidence ?? [] as e}
+                        <blockquote>« {e.quote} »
+                          {#if e.url}<a class="messageLink" href={e.url} target="_blank" rel="noopener noreferrer">Voir sur Discord ↗</a>{/if}
+                        </blockquote>
+                      {/each}
+                    </li>
                   {/each}
                 </ul>
               {/if}
@@ -122,7 +128,11 @@
                 <span class="propText">{p.proposition}</span>
                 <span class="badge small" class:success={p.stance === 1} class:danger={p.stance === -1}>{stanceName[p.stance]}</span>
                 {#if p.history.length}<span class="muted small">a changé : {p.history.map((h) => stanceName[h.stance]).join(' → ')}</span>{/if}
-                {#each p.evidence as e}<blockquote>« {e.quote} »</blockquote>{/each}
+                {#each p.evidence as e}
+                  <blockquote>« {e.quote} »
+                    {#if e.url}<a class="messageLink" href={e.url} target="_blank" rel="noopener noreferrer">Voir sur Discord ↗</a>{/if}
+                  </blockquote>
+                {/each}
               </li>
             {/each}
           </ul>
@@ -233,7 +243,9 @@
   .positions { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.5rem; }
   .positions li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.375rem 0.5rem; }
   .propText { font-weight: 600; color: var(--text-primary); }
-  .positions blockquote { flex-basis: 100%; margin: 0; padding: 0.25rem 0.625rem; border-left: 3px solid var(--border-subtle); color: var(--text-secondary); font-size: 0.8125rem; line-height: 1.45; }
+  .positions blockquote, .contrib blockquote { flex-basis: 100%; margin: 0; padding: 0.25rem 0.625rem; border-left: 3px solid var(--border-subtle); color: var(--text-secondary); font-size: 0.8125rem; line-height: 1.45; overflow-wrap: anywhere; }
+  .contrib blockquote { margin-top: .375rem; }
+  .messageLink { display: block; width: fit-content; margin-top: .25rem; font-size: .75rem; color: var(--accent); text-decoration: underline; text-underline-offset: .15em; }
   .hero { display: flow-root; margin: -1.25rem -1.125rem 0; height: 4.5rem; background: linear-gradient(135deg, color-mix(in srgb, var(--tint) 70%, #000), color-mix(in srgb, var(--tint) 25%, var(--bg-secondary))); }
   .portrait { position: relative; display: block; width: 4.75rem; height: 4.75rem; margin: 2.25rem 0 0 0.25rem; border: 4px solid var(--bg-secondary); border-radius: 50%; overflow: hidden; background: var(--tint); box-shadow: 0 0 0 2px var(--tint), var(--shadow-md); }
   .portrait img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
