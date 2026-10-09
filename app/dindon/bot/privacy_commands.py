@@ -298,7 +298,7 @@ class PrivacyService:
             if data is None:
                 return Reply("Dindon n'a pas de positions à montrer pour cette personne.")
             pictures = self._pictures(guild_id, {user_id: data["avatar"]}) if data["avatar"] else {}
-            sources = [{"type": 2, "style": 5, "label": f"Source {i + 1}", "url": p["url"]} for i, p in enumerate(data["positions"])]
+            sources = [{"type": 2, "style": 5, "label": f"Source {i + 1}", "url": p["url"]} for i, p in enumerate(data["positions"]) if p["url"]]
             return Reply("", file=("politimetre.png", politimetre.render(data, pictures.get(user_id))),
                          components=[{"type": 1, "components": sources}] if sources else [])
         except (psycopg.OperationalError, psycopg.InterfaceError):
