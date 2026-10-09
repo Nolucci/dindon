@@ -23,7 +23,7 @@ import psycopg
 from psycopg.rows import tuple_row
 
 from dindon.analysis.parallel import pipeline, workers_for
-from dindon.analysis.ollama import Ollama, OllamaError
+from dindon.analysis.ollama import Ollama, OllamaError, OllamaUnavailable
 
 log = logging.getLogger("dindon.analysis")
 
@@ -251,7 +251,7 @@ def assign_axes(conn: psycopg.Connection, client: Ollama, model: str, guild_id: 
         if cancelled():
             break
         if error is not None:
-            if not isinstance(error, OllamaError):
+            if isinstance(error, OllamaUnavailable) or not isinstance(error, OllamaError):
                 raise error
             failed += 1
             in_a_row += 1

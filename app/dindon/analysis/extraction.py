@@ -29,7 +29,7 @@ from dindon.analysis import irony
 from dindon.analysis.chunks import split_long
 from dindon.analysis.compact import clean
 from dindon.analysis.embeddings import vector_literal
-from dindon.analysis.ollama import Ollama, OllamaError
+from dindon.analysis.ollama import Ollama, OllamaError, OllamaUnavailable
 from dindon.analysis.parallel import pipeline, workers_for
 
 log = logging.getLogger("dindon.analysis")
@@ -294,7 +294,7 @@ def extract_claims(conn: psycopg.Connection, client: Ollama, model: str, embed_m
         if cancelled():
             break
         if error is not None:
-            if not isinstance(error, OllamaError):
+            if isinstance(error, OllamaUnavailable) or not isinstance(error, OllamaError):
                 raise error
             failed += 1
             in_a_row += 1

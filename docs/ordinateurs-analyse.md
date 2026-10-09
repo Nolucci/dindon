@@ -2,7 +2,7 @@
 
 Dindon peut faire calculer les vecteurs des conversations par son serveur Debian et par des ordinateurs auxiliaires. Chaque machine garde **sa propre RAM et sa propre copie des modèles** ; il n'y a pas de mémoire partagée. Les conversations nécessaires au calcul sont envoyées aux ordinateurs ajoutés. Ils doivent donc être des machines de confiance.
 
-Les lots de vecteurs sont traités en parallèle. Les étapes qui dépendent du résultat précédent (nommage des thèmes, extraction et vérification des positions) restent séquentielles et peuvent être exécutées par l'un des ordinateurs. Le bot Discord et sa vérification des débats continuent à utiliser l'Ollama du serveur. Le gain dépend du nombre de conversations en attente, de la vitesse de chaque ordinateur et du réseau.
+Les calculs indépendants de vecteurs, de positions et d’axes peuvent être traités en parallèle, avec au plus un calcul par ordinateur. Chaque étape attend les résultats nécessaires avant de passer à la suivante. Le gain dépend du nombre de conversations en attente, de la vitesse de chaque ordinateur et du réseau.
 
 ## 1. Réseau privé
 
@@ -69,11 +69,15 @@ Puis dans **Système → Performance → Ordinateurs d'analyse**, ajoutez `http:
 
 Ne mettez pas à jour le modèle de vecteurs du serveur juste pour rendre un ordinateur compatible si des vecteurs ont déjà été calculés : les anciens vecteurs restent associés au nom du modèle. Faites correspondre la version de l'auxiliaire à celle du serveur ou planifiez une reconstruction complète des vecteurs.
 
-Dès qu'il y a au moins deux machines (le serveur compte), le même panneau affiche un curseur **Part du travail** par ordinateur. Le total doit faire 100 %. « Répartir également » remet un partage égal, et un ordinateur à 0 % ne reçoit rien. La répartition s'applique aux vecteurs et au nommage des thèmes, et elle peut être changée pendant une analyse. Elle revient à un partage égal quand la liste des ordinateurs change.
+Dès qu'il y a au moins deux machines (le serveur compte), le même panneau affiche un curseur **Part du travail** par ordinateur. Le total doit faire 100 %. « Répartir également » remet un partage égal, et un ordinateur à 0 % reste réservé au secours si aucun autre ordinateur compatible ne peut répondre. La répartition s'applique aux vecteurs et au nommage des thèmes, et elle peut être changée pendant une analyse. Elle revient à un partage égal quand la liste des ordinateurs change.
 
 Lancez ensuite une analyse qui comporte des **vecteurs**. Le journal annonce le nombre d'ordinateurs configurés. Pour vérifier leur utilisation, observez l'activité d'Ollama sur les ordinateurs et le nombre de vecteurs terminés dans l'interface.
 
-Si un ordinateur s'éteint pendant une analyse, Dindon essaie de refaire sa requête sur l'Ollama du serveur si le même modèle y est installé. Une requête en cours peut attendre le délai d'expiration avant cette reprise ; retirez l'ordinateur hors ligne pour les analyses suivantes.
+Pendant une analyse, un ordinateur configuré qui ne répond plus est retiré du répartiteur. Le calcul interrompu est confié à un autre ordinateur disposant du même modèle et de la même version exacte. Les autres calculs continuent.
+
+Les ordinateurs absents sont vérifiés toutes les deux secondes (avec un délai réseau d’une seconde par vérification, par groupes de huit). Dès qu’un ordinateur répond à nouveau, il peut recevoir le prochain calcul en attente, sans ouvrir la page Système ni relancer l’analyse. Les calculs déjà en cours restent sur leur ordinateur. La répartition configurée continue de s’appliquer : une part de 0 % réserve l’ordinateur au secours.
+
+L’analyse s’arrête lorsque le travail demandé est terminé, lorsque quelqu’un l’annule, ou lorsqu’aucun ordinateur compatible ne peut poursuivre le calcul. Les résultats déjà enregistrés sont conservés. Une erreur de modèle, de données ou de base peut également empêcher la poursuite : elle ne doit pas être affichée comme une analyse réussie.
 
 ## Arrêter le partage
 
@@ -86,3 +90,71 @@ tailscale serve --tcp=11434 off
 Sur Windows, remplacez `tailscale` par `& "$env:ProgramFiles\Tailscale\tailscale.exe"`.
 
 Pour les détails du réseau privé : [Tailscale Serve](https://tailscale.com/docs/reference/tailscale-cli/serve). Pour Ollama : [API Ollama](https://docs.ollama.com/api).
+
+## Protection thermique sur un ordinateur Linux
+
+Ollama ne transmet pas les températures. La reprise automatique seule ne protège donc pas contre la surchauffe. Le relais `tools/host/ollama_thermal_proxy.py` permet de retirer un hôte Linux en fonction de ses capteurs CPU, sans arrêter les autres ordinateurs. Installer ce relais sur **chaque ordinateur à protéger**, avant de lancer une analyse.
+
+Ce relais reconnaît les capteurs CPU `coretemp`, `k10temp`, `zenpower`, `cpu_thermal` et `k8temp` via `/sys/class/hwmon`. Il ne surveille pas les GPU. Il refuse de démarrer sans capteur CPU reconnu ; une VM ne dispose souvent pas des températures de son hôte physique. Dans ce cas, la protection doit être assurée sur l’hôte physique : ne pas supposer que la VM est protégée par ce relais.
+
+Le seuil par défaut est 85 °C, abaissé si le capteur expose une température critique plus basse (marge de 5 °C). La reprise exige de redescendre à 75 °C, ou à 10 °C sous le seuil effectif si celui-ci est inférieur à 85 °C. Ces valeurs sont des réglages de départ, à adapter aux limites du matériel ; elles ne garantissent pas la protection de toute machine. Les mesures sont relues toutes les 0,5 seconde. Une mesure devenue indisponible retire aussi l’ordinateur.
+
+Le relais coupe la connexion d’un calcul en cours lorsque la température dépasse le seuil, refuse les calculs et les contrôles de disponibilité pendant le refroidissement, puis permet la reprise automatique. Ollama doit rester sur `127.0.0.1:11434` et tous les appels d’analyse doivent passer par le relais pour bénéficier de la protection.
+
+### Installation
+
+Copier `tools/host/ollama_thermal_proxy.py` sur l’ordinateur Linux, puis, depuis son dossier :
+
+```sh
+sudo apt install -y python3
+sudo install -d /opt/dindon-worker
+sudo install -m 644 ollama_thermal_proxy.py /opt/dindon-worker/ollama_thermal_proxy.py
+python3 /opt/dindon-worker/ollama_thermal_proxy.py
+```
+
+Si un capteur est reconnu, le relais démarre sur `127.0.0.1:11435`. Interrompre avec Ctrl+C et créer le service :
+
+```sh
+sudo tee /etc/systemd/system/dindon-thermal.service >/dev/null <<'EOF'
+[Unit]
+Description=Ollama avec protection thermique CPU
+After=network.target ollama.service
+
+[Service]
+DynamicUser=yes
+ExecStart=/usr/bin/python3 /opt/dindon-worker/ollama_thermal_proxy.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now dindon-thermal
+sudo systemctl status dindon-thermal --no-pager
+curl --fail http://127.0.0.1:11435/api/tags
+```
+
+Lorsque le relais répond, faire pointer Tailscale sur ce relais, en gardant l’adresse que Dindon utilise :
+
+```sh
+sudo tailscale serve --bg --tcp=11434 tcp://localhost:11435
+sudo tailscale serve status
+```
+
+Depuis la machine qui héberge Dindon :
+
+```sh
+curl --fail --connect-timeout 10 http://100.X.Y.Z:11434/api/tags
+```
+
+En cas de retrait thermique, le journal du service donne le motif :
+
+```sh
+journalctl -u dindon-thermal --since '10 minutes ago'
+```
+
+Le relais se lie uniquement à la boucle locale et n’expose que les appels Ollama utilisés par Dindon. Ne pas ouvrir les ports Ollama sur Internet. Pour modifier les seuils, ajouter `--max-temperature` et `--resume-temperature` à `ExecStart`, puis recharger systemd et redémarrer ce service entre deux analyses.
+
+La lecture des capteurs suit la [documentation officielle Linux hwmon](https://www.kernel.org/doc/html/latest/hwmon/sysfs-interface.html). Ce relais ne couvre pas Windows ni macOS : ces ordinateurs ont besoin d’une mesure locale adaptée avant qu’un retrait thermique automatique soit possible.

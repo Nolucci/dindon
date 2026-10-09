@@ -24,7 +24,7 @@ import numpy as np
 import psycopg
 
 from dindon.analysis.embeddings import conversation_chunks, conversation_texts
-from dindon.analysis.ollama import Ollama, OllamaError
+from dindon.analysis.ollama import Ollama, OllamaError, OllamaUnavailable
 
 log = logging.getLogger("dindon.analysis")
 
@@ -205,6 +205,8 @@ def name_topic(client: Ollama, model: str, words: list[str], excerpts: list[str]
     for _ in range(2):
         try:
             answer = client.chat_json(model, NAMING_SYSTEM, user, NAMING_SCHEMA)
+        except OllamaUnavailable:
+            raise
         except OllamaError as error:
             log.warning("topic naming failed: %s", error)
             continue

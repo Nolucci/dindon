@@ -37,7 +37,7 @@ from dindon.analysis import irony
 from dindon.analysis.axes import assign_axes
 from dindon.analysis.extraction import _proposition_ids
 from dindon.analysis.job import AnalysisJobs, NotReady
-from dindon.analysis.ollama import OllamaError, OllamaPool
+from dindon.analysis.ollama import OllamaError, OllamaUnavailable, OllamaPool
 from dindon.analysis.parallel import pipeline, workers_for
 from dindon.clock import utc_iso
 from dindon.config import Settings
@@ -615,7 +615,7 @@ class RereadJobs:
             if cancel.is_set():
                 break
             if error is not None:
-                if not isinstance(error, OllamaError):
+                if isinstance(error, OllamaUnavailable) or not isinstance(error, OllamaError):
                     raise error
                 in_a_row += 1
                 self._count("failed")

@@ -95,7 +95,8 @@ def embed_conversations(conn: psycopg.Connection, client: Ollama, model: str, gu
             break
         size = max(1, batch() if callable(batch) else batch)       # the size of a batch is a setting that can change while this runs
         # With helpers, collect enough work to keep each computer busy at once.
-        parallelism = client.parallelism_for(model) if hasattr(client, "parallelism_for") else 1
+        capacity = getattr(client, "capacity_for", None) or getattr(client, "parallelism_for", None)
+        parallelism = capacity(model) if capacity else 1
         window = size * parallelism
         ids = todo[start:start + window]
         chunks = conversation_chunks(conn, ids)

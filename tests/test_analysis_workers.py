@@ -409,3 +409,106 @@ def test_entire_request_has_a_deadline_even_if_response_keeps_trickling():
         server.shutdown()
         server.server_close()
         thread.join(1)
+
+
+def test_reconnected_computer_receives_work_during_running_call_without_ui(monkeypatch):
+    from dindon.analysis import ollama as module
+    from dindon.analysis.parallel import pipeline, workers_for
+    pool = _measured_pool()
+    helper = pool.clients[0]
+    pool._models.pop(helper.base_url)
+    pool._failed.add(helper.base_url)
+    monkeypatch.setattr(module, 'RECOVERY_INTERVAL', 0.02)
+    online, local_started, helper_started, release = (threading.Event() for _ in range(4))
+
+    def tags(client, *_args, **_kwargs):
+        if client.base_url == helper.base_url and not online.is_set():
+            raise module.OllamaError('offline')
+        return {'models': [{'name': 'vectors', 'digest': 'same'}]}
+
+    def local_work(_model, texts):
+        local_started.set()
+        assert release.wait(3)
+        return texts
+
+    def helper_work(_model, texts):
+        helper_started.set()
+        return texts
+
+    monkeypatch.setattr(Ollama, '_call', tags)
+    monkeypatch.setattr(pool.local, 'embed', local_work)
+    monkeypatch.setattr(helper, 'embed', helper_work)
+    assert workers_for(pool, 'vectors') == 2
+    groups = [['a'], ['b'], ['c']]
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        task = executor.submit(lambda: list(pipeline(groups, lambda texts: pool.embed('vectors', texts), workers_for(pool, 'vectors'))))
+        try:
+            assert local_started.wait(1)
+            online.set()
+            assert helper_started.wait(1), 'must rejoin before the healthy call finishes'
+        finally:
+            release.set()
+        results = task.result(timeout=3)
+    assert all(error is None and item == result for item, result, error in results)
+    assert helper.base_url not in pool._failed
+    with pool._lock:
+        assert pool._lock.wait_for(lambda: pool._monitor is None, timeout=1)
+
+
+def test_recovered_model_must_keep_digest_used_before_disconnect(monkeypatch):
+    pool = _measured_pool()
+    helper = pool.clients[0]
+    pool._digests = {c.base_url: {'vectors': 'original'} for c in pool.clients}
+    pool.set_shares({pool.local.base_url: 100, helper.base_url: 0})
+    monkeypatch.setattr(pool.local, 'embed', lambda _model, texts: texts)
+    pool.embed('vectors', ['a'])
+    pool._failed.add(pool.local.base_url)
+    pool._models.pop(pool.local.base_url)
+    monkeypatch.setattr(Ollama, '_call', lambda *_args, **_kwargs: {'models': [{'name': 'vectors', 'digest': 'changed'}]})
+    pool.models()
+    assert pool._eligible('vectors') == []
+    from dindon.analysis.ollama import OllamaUnavailable
+    with pytest.raises(OllamaUnavailable):
+        pool.embed('vectors', ['b'])
+
+
+def test_late_health_check_does_not_clear_a_newer_failure(monkeypatch):
+    pool = _measured_pool()
+    entered, release = threading.Event(), threading.Event()
+    helper = pool.clients[0]
+
+    def tags(*_args, **_kwargs):
+        entered.set()
+        assert release.wait(3)
+        return {'models': [{'name': 'vectors', 'digest': 'original'}]}
+
+    monkeypatch.setattr(Ollama, '_call', tags)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        task = executor.submit(pool.models)
+        try:
+            assert entered.wait(1)
+            with pool._lock:
+                pool._failed.add(helper.base_url)
+                pool._failure_versions[helper.base_url] = 1
+        finally:
+            release.set()
+        task.result(timeout=3)
+    assert helper.base_url in pool._failed
+
+
+def test_all_computers_down_stops_without_retrying_same_work_forever(monkeypatch):
+    from dindon.analysis.ollama import OllamaError, OllamaUnavailable
+    pool = _measured_pool()
+    attempted = []
+
+    def fail(client, *_args):
+        attempted.append(client.base_url)
+        raise OllamaError('offline')
+
+    monkeypatch.setattr(Ollama, '_call', lambda *_args, **_kwargs: (_ for _ in ()).throw(OllamaError('offline')))
+    for client in pool.clients:
+        monkeypatch.setattr(client, 'embed', lambda *args, c=client: fail(c, *args))
+    with pytest.raises(OllamaUnavailable):
+        pool.embed('vectors', ['a'])
+    assert set(attempted) == {c.base_url for c in pool.clients}
+    assert len(attempted) == 2

@@ -144,6 +144,10 @@ docker compose logs -f bot
 
 La collecte de l'application peut aussi fonctionner sans ce service. Voir [les règles du bot](docs/regles-du-bot.md) pour ses permissions et ses commandes.
 
+## Ordinateurs d’analyse supplémentaires
+
+Voir [la reprise automatique et la protection thermique Linux](docs/ordinateurs-analyse.md).
+
 ## Ollama dans Docker sur Linux (variante)
 
 À la place d'Ollama installé sur la machine, mettre `OLLAMA_URL=http://ollama:11434` dans `.env`, puis lancer :

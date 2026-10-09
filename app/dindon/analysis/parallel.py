@@ -10,8 +10,8 @@ _END = object()
 
 
 def workers_for(client, model: str) -> int:
-    """How many questions can be asked at once: one per computer that has the model (a single Ollama is one)."""
-    count = getattr(client, "parallelism_for", None)
+    """Reserve work for reconnecting computers too; the dispatcher enforces one call per available host."""
+    count = getattr(client, "capacity_for", None) or getattr(client, "parallelism_for", None)
     return max(1, count(model)) if callable(count) else 1
 
 

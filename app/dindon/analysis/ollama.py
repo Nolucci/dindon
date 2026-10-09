@@ -9,7 +9,7 @@ import http.client
 import socket
 import threading
 import time
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Callable
 from urllib.parse import urlsplit
@@ -17,10 +17,15 @@ from urllib.parse import urlsplit
 
 # A safety net under the grammar of each answer: a model that loops is cut after about a minute on a laptop instead of filling its whole context
 MAX_ANSWER_TOKENS = 2500
+RECOVERY_INTERVAL = 2.0
 
 
 class OllamaError(Exception):
     """Ollama cannot answer now (not running, model missing, timeout) or answered something unusable."""
+
+
+class OllamaUnavailable(OllamaError):
+    """No compatible computer remains: stop the job, preserving completed work."""
 
 
 class Ollama:
@@ -94,7 +99,7 @@ class Ollama:
             response = connection.getresponse()
             raw = response.read()
             if timed_out.is_set():
-                raise OllamaError(f"Ollama ne répond pas à {self.base_url} (TimeoutError)")
+                raise OllamaUnavailable(f"Ollama ne répond pas à {self.base_url} (TimeoutError)")
             if self.cancelled():
                 raise InterruptedError("analyse annulée")
             if response.status >= 400:
@@ -111,7 +116,7 @@ class Ollama:
             if self.cancelled():
                 raise InterruptedError("analyse annulée") from None
             reason = "TimeoutError" if timed_out.is_set() else type(error).__name__
-            raise OllamaError(f"Ollama ne répond pas à {self.base_url} ({reason})") from None
+            raise OllamaUnavailable(f"Ollama ne répond pas à {self.base_url} ({reason})") from None
         finally:
             finished.set()
             connection.close()
@@ -180,6 +185,11 @@ class OllamaPool:
         self._models: dict[str, set[str]] = {}
         self._digests: dict[str, dict[str, str]] = {}
         self._failed: set[str] = set()
+        self._failure_versions: dict[str, int] = {}
+        self._references: dict[str, str] = {}
+        self._pending = 0
+        self._monitor: threading.Thread | None = None
+        self._probe_lock = threading.Lock()
         self._busy: dict[str, int] = {}                  # calls in flight on each computer
         self._activity: dict[str, dict] = {}              # what each computer is doing and has done since the last reset (counts only, never a text)
         self._sent: dict[tuple[str, str, str], int] = {}                  # calls given to each computer since the last reset (for the shares)
@@ -240,11 +250,9 @@ class OllamaPool:
         for client in self.clients:
             client.limits, client.cancelled = self.limits, self.cancelled
 
-    def models(self, timeout: float = 5) -> list[str]:
-        found: set[str] = set()
-        models = {}
-        digests = {}
-        errors = []
+    def _probe(self, clients: list[Ollama], timeout: float):
+        with self._lock:
+            versions = dict(self._failure_versions)
         def probe(client):
             try:
                 # Health checks must not inherit the cancellation callback of an
@@ -254,23 +262,77 @@ class OllamaPool:
             except OllamaError as error:
                 return client.base_url, [], str(error)
 
-        # One unavailable helper must not delay checks of every other computer.
-        # Publish the complete snapshot together so ongoing work never sees a
-        # partially cleared model/digest catalogue.
-        with ThreadPoolExecutor(max_workers=min(8, len(self.clients))) as executor:
-            for url, listed, error in executor.map(probe, self.clients):
+        with ThreadPoolExecutor(max_workers=min(8, len(clients))) as executor:
+            results = list(executor.map(probe, clients))
+        with self._lock:
+            for url, listed, error in results:
+                # A successful probe begun before a newer inference failure must
+                # not silently put that computer back in service.
+                if self._failure_versions.get(url, 0) != versions.get(url, 0):
+                    continue
                 if error is not None:
-                    errors.append(error)
+                    self._models.pop(url, None)
+                    self._failed.add(url)
                     continue
                 names = {m["name"] for m in listed}
-                models[url] = names
-                digests[url] = {m["name"]: m.get("digest", "") for m in listed}
-                found.update(names)
+                self._models[url] = names
+                self._digests[url] = {m["name"]: m.get("digest", "") for m in listed}
+                self._failed.discard(url)
+            self._lock.notify_all()
+        return results
+
+    def models(self, timeout: float = 5) -> list[str]:
+        # Publish the complete result under the lock, never a partial catalogue.
+        with self._probe_lock:
+            results = self._probe(self.clients, timeout)
         with self._lock:
-            self._models, self._digests = models, digests
-        if not models:
+            found = set().union(*self._models.values()) if self._models else set()
+            available = bool(self._models)
+        if not available:
+            errors = [error for _, _, error in results if error]
             raise OllamaError("Aucun ordinateur d'analyse ne répond : " + "; ".join(errors))
         return sorted(found)
+
+    def _recover(self) -> None:
+        """Probe disconnected computers independently of the UI and running calls."""
+        with self._probe_lock:
+            with self._lock:
+                missing = [c for c in self.clients if c.base_url in self._failed or c.base_url not in self._models]
+            if missing:
+                self._probe(missing, timeout=1)
+
+    @contextmanager
+    def _watch_reconnections(self):
+        with self._lock:
+            self._pending += 1
+            if self._monitor is None:
+                self._monitor = threading.Thread(target=self._monitor_reconnections, daemon=True, name="ollama-reconnect")
+                self._monitor.start()
+        try:
+            yield
+        finally:
+            with self._lock:
+                self._pending -= 1
+                self._lock.notify_all()
+
+    def _monitor_reconnections(self) -> None:
+        try:
+            while True:
+                with self._lock:
+                    if not self._pending or self.cancelled():
+                        return
+                    # Notifications wake dispatchers, but do not cause a probe storm.
+                    self._lock.wait_for(lambda: not self._pending or self.cancelled(), timeout=RECOVERY_INTERVAL)
+                    if not self._pending or self.cancelled():
+                        return
+                self._recover()
+        finally:
+            with self._lock:
+                self._monitor = None
+                if self._pending and not self.cancelled():
+                    self._monitor = threading.Thread(target=self._monitor_reconnections, daemon=True, name="ollama-reconnect")
+                    self._monitor.start()
+                self._lock.notify_all()
 
     def known_models(self) -> dict[str, list[str]]:
         """The models that each computer listed the last time it was asked (no network call): a computer that is not in it did not answer."""
@@ -279,8 +341,6 @@ class OllamaPool:
 
     def retry_failed(self) -> None:
         """For a pool that lives for ever (the debates): a computer that failed is tried again, and the lists of models are read again. The counters of the live report are kept."""
-        with self._lock:
-            self._failed.clear()
         with suppress(OllamaError):
             self.models(timeout=2)
 
@@ -288,6 +348,7 @@ class OllamaPool:
         """Try previously failed helpers again for a new analysis."""
         with self._lock:
             self._failed.clear()
+            self._references.clear()
             self._sent.clear()
             self._activity.clear()
             self._measurements.clear()
@@ -309,12 +370,10 @@ class OllamaPool:
         return result
 
     def _eligible(self, model: str) -> list[Ollama]:
-        if not self._models:
-            self.models()
         candidates = [client for client in self.clients if client.base_url not in self._failed and (model in self._models.get(client.base_url, set())
                       or f"{model}:latest" in self._models.get(client.base_url, set()))]
         # One vector space must not contain embeddings from different model builds.
-        reference = next((self._digests.get(c.base_url, {}).get(model) or self._digests.get(c.base_url, {}).get(f"{model}:latest")
+        reference = self._references.get(model.removesuffix(":latest")) or next((self._digests.get(c.base_url, {}).get(model) or self._digests.get(c.base_url, {}).get(f"{model}:latest")
                           for c in reversed(self.clients) if self._digests.get(c.base_url, {}).get(model)
                           or self._digests.get(c.base_url, {}).get(f"{model}:latest")), None)
         return [c for c in candidates if not reference or (self._digests.get(c.base_url, {}).get(model)
@@ -322,6 +381,14 @@ class OllamaPool:
 
     def parallelism_for(self, model: str) -> int:
         eligible = self._eligible(model)
+        if self.shares:
+            eligible = [c for c in eligible if self.shares.get(c.base_url, 0) > 0] or eligible
+        return max(1, len(eligible))
+
+    def capacity_for(self, model: str) -> int:
+        # Reserve slots for configured computers too: a reconnection must be
+        # able to receive work even when only one host was online at stage start.
+        eligible = self.clients
         if self.shares:
             eligible = [c for c in eligible if self.shares.get(c.base_url, 0) > 0] or eligible
         return max(1, len(eligible))
@@ -405,29 +472,52 @@ class OllamaPool:
 
     def _dispatch(self, method: str, *args):
         self._sync()
+        if not self._models:
+            try:
+                self.models(timeout=1)
+            except OllamaError as error:
+                raise OllamaUnavailable(str(error)) from error
+        with self._watch_reconnections():
+            return self._dispatch_watched(method, *args)
+
+    def _dispatch_watched(self, method: str, *args):
+        attempted: set[str] = set()
+        refreshed = False
         while True:
             with self._lock:
                 while True:
                     if self.cancelled():
                         raise InterruptedError("analyse annulée")
-                    eligible = self._eligible(args[0])
+                    eligible = [c for c in self._eligible(args[0]) if c.base_url not in attempted]
                     if not eligible:
-                        raise OllamaError(f"Le modèle {args[0]} n'est disponible sur aucun ordinateur d'analyse")
+                        client = None
+                        break
                     wanted = [c for c in eligible if not self.shares or self.shares.get(c.base_url, 0) > 0] or eligible
                     free = [c for c in wanted if not self._busy.get(c.base_url, 0)]
                     if free:
                         shares = self._adaptive.get((method, args[0]), self.shares)
                         client = self._pick(free, shares, (method, args[0]))
+                        digest = self._digests.get(client.base_url, {}).get(args[0]) or self._digests.get(client.base_url, {}).get(f"{args[0]}:latest")
+                        if digest:
+                            self._references.setdefault(args[0].removesuffix(":latest"), digest)
                         self._busy[client.base_url] = 1
                         break
                     self._lock.wait(timeout=0.1)
+            if client is None:
+                if refreshed:
+                    raise OllamaUnavailable(f"Aucun ordinateur compatible ne peut poursuivre l'analyse avec le modèle {args[0]}")
+                # Discover a just-reconnected host before declaring a total
+                # outage. Do not hold the scheduling lock during network calls.
+                self._recover()
+                refreshed = True
+                continue
             try:
                 return self._timed(client, method, *args)
             except OllamaError:
                 with self._lock:
                     self._failed.add(client.base_url)
-                if not self._eligible(args[0]):
-                    raise
+                    self._failure_versions[client.base_url] = self._failure_versions.get(client.base_url, 0) + 1
+                    attempted.add(client.base_url)
             finally:
                 with self._lock:
                     self._busy[client.base_url] = 0
@@ -440,7 +530,7 @@ class OllamaPool:
         if len(groups) < 2:
             return [self.embed(model, group) for group in groups]
         self._sync()
-        with ThreadPoolExecutor(max_workers=min(self.parallelism_for(model), len(groups))) as executor:
+        with ThreadPoolExecutor(max_workers=min(self.capacity_for(model), len(groups))) as executor:
             return list(executor.map(lambda group: self.embed(model, group), groups))
 
     def chat_json(self, model: str, system: str, user: str, schema: dict, num_ctx: int = 8192) -> dict:
