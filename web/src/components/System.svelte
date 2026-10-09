@@ -165,6 +165,9 @@
   let perf = $state(null);          // /api/performance: settings, presets, limits, keep_alive, cpu_count
   let workers = $state(null);
   let workerUrl = $state('');
+  let workerName = $state('');
+  let workerNames = $state({});
+  let nameSaving = $state(false);
   let workerNote = $state('');
   let shareForm = $state(null);     // the percentage of the work by computer ("local" is the server), while it is edited
   const shareKey = (worker) => (worker.local ? 'local' : worker.url);
@@ -190,6 +193,7 @@
   async function loadWorkers() {
     try {
       workers = await api.analysisWorkers();
+      workerNames = { ...workers.names };
       shareForm = { ...workers.shares };
     } catch (error) {
       if (error instanceof AuthError) onAuthLost();
@@ -197,16 +201,38 @@
     }
   }
 
-  async function saveWorkers(urls) {
+  async function saveWorkers(urls, names = {}) {
     workerNote = '';
     try {
-      workers = await api.analysisWorkersSave(urls);
+      workers = await api.analysisWorkersSave(urls, names);
+      workerNames = { ...workers.names };
       shareForm = { ...workers.shares };
       workerUrl = '';
+      workerName = '';
       workerNote = 'Liste enregistrée. Les prochaines analyses utiliseront les ordinateurs connectés.';
     } catch (error) {
       if (error instanceof AuthError) onAuthLost();
       else workerNote = error.message;
+    }
+  }
+
+  async function renameWorker(worker) {
+    if (nameSaving) return;
+    const key = shareKey(worker);
+    const submittedName = workerNames[key] ?? '';
+    nameSaving = true;
+    workerNote = '';
+    try {
+      const saved = await api.analysisWorkerRename(key, submittedName);
+      worker.name = saved.name;
+      if (workerNames[key] === submittedName) workerNames[key] = saved.name;
+      workers.names = { ...workers.names, [key]: saved.name };
+      workerNote = 'Nom enregistré.';
+    } catch (error) {
+      if (error instanceof AuthError) onAuthLost();
+      else workerNote = error.message;
+    } finally {
+      nameSaving = false;
     }
   }
 
@@ -414,7 +440,8 @@
         {#if debateFleet?.computers?.length}
           {#if !debateFleet.fresh}<p class="muted small">Dernier état connu · {duration(debateFleet.age_seconds)}</p>{/if}
           <ul class="workerList">{#each debateFleet.computers as machine (machine.url)}<li>
-            <strong>{machine.local ? 'Serveur' : machine.url}</strong>
+            <strong>{machine.name || (machine.local ? 'Serveur' : machine.url)}</strong>
+            {#if machine.name}<code class="muted small">{machine.url}</code>{/if}
             <span class="badge" class:danger={!machine.online || !machine.has_model}>{!machine.online ? 'Hors ligne' : !machine.has_model ? 'Modèle absent' : machine.active ? 'En cours' : 'Disponible'}</span>
             <span class="muted small">{machine.calls} vérifications · {duration(machine.average)} en moyenne · {machine.observed} % · {machine.errors} erreurs</span>
             {#if machine.last_error}<span class="muted small">{machine.last_error}</span>{/if}
@@ -607,12 +634,16 @@
               {#each workers.workers as worker}
                 <li><span class="badge" class:success={worker.online} class:danger={!worker.online}>{worker.online ? 'Connecté' : 'Hors ligne'}</span>
                   <code>{worker.local ? 'Serveur' : worker.url}</code>
+                  <form class="workerName" onsubmit={(event) => { event.preventDefault(); renameWorker(worker); }}>
+                    <input class="field-input" type="text" maxlength="80" placeholder={worker.local ? 'Serveur' : 'Nom de l’ordinateur'} aria-label={`Nom de ${worker.local ? 'le serveur' : worker.url}`} value={workerNames[shareKey(worker)] ?? ''} oninput={(event) => workerNames[shareKey(worker)] = event.currentTarget.value} />
+                    <button type="submit" class="btn" disabled={nameSaving || (workerNames[shareKey(worker)] ?? '').trim() === (worker.name ?? '')}>Enregistrer le nom</button>
+                  </form>
                   {#if worker.online}<span class="muted small">{worker.usable?.length ? `Utilisé pour : ${worker.usable.join(', ')}` : 'Aucun modèle compatible avec le serveur'}</span>{/if}
                   {#if !worker.local}<button type="button" class="btn" onclick={() => saveWorkers(workers.configured.filter((url) => url !== worker.url))}>Retirer</button>{/if}
                   {#if shareForm && workers.workers.length > 1}
                     <label class="shareRow">
                       <span class="muted small">Part initiale du travail</span>
-                      <input type="range" min="0" max="100" step="1" value={shareForm[shareKey(worker)] ?? 0} oninput={(e) => setShare(shareKey(worker), e.currentTarget.value)} aria-label={`Part du travail de ${worker.local ? 'le serveur' : worker.url}, en pourcentage`} />
+                      <input type="range" min="0" max="100" step="1" value={shareForm[shareKey(worker)] ?? 0} oninput={(e) => setShare(shareKey(worker), e.currentTarget.value)} aria-label={`Part du travail de ${worker.name || (worker.local ? 'le serveur' : worker.url)}, en pourcentage`} />
                       <input class="field-input shareNumber" type="number" min="0" max="100" value={shareForm[shareKey(worker)] ?? 0} oninput={(e) => setShare(shareKey(worker), e.currentTarget.value)} aria-label="Pourcentage" /> %
                     </label>
                   {/if}
@@ -628,8 +659,9 @@
             {/if}
           {:else}<p class="muted small">Le serveur travaille seul pour le moment.</p>{/if}
           <div class="actions">
+            <input class="field-input" type="text" placeholder="Nom de l’ordinateur" maxlength="80" aria-label="Nom du nouvel ordinateur" bind:value={workerName} />
             <input class="field-input" type="url" placeholder="http://100.x.y.z:11434" aria-label="Adresse Tailscale de l’ordinateur" bind:value={workerUrl} />
-            <button type="button" class="btn" disabled={!workerUrl.trim()} onclick={() => saveWorkers([...(workers?.configured ?? []), workerUrl.trim()])}>Ajouter un ordinateur</button>
+            <button type="button" class="btn" disabled={!workerUrl.trim()} onclick={() => saveWorkers([...(workers?.configured ?? []), workerUrl.trim()], workerName.trim() ? { [workerUrl.trim()]: workerName.trim() } : {})}>Ajouter un ordinateur</button>
             <button type="button" class="btn" onclick={loadWorkers}>Actualiser l’état</button>
           </div>
           {#if workerNote}<span class="muted small" role="status">{workerNote}</span>{/if}
@@ -868,6 +900,7 @@
   .workerPanel .field-input { flex: 1 1 16rem; max-width: 25rem; }
   .workerList { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
   .workerList li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.625rem; }
+  .workerName { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; flex: 1 1 100%; }
   .shareRow { display: flex; align-items: center; gap: 0.5rem; flex: 1 1 100%; }
   .shareRow input[type="range"] { flex: 1 1 8rem; max-width: 18rem; }
   .shareNumber { width: 4.5rem; flex: 0 0 auto; }

@@ -87,8 +87,9 @@
         {#each computers as machine (machine.url)}
           <li class:busy={machine.active > 0} class:down={machine.failed}>
             <span class="dot" aria-hidden="true"></span>
-            <strong>{machine.local ? 'Serveur' : machine.url.replace('http://', '')}</strong>
+            <strong>{machine.name || (machine.local ? 'Serveur' : machine.url.replace('http://', ''))}</strong>
             <span class="share" title="Part des calculs reçus, et part visée par le réglage">{machine.observed} %{machine.share !== null ? ` / ${machine.share} % visés` : ''}</span>
+            {#if machine.name}<span class="address muted small">{machine.url.replace('http://', '')}</span>{/if}
             <span class="state">
               {#if machine.failed}Hors service pour cette tâche
               {:else if machine.active > 0}Calcule : {machine.kind}{machine.running_for !== null ? ` · depuis ${Math.round(machine.running_for)} s` : ''}
@@ -118,7 +119,7 @@
   .task progress { flex: 1 1 14rem; height: .7rem; accent-color: var(--accent, #8b6cff); }
   .numbers { font-variant-numeric: tabular-nums; color: var(--text-secondary); }
   .log pre { max-height: 10rem; overflow: auto; font-size: .75rem; white-space: pre-wrap; }
-  .machines { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: .6rem; }
+  .machines { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, max(19rem, calc((100% - 1.8rem) / 4))), 1fr)); gap: .6rem; }
   .machines li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .3rem .6rem; padding: .85rem .95rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--bg-secondary); font-size: .8125rem; font-variant-numeric: tabular-nums; }
   .machines li.busy { border-color: var(--accent, #8b6cff); box-shadow: inset 0 0 0 1px var(--accent, #8b6cff); }
   .machines li.down { opacity: .7; }
@@ -127,6 +128,7 @@
   li.down .dot { background: var(--danger, #d9534f); }
   .machines strong { color: var(--text-primary); overflow-wrap: anywhere; }
   .machines .state, .machines .numbers { grid-column: 1 / -1; color: var(--text-secondary); }
+  .machines .address { grid-column: 1 / -1; overflow-wrap: anywhere; }
   .machines .share { color: var(--text-primary); font-weight: 600; }
   .machines progress { grid-column: 1 / -1; width: 100%; height: .5rem; accent-color: var(--accent, #8b6cff); }
   .machines .err { grid-column: 1 / -1; color: var(--danger, #d9534f); overflow-wrap: anywhere; }

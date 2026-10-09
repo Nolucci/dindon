@@ -4,6 +4,34 @@ Dindon peut faire calculer les vecteurs des conversations par son serveur Debian
 
 Les calculs indépendants de vecteurs, de positions et d’axes peuvent être traités en parallèle, avec au plus un calcul par ordinateur. Chaque étape attend les résultats nécessaires avant de passer à la suivante. Le gain dépend du nombre de conversations en attente, de la vitesse de chaque ordinateur et du réseau.
 
+## Installation automatique sur Linux
+
+Copier uniquement [`install-analysis-linux.sh`](../tools/host/install-analysis-linux.sh) sur l’ordinateur à ajouter, puis exécuter :
+
+```sh
+sudo bash install-analysis-linux.sh
+```
+
+Le fichier est autonome : il contient aussi le relais thermique. Il installe les paquets avec apt-get, dnf ou zypper, installe Ollama et Tailscale si nécessaire, télécharge `qwen3.5:4b` et `leoipulsar/harrier-0.6b`, configure le démarrage automatique et partage l’API dans Tailscale. Il réserve la RAM à une requête et un modèle chargé à la fois, avec un contexte de 8 192 tokens pour les lectures Dindon. Il vérifie réellement les vecteurs et une réponse JSON avant d’annoncer que l’installation est terminée. La durée dépend des téléchargements et de la vitesse du CPU.
+
+Ouvrir le lien de connexion Tailscale affiché et choisir le réseau utilisé par Dindon. Pour une connexion sans navigateur, fournir une **nouvelle clé** dans un fichier local :
+
+```sh
+sudo bash install-analysis-linux.sh --auth-key-file /chemin/cle-tailscale.txt
+```
+
+L’installateur n’enregistre pas cette clé. La connexion par fichier suit la [documentation Tailscale](https://tailscale.com/docs/reference/tailscale-cli/up).
+
+La protection thermique CPU est activée automatiquement si des capteurs sont reconnus. Sans capteur, notamment dans une VM, l’installation continue en indiquant que la protection est indisponible. Pour exiger cette protection et refuser le partage sans capteur :
+
+```sh
+sudo bash install-analysis-linux.sh --require-thermal
+```
+
+Linux doit utiliser systemd et un processeur x86_64 ou ARM64. Une VM de 8 Go reste à valider sur des analyses complètes ; une seule lecture de vérification ne garantit pas que tous les messages tiendront en mémoire. Les modèles doivent correspondre aux versions exactes utilisées par le serveur.
+
+À la fin, copier l’adresse `http://100.x.y.z:11434` affichée dans **Système → Performance → Ordinateurs d’analyse**. Le script ne dispose pas de la connexion administrateur Dindon pour faire cet ajout lui-même. Il peut être relancé après une interruption et conserve la connexion Tailscale existante. Il redémarre Ollama sur l’ordinateur concerné : l’exécuter avant de lancer une analyse.
+
 ## 1. Réseau privé
 
 Installez Tailscale sur le [serveur Debian](https://tailscale.com/docs/install/linux), sur le [Mac](https://tailscale.com/docs/install/mac) et sur chaque [PC Windows](https://tailscale.com/docs/install/windows), puis connectez-les au **même réseau privé Tailscale**. Sur Debian, la méthode rapide indiquée par Tailscale est :
@@ -65,7 +93,7 @@ cd /srv/dindon
 sudo docker compose exec -T app python -c 'import json,urllib.request; print([m["name"] for m in json.load(urllib.request.urlopen("http://100.x.y.z:11434/api/tags", timeout=5))["models"]])'
 ```
 
-Puis dans **Système → Performance → Ordinateurs d'analyse**, ajoutez `http://100.x.y.z:11434`. L'état doit passer à **Connecté** après « Actualiser l'état » et indiquer les modèles utilisés. Si un modèle porte le bon nom mais n'a pas la même empreinte que sur le serveur, Dindon écarte cet ordinateur pour ce modèle afin de ne pas mélanger deux espaces de vecteurs. Vous pouvez ajouter un Mac et plusieurs PC Windows ; la liste est conservée dans la base, même après un redémarrage. Une modification est refusée pendant une analyse pour ne pas interrompre ses calculs.
+Puis dans **Système → Performance → Ordinateurs d'analyse**, ajoutez `http://100.x.y.z:11434` avec un nom, par exemple « PC Pilgrimeru » ou « VM Linux ». Le nom peut être modifié à tout moment, y compris pendant une analyse. Il est conservé après redémarrage et affiché avec l’adresse dans le suivi et les débats. L'état doit passer à **Connecté** après « Actualiser l'état » et indiquer les modèles utilisés. Si un modèle porte le bon nom mais n'a pas la même empreinte que sur le serveur, Dindon écarte cet ordinateur pour ce modèle afin de ne pas mélanger deux espaces de vecteurs. Vous pouvez ajouter un Mac et plusieurs PC Windows ; la liste est conservée dans la base, même après un redémarrage. Une modification est refusée pendant une analyse pour ne pas interrompre ses calculs.
 
 Ne mettez pas à jour le modèle de vecteurs du serveur juste pour rendre un ordinateur compatible si des vecteurs ont déjà été calculés : les anciens vecteurs restent associés au nom du modèle. Faites correspondre la version de l'auxiliaire à celle du serveur ou planifiez une reconstruction complète des vecteurs.
 

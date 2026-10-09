@@ -11,6 +11,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from dindon import digest as digest_of
+from dindon.analysis import helpers
 from dindon.analysis.embeddings import conversation_texts
 from dindon.analysis.job import STAGES, AnalysisBusy, NotReady
 from dindon.analysis.ollama import OllamaPool
@@ -93,9 +94,11 @@ def live(request: Request) -> dict:
     state = request.app.state
     analysis, reread = state.analysis.status(), state.reread.status()
     client = state.analysis.client
+    with state.pool.connection() as conn:
+        names = helpers.load_names(conn)
     return {"now": time.time(), "analysis": {k: v for k, v in analysis.items() if k != "computers"}, "reread": reread,
             "pool": isinstance(client, OllamaPool) and len(client.clients) > 1,
-            "computers": client.activity() if isinstance(client, OllamaPool) and len(client.clients) > 1 else []}
+            "computers": helpers.with_names(client.activity(), names) if isinstance(client, OllamaPool) and len(client.clients) > 1 else []}
 
 
 @router.post("/analysis")

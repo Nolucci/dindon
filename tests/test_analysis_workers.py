@@ -512,3 +512,57 @@ def test_all_computers_down_stops_without_retrying_same_work_forever(monkeypatch
         pool.embed('vectors', ['a'])
     assert set(attempted) == {c.base_url for c in pool.clients}
     assert len(attempted) == 2
+
+
+def test_computer_names_persist_and_rename_does_not_interrupt_or_rebalance(ingest_url, ingest_db, tmp_path, monkeypatch):
+    import json
+    from dindon.analysis.job import AnalysisBusy
+
+    monkeypatch.setattr(OllamaPool, 'status', lambda self, wanted: [{'url': c.base_url, 'online': True, 'models': [], 'usable': [], 'local': c is self.local} for c in self.clients])
+    monkeypatch.setattr(Ollama, 'models', lambda *_args, **_kwargs: [])
+    url = 'http://100.114.220.82:11434'
+    settings = settings_for(ingest_url, tmp_path, 'password')
+    with TestClient(create_app(settings, background=False)) as web:
+        assert web.patch('/api/performance/workers/name', json={'key': url, 'name': 'PC Alice'}).status_code == 401
+        web.post('/api/login', json={'password': 'password'})
+        added = web.put('/api/performance/workers', json={'urls': [url], 'names': {url: 'PC Alice'}}).json()
+        assert added['workers'][0]['name'] == 'PC Alice'
+        web.put('/api/performance/workers/shares', json={'shares': {'local': 30, url: 70}})
+        pool = web.app.state.analysis.client
+        pool._act(url)['calls'] = 4
+        # Renaming must succeed even when changing the pool would be refused.
+        monkeypatch.setattr(web.app.state.analysis, 'configure_helpers', lambda *_args, **_kwargs: (_ for _ in ()).throw(AnalysisBusy()))
+        renamed = web.patch('/api/performance/workers/name', json={'key': url + '/', 'name': '  PC   Pilgrimeru  '})
+        assert renamed.json() == {'key': url, 'name': 'PC Pilgrimeru'}
+        assert web.app.state.analysis.client is pool and pool._act(url)['calls'] == 4
+        assert pool.shares == {pool.local.base_url: 30, url: 70}
+        live = web.get('/api/analysis/live').json()['computers']
+        assert next(c for c in live if c['url'] == url)['name'] == 'PC Pilgrimeru'
+        ingest_db.execute("INSERT INTO service_status (name, updated_at, data) VALUES ('debate_computers', now(), %s::jsonb)",
+                          (json.dumps({'computers': [{'url': url, 'local': False}], 'model': 'm'}),))
+        assert web.get('/api/debates/computers').json()['computers'][0]['name'] == 'PC Pilgrimeru'
+        assert web.patch('/api/performance/workers/name', json={'key': 'local', 'name': 'Serveur Debian'}).status_code == 200
+        assert web.patch('/api/performance/workers/name', json={'key': 'http://100.64.0.99:11434', 'name': 'Inconnu'}).status_code == 422
+        assert web.patch('/api/performance/workers/name', json={'key': url, 'name': 'x' * 81}).status_code == 422
+    with TestClient(create_app(settings, background=False)) as web:
+        web.post('/api/login', json={'password': 'password'})
+        answer = web.get('/api/performance/workers').json()
+        assert answer['names'] == {url: 'PC Pilgrimeru', 'local': 'Serveur Debian'}
+        assert answer['shares'] == {'local': 30, url: 70}
+        assert web.patch('/api/performance/workers/name', json={'key': url, 'name': '   '}).status_code == 200
+        assert url not in web.get('/api/performance/workers').json()['names']
+
+
+def test_invalid_name_on_add_keeps_existing_pool_and_saved_configuration(ingest_url, ingest_db, tmp_path, monkeypatch):
+    monkeypatch.setattr(OllamaPool, 'status', lambda self, wanted: [])
+    monkeypatch.setattr(Ollama, 'models', lambda *_args, **_kwargs: [])
+    with TestClient(create_app(settings_for(ingest_url, tmp_path, 'password'), background=False)) as web:
+        web.post('/api/login', json={'password': 'password'})
+        url = 'http://100.64.0.9:11434'
+        web.put('/api/performance/workers', json={'urls': [url], 'names': {url: 'VM Linux'}})
+        pool = web.app.state.analysis.client
+        failed = web.put('/api/performance/workers', json={'urls': [url, 'http://100.64.0.10:11434'], 'names': {url: 'x' * 81}})
+        assert failed.status_code == 422
+        assert web.app.state.analysis.client is pool
+        assert helpers.load(ingest_db) == (url,)
+        assert helpers.load_names(ingest_db) == {url: 'VM Linux'}

@@ -3,6 +3,7 @@ its exact quotations and its links (docs/regles-du-bot.md). Read only. People wh
 not Discord."""
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from dindon.analysis import helpers
 from dindon.api.auth import require_session
 from dindon.debate import claims, stats
 from dindon.debate.checker import resolve_mode
@@ -38,10 +39,11 @@ def computers(request: Request) -> dict:
     and durations only, never a text. `fresh` is false when the bot has said nothing lately (no debate runs, or the bot is stopped)."""
     with request.app.state.pool.connection() as conn:
         row = conn.execute("SELECT data, extract(epoch FROM now() - updated_at) AS age FROM service_status WHERE name = 'debate_computers'").fetchone()
+        names = helpers.load_names(conn)
     if row is None:
         return {"computers": [], "model": None, "age_seconds": None, "fresh": False}
     data = row["data"] or {}
-    return {"computers": data.get("computers", []), "model": data.get("model"), "age_seconds": round(float(row["age"])), "fresh": float(row["age"]) <= COMPUTERS_STALE_SECONDS}
+    return {"computers": helpers.with_names(data.get("computers", []), names), "model": data.get("model"), "age_seconds": round(float(row["age"])), "fresh": float(row["age"]) <= COMPUTERS_STALE_SECONDS}
 
 
 @router.get("/{debate_id}")

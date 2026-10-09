@@ -32,7 +32,7 @@
   let summaryTimer;
   const SUMMARY_PERIOD = 20 * 60 * 1000;
   const duration = (seconds) => seconds == null ? '—' : seconds < 60 ? `${Math.round(seconds)} s` : `${Math.floor(seconds / 60)} min`;
-  const machineName = (machine) => { if (machine.local) return 'Serveur'; try { return new URL(machine.url).host; } catch { return machine.url; } };
+  const machineName = (machine) => { if (machine.name) return machine.name; if (machine.local) return 'Serveur'; try { return new URL(machine.url).host; } catch { return machine.url; } };
   const machineState = (machine) => fleetError || !fleet?.fresh ? 'État ancien' : !machine.online ? 'Hors ligne' : !machine.has_model ? 'Modèle absent' : machine.active ? 'En cours' : 'Disponible';
   const fleetCalls = $derived((fleet?.computers ?? []).reduce((sum, machine) => sum + (machine.calls || 0), 0));
   const share = (machine) => (fleetCalls ? Math.round(100 * (machine.calls || 0) / fleetCalls) : 0);
@@ -123,6 +123,7 @@
           <span class="dot" aria-hidden="true"></span>
           <strong title={machine.url}>{machineName(machine)}</strong>
           <span class="share" title="Part des vérifications faites par cet ordinateur">{share(machine)} %</span>
+          {#if machine.name}<span class="address muted small">{machine.url.replace('http://', '')}</span>{/if}
           <span class="state">{machineState(machine)}{#if live && machine.active} · depuis {duration(machine.running_for)}{/if}</span>
           <progress max="100" value={share(machine)} aria-label="Part des vérifications faites"></progress>
           <span class="numbers">{machine.calls} vérification{machine.calls > 1 ? 's' : ''}{machine.average != null ? ` · ${duration(machine.average)} en moyenne` : ''}</span>
@@ -287,7 +288,7 @@
   .source { overflow-wrap: anywhere; }
 
   .fleet { display: flex; flex-direction: column; gap: .75rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-subtle); }
-  .machines { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: .6rem; }
+  .machines { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, max(19rem, calc((100% - 1.8rem) / 4))), 1fr)); gap: .6rem; }
   .machines > li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .3rem .6rem; padding: .85rem .95rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--bg-secondary); font-size: .8125rem; font-variant-numeric: tabular-nums; }
   .machines > li.working { border-color: var(--accent, #8b6cff); box-shadow: inset 0 0 0 1px var(--accent, #8b6cff); }
   .machines > li.down { opacity: .7; }
@@ -297,6 +298,7 @@
   .machines strong { color: var(--text-primary); min-width: 0; overflow-wrap: anywhere; }
   .machines .share { color: var(--text-primary); font-weight: 600; }
   .machines .state, .machines .numbers, .machines .err { grid-column: 1 / -1; color: var(--text-secondary); }
+  .machines .address { grid-column: 1 / -1; overflow-wrap: anywhere; }
   .machines .err { color: var(--danger, #d9534f); overflow-wrap: anywhere; }
   .machines progress { grid-column: 1 / -1; width: 100%; height: .5rem; accent-color: var(--accent, #8b6cff); }
   @keyframes machine-pulse { 50% { opacity: .35; } }

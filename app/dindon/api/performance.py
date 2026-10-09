@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from dindon import performance
 from dindon.analysis import helpers
 from dindon.analysis.job import AnalysisBusy
-from dindon.analysis.ollama import OllamaPool
+from dindon.analysis.ollama import OllamaError, OllamaPool
 from dindon.api.auth import require_session
 from fastapi import HTTPException
 
@@ -26,18 +26,29 @@ def _equal(keys: list[str]) -> dict[str, int]:
 def workers(request: Request) -> dict:
     """Only the logged-in administrator can see the configured analysis computers."""
     client = request.app.state.analysis.client
-    if not isinstance(client, OllamaPool):
-        return {"workers": [], "configured": [], "shares": {helpers.LOCAL: 100}}
-    configured = [c.base_url for c in client.clients if c is not client.local]
+    configured = [c.base_url for c in client.clients if c is not client.local] if isinstance(client, OllamaPool) else []
     keys = [helpers.LOCAL, *configured]
     with request.app.state.pool.connection() as conn:
         stored = helpers.load_shares(conn)
+        names = helpers.load_names(conn)
     shares = stored if stored and set(stored) == set(keys) else _equal(keys)
-    return {"workers": client.status((request.app.state.analysis.embed_model, request.app.state.analysis.name_model)), "configured": configured, "shares": shares}
+    wanted = (request.app.state.analysis.embed_model, request.app.state.analysis.name_model)
+    if isinstance(client, OllamaPool):
+        rows = client.status(wanted)
+    else:
+        try:
+            installed = client.models(timeout=2)
+            online = True
+        except OllamaError:
+            installed, online = [], False
+        rows = [{"url": client.base_url, "local": True, "online": online, "models": installed,
+                 "usable": [m for m in wanted if m in installed or f"{m}:latest" in installed]}]
+    return {"workers": helpers.with_names(rows, names), "configured": configured, "shares": shares, "names": names}
 
 
 class WorkerList(BaseModel):
     urls: list[str] = Field(max_length=8)
+    names: dict[str, str] = Field(default_factory=dict, max_length=9)
 
 
 @router.put("/workers")
@@ -45,6 +56,8 @@ def set_workers(request: Request, body: WorkerList) -> dict:
     try:
         with request.app.state.pool.connection() as conn, conn.transaction():
             urls = helpers.save(conn, body.urls)
+            for key, name in body.names.items():
+                helpers.save_name(conn, key, name, list(urls))
             request.app.state.analysis.configure_helpers(urls)      # a new list starts again from an equal split
             helpers.clear_shares(conn)
     except ValueError as error:
@@ -52,6 +65,23 @@ def set_workers(request: Request, body: WorkerList) -> dict:
     except AnalysisBusy:
         raise HTTPException(status_code=409, detail="Attendez la fin de l'analyse avant de modifier les ordinateurs.") from None
     return workers(request)
+
+
+class WorkerName(BaseModel):
+    key: str = Field(max_length=256)
+    name: str = Field(max_length=80)
+
+
+@router.patch("/workers/name")
+def rename_worker(request: Request, body: WorkerName) -> dict:
+    client = request.app.state.analysis.client
+    known = [c.base_url for c in client.clients if c is not client.local] if isinstance(client, OllamaPool) else []
+    try:
+        with request.app.state.pool.connection() as conn:
+            key, name = helpers.save_name(conn, body.key, body.name, known)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from None
+    return {"key": key, "name": name}
 
 
 class Shares(BaseModel):
